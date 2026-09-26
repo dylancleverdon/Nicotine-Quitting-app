@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Firewatch</string>
+    <string name="update_channel_name">App updates</string>
+    <string name="update_channel_description">Only used when an update needs a tap to finish.</string>
+</resources>

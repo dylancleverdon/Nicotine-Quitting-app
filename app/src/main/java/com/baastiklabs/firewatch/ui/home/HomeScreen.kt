@@ -1,0 +1,519 @@
+package com.baastiklabs.firewatch.ui.home
+
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import com.baastiklabs.firewatch.core.Baseline
+import com.baastiklabs.firewatch.core.BaselineStatus
+import com.baastiklabs.firewatch.core.CravingScale
+import com.baastiklabs.firewatch.core.Cravings
+import com.baastiklabs.firewatch.core.DaySummary
+import com.baastiklabs.firewatch.core.Days
+import com.baastiklabs.firewatch.core.localDate
+import com.baastiklabs.firewatch.core.model.Craving
+import com.baastiklabs.firewatch.core.model.CravingOutcome
+import com.baastiklabs.firewatch.core.model.Dose
+import com.baastiklabs.firewatch.core.model.Product
+import com.baastiklabs.firewatch.core.model.SleepKind
+import com.baastiklabs.firewatch.core.pieces
+import com.baastiklabs.firewatch.core.records.FirewatchData
+import com.baastiklabs.firewatch.core.toDose
+import com.baastiklabs.firewatch.ui.EstimateNote
+import com.baastiklabs.firewatch.ui.FirewatchViewModel
+import com.baastiklabs.firewatch.ui.Fmt
+import com.baastiklabs.firewatch.ui.Stat
+import com.baastiklabs.firewatch.ui.TimePickDialog
+import com.baastiklabs.firewatch.ui.theme.cravingColor
+import com.baastiklabs.firewatch.ui.toEpochMillis
+import kotlinx.coroutines.launch
+import kotlinx.datetime.TimeZone
+import java.time.LocalDate
+import java.time.LocalTime
+
+@Composable
+fun HomeScreen(vm: FirewatchViewModel, data: FirewatchData, now: Long, snackbar: SnackbarHostState) {
+    val repo = vm.repository
+    val scope = rememberCoroutineScope()
+    val haptic = LocalHapticFeedback.current
+    val tz = TimeZone.currentSystemDefault()
+    val today = now.localDate(tz)
+    val minute = now / 60_000
+    val summaries = remember(data, minute) { Days.summaries(data, tz, now) }
+    val todaySummary = summaries[today] ?: DaySummary(today)
+    val baseline = remember(data, minute) { Baseline.status(data, today, tz) }
+    val activeCraving = remember(data, minute) { Cravings.active(data, now) }
+    val todayDoses = remember(data, minute) { data.doses.filter { it.at.localDate(tz) == today }.sortedByDescending { it.at } }
+    val lastDoseAt = data.doses.maxOfOrNull { it.at }
+
+    var optionsFor by remember { mutableStateOf<Product?>(null) }
+    var editing by remember { mutableStateOf<Dose?>(null) }
+    var cravingSheet by remember { mutableStateOf(false) }
+    var sleepPicker by remember { mutableStateOf<SleepKind?>(null) }
+
+    fun logNow(product: Product, draft: DoseDraft? = null) {
+        scope.launch {
+            val at = draft?.at ?: repo.now()
+            val dose = repo.logDose(
+                product.toDose(
+                    id = repo.newId(),
+                    at = at,
+                    loggedAt = repo.now(),
+                    multiplier = draft?.multiplier ?: 1.0,
+                    duration = draft?.duration ?: com.baastiklabs.firewatch.core.model.Duration.FULL,
+                    acidicDrink = draft?.acidicDrink ?: false,
+                    tags = draft?.tags ?: emptyList(),
+                ),
+            )
+            val result = snackbar.showSnackbar(
+                message = "Logged ${product.name} · ${Fmt.piecesLabel(dose.pieces(data.referenceMg))}",
+                actionLabel = "Undo",
+                duration = SnackbarDuration.Short,
+            )
+            if (result == SnackbarResult.ActionPerformed) repo.deleteDose(dose.id)
+        }
+    }
+
+    fun logSleep(kind: SleepKind, at: Long) {
+        scope.launch {
+            val event = repo.logSleep(kind, at)
+            val label = if (kind == SleepKind.WAKE) "Good morning" else "Good night"
+            val result = snackbar.showSnackbar("$label · ${Fmt.time(at)}", actionLabel = "Undo", duration = SnackbarDuration.Short)
+            if (result == SnackbarResult.ActionPerformed) repo.deleteSleep(event.id)
+        }
+    }
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize().statusBarsPadding(),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        item {
+            Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Firewatch", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                Text(
+                    "by Baastik Labs",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(bottom = 3.dp),
+                )
+            }
+        }
+        item {
+            StatusCard(todaySummary, baseline, summaries, lastDoseAt, now)
+        }
+        item {
+            if (activeCraving != null) {
+                ActiveCravingCard(
+                    craving = activeCraving,
+                    now = now,
+                    onPassed = { scope.launch { repo.finishCraving(activeCraving.id, CravingOutcome.RODE_OUT) } },
+                    onUsed = { scope.launch { repo.finishCraving(activeCraving.id, CravingOutcome.USED) } },
+                )
+            } else {
+                OutlinedButton(
+                    onClick = { cravingSheet = true },
+                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                    shape = RoundedCornerShape(16.dp),
+                ) {
+                    Text("Craving? Log the urge", style = MaterialTheme.typography.titleSmall)
+                }
+            }
+        }
+        item {
+            Column {
+                Text("Log a dose", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Text(
+                    "Tap to log it now · hold for time, amount and more",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        items(data.homeProducts.chunked(2)) { row ->
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                row.forEach { product ->
+                    ProductButton(
+                        product = product,
+                        referenceMg = data.referenceMg,
+                        modifier = Modifier.weight(1f),
+                        onTap = {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            logNow(product)
+                        },
+                        onLongPress = {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            optionsFor = product
+                        },
+                    )
+                }
+                if (row.size == 1) Spacer(Modifier.weight(1f))
+            }
+        }
+        if (data.homeProducts.isEmpty()) {
+            item {
+                Text(
+                    "No products on the home screen. Add them in Settings → Products.",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
+        }
+        item {
+            SleepRow(
+                data = data,
+                today = LocalDate.now(),
+                onTap = { kind -> logSleep(kind, repo.now()) },
+                onLongPress = { kind -> sleepPicker = kind },
+            )
+        }
+        item {
+            Text("Today", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+        }
+        if (todayDoses.isEmpty()) {
+            item {
+                Text(
+                    "Nothing logged yet today.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        items(todayDoses, key = { it.id }) { dose ->
+            DoseRow(dose, data.referenceMg, onClick = { editing = dose })
+        }
+        item { EstimateNote(Modifier.padding(top = 8.dp)) }
+    }
+
+    optionsFor?.let { product ->
+        DoseSheet(
+            title = product.name,
+            kind = product.kind,
+            labelMg = product.labelMg,
+            absorption = product.absorption,
+            referenceMg = data.referenceMg,
+            initial = DoseDraft(at = repo.now()),
+            relativeTime = true,
+            saveLabel = "Log it",
+            onDismiss = { optionsFor = null },
+            onSave = { draft ->
+                optionsFor = null
+                logNow(product, draft)
+            },
+        )
+    }
+
+    editing?.let { dose ->
+        EditDoseSheet(vm, dose, data.referenceMg, snackbar, onDone = { editing = null })
+    }
+
+    if (cravingSheet) {
+        CravingSheet(
+            onDismiss = { cravingSheet = false },
+            onPick = { level ->
+                cravingSheet = false
+                scope.launch {
+                    val craving = repo.startCraving(level)
+                    val result = snackbar.showSnackbar(
+                        "Craving logged · ${level} ${CravingScale.level(level).name}. You've got this.",
+                        actionLabel = "Undo",
+                        duration = SnackbarDuration.Short,
+                    )
+                    if (result == SnackbarResult.ActionPerformed) repo.deleteCraving(craving.id)
+                }
+            },
+        )
+    }
+
+    sleepPicker?.let { kind ->
+        TimePickDialog(
+            title = if (kind == SleepKind.WAKE) "When did you wake up?" else "When did you go to sleep?",
+            initial = LocalTime.now(),
+            onDismiss = { sleepPicker = null },
+            onPick = { time ->
+                sleepPicker = null
+                var at = LocalDate.now().atTime(time)
+                if (at.toEpochMillis() > System.currentTimeMillis()) at = at.minusDays(1)
+                logSleep(kind, at.toEpochMillis())
+            },
+        )
+    }
+}
+
+/** Edit or delete an existing dose (shared with the day view). */
+@Composable
+fun EditDoseSheet(
+    vm: FirewatchViewModel,
+    dose: Dose,
+    referenceMg: Double,
+    snackbar: SnackbarHostState,
+    onDone: () -> Unit,
+) {
+    val scope = rememberCoroutineScope()
+    DoseSheet(
+        title = dose.productName.ifBlank { "Dose" },
+        kind = dose.kind,
+        labelMg = dose.labelMg,
+        absorption = dose.absorption,
+        referenceMg = referenceMg,
+        initial = DoseDraft(dose.at, dose.multiplier, dose.duration, dose.acidicDrink, dose.tags),
+        relativeTime = false,
+        saveLabel = "Save",
+        onDismiss = onDone,
+        onSave = { draft ->
+            onDone()
+            scope.launch {
+                vm.repository.updateDose(
+                    dose.copy(
+                        at = draft.at,
+                        multiplier = draft.multiplier,
+                        duration = draft.duration,
+                        acidicDrink = draft.acidicDrink,
+                        tags = draft.tags,
+                    ),
+                )
+            }
+        },
+        onDelete = {
+            onDone()
+            scope.launch {
+                vm.repository.deleteDose(dose.id)
+                val result = snackbar.showSnackbar("Dose deleted", actionLabel = "Undo", duration = SnackbarDuration.Short)
+                if (result == SnackbarResult.ActionPerformed) vm.repository.updateDose(dose)
+            }
+        },
+    )
+}
+
+@Composable
+private fun StatusCard(
+    today: DaySummary,
+    baseline: BaselineStatus,
+    summaries: Map<kotlinx.datetime.LocalDate, DaySummary>,
+    lastDoseAt: Long?,
+    now: Long,
+) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
+        shape = RoundedCornerShape(24.dp),
+    ) {
+        Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            when (baseline) {
+                BaselineStatus.NotStarted -> {
+                    Text("Baseline week", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+                    Text(
+                        "Starts with your first log. For 7 days Firewatch just watches, then it shows your starting tier.",
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
+                is BaselineStatus.InProgress -> {
+                    Text(
+                        "Baseline week · day ${baseline.dayNumber} of ${Baseline.DAYS}",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                    LinearProgressIndicator(
+                        progress = { baseline.dayNumber / Baseline.DAYS.toFloat() },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Text(
+                        "Just log as usual. Your starting tier appears after day ${Baseline.DAYS}.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                is BaselineStatus.Complete -> {
+                    val avg = Baseline.averagePiecesPerDay(summaries, baseline.startedOn)
+                    Text("Baseline week complete", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+                    Text(
+                        "Your baseline: about ${Fmt.pieces(avg)} pieces a day. Tiers and the next-piece battery arrive in an upcoming update.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+                Stat("≈ ${Fmt.pieces(today.pieces)}", "pieces today", big = true)
+                Stat("≈ ${Fmt.mg(today.absorbedMg)}", "absorbed today", big = true)
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+                Stat("${today.doseCount}", if (today.doseCount == 1) "dose" else "doses")
+                Stat(lastDoseAt?.let { Fmt.duration(now - it) } ?: "–", "since last")
+                Stat("${today.cravingsRodeOut} of ${today.cravings}", "cravings ridden out")
+            }
+        }
+    }
+}
+
+@Composable
+private fun ActiveCravingCard(craving: Craving, now: Long, onPassed: () -> Unit, onUsed: () -> Unit) {
+    val level = CravingScale.level(craving.intensity)
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
+        shape = RoundedCornerShape(20.dp),
+    ) {
+        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Surface(shape = RoundedCornerShape(50), color = cravingColor(craving.intensity)) {
+                    Text(
+                        "${craving.intensity}",
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = androidx.compose.ui.graphics.Color.White,
+                    )
+                }
+                Column {
+                    Text("Riding out a craving · ${level.name}", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                    Text("Started ${Fmt.ago(craving.at, now)}", style = MaterialTheme.typography.bodySmall)
+                }
+            }
+            Text(
+                "Most cravings pass within a few minutes. Tap when it does.",
+                style = MaterialTheme.typography.bodySmall,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Button(onClick = onPassed, modifier = Modifier.weight(1f)) { Text("It passed") }
+                OutlinedButton(onClick = onUsed, modifier = Modifier.weight(1f)) { Text("I used") }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun ProductButton(
+    product: Product,
+    referenceMg: Double,
+    modifier: Modifier,
+    onTap: () -> Unit,
+    onLongPress: () -> Unit,
+) {
+    val shape = RoundedCornerShape(20.dp)
+    val pieces = com.baastiklabs.firewatch.core.Absorption.pieces(
+        com.baastiklabs.firewatch.core.Absorption.absorbedMg(product),
+        referenceMg,
+    )
+    Surface(
+        color = MaterialTheme.colorScheme.primaryContainer,
+        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+        shape = shape,
+        modifier = modifier
+            .height(96.dp)
+            .clip(shape)
+            .combinedClickable(onClick = onTap, onLongClick = onLongPress),
+    ) {
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.SpaceBetween) {
+            Text(
+                product.name,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(Fmt.piecesLabel(pieces), style = MaterialTheme.typography.bodySmall)
+        }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun SleepRow(
+    data: FirewatchData,
+    today: LocalDate,
+    onTap: (SleepKind) -> Unit,
+    onLongPress: (SleepKind) -> Unit,
+) {
+    val zone = java.time.ZoneId.systemDefault()
+    val startOfToday = today.atStartOfDay(zone).toInstant().toEpochMilli()
+    val wokeToday = data.sleepEvents.lastOrNull { it.kind == SleepKind.WAKE && it.at >= startOfToday }
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            listOf(SleepKind.WAKE to "Good morning", SleepKind.SLEEP to "Good night").forEach { (kind, label) ->
+                val shape = RoundedCornerShape(16.dp)
+                Surface(
+                    shape = shape,
+                    color = MaterialTheme.colorScheme.surfaceContainer,
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(48.dp)
+                        .clip(shape)
+                        .combinedClickable(onClick = { onTap(kind) }, onLongClick = { onLongPress(kind) }),
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text(label, style = MaterialTheme.typography.labelLarge)
+                    }
+                }
+            }
+        }
+        val schedule = "Usual day ${Fmt.minutesOfDay(data.settings.wakeMinutes)}–${Fmt.minutesOfDay(data.settings.sleepMinutes)}"
+        Text(
+            (wokeToday?.let { "Up since ${Fmt.time(it.at)} · " } ?: "") + "$schedule · hold to set a time",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
+fun DoseRow(dose: Dose, referenceMg: Double, onClick: () -> Unit) {
+    val extras = buildList {
+        if (dose.multiplier != 1.0) add("×${Fmt.pieces(dose.multiplier)}")
+        if (dose.duration != com.baastiklabs.firewatch.core.model.Duration.FULL) add(dose.duration.name.lowercase())
+        if (dose.acidicDrink) add("with coffee/soda")
+        addAll(dose.tags.map { it.lowercase() })
+    }
+    ListItem(
+        colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.background),
+        modifier = Modifier.clip(RoundedCornerShape(12.dp)).clickable(onClick = onClick),
+        headlineContent = { Text(dose.productName.ifBlank { "Dose" }) },
+        supportingContent = {
+            Text(
+                Fmt.time(dose.at) + if (extras.isEmpty()) "" else " · " + extras.joinToString(", "),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        },
+        trailingContent = { Text(Fmt.piecesLabel(dose.pieces(referenceMg)), style = MaterialTheme.typography.labelLarge) },
+    )
+}
+

@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android's own device backup: keep the logs database. -->
+<full-backup-content>
+    <include domain="database" path="firewatch.db" />
+</full-backup-content>
