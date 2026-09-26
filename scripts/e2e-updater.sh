@@ -38,21 +38,28 @@ broadcast() {
   adb shell am broadcast -f 32 -n "$PKG/.e2e.E2eReceiver" -a "$PKG.e2e.$1" >/dev/null
 }
 
-# Prints the dose count the app reports.
+# Prints the dose count the app reports. Android drops broadcasts to an app while an install is
+# still finishing (the package is frozen), so keep asking for a while.
 report_doses() {
-  adb logcat -c
-  broadcast REPORT
-  for _ in $(seq 1 30); do
-    local line
-    line=$(adb logcat -d -s FW_E2E:I | grep "report versionCode" | tail -1 || true)
-    if [ -n "$line" ]; then
-      echo "$line" >&2
-      echo "$line" | grep -o 'doses=[0-9]*' | cut -d= -f2
-      return 0
-    fi
-    sleep 1
+  for attempt in $(seq 1 8); do
+    adb logcat -c
+    broadcast REPORT || true
+    for _ in $(seq 1 10); do
+      local line
+      line=$(adb logcat -d -s FW_E2E:I | grep "report versionCode" | tail -1 || true)
+      if [ -n "$line" ]; then
+        echo "$line" >&2
+        echo "$line" | grep -o 'doses=[0-9]*' | cut -d= -f2
+        return 0
+      fi
+      sleep 1
+    done
+    echo "=== no report yet (attempt $attempt), asking again" >&2
   done
   log "FAILED: app did not report" >&2
+  local pid
+  pid=$(adb shell pidof "$PKG" || true)
+  [ -n "$pid" ] && adb logcat -d --pid="$pid" | tail -80 >&2
   dump_logs >&2
   return 1
 }
@@ -83,6 +90,7 @@ log "Publish version B (20) and let the app find it by itself"
 cp "$DIR/manifest-update.json" "$DIR/update.json"
 broadcast CHECK
 wait_for_code 20
+sleep 10
 after=$(report_doses)
 log "doses after update: $after"
 [ "$after" = "$before" ]
@@ -93,6 +101,7 @@ sleep 35
 cp "$DIR/manifest-rollback.json" "$DIR/update.json"
 broadcast ROLLBACK
 wait_for_code 25
+sleep 10
 after_rollback=$(report_doses)
 log "doses after rollback: $after_rollback"
 [ "$after_rollback" = "$before" ]
