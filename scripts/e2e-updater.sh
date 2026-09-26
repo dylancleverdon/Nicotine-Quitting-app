@@ -88,6 +88,8 @@ log "doses after update: $after"
 [ "$after" = "$before" ]
 
 log "Go back to the previous version (rollback build, 25)"
+# Android throttles silent updates of the same app to one per ~30 s; stay clear of it here.
+sleep 35
 cp "$DIR/manifest-rollback.json" "$DIR/update.json"
 broadcast ROLLBACK
 wait_for_code 25

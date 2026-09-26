@@ -18,6 +18,8 @@ import java.io.File
  */
 object SelfInstaller {
     const val EXTRA_VERSION_CODE = "com.baastiklabs.firewatch.VERSION_CODE"
+    const val EXTRA_ROLLBACK = "com.baastiklabs.firewatch.ROLLBACK"
+    const val EXTRA_INSTALL_NOW = "com.baastiklabs.firewatch.INSTALL_NOW"
 
     /** Whether updates can install with zero taps on this phone right now. */
     fun canInstallSilently(context: Context): Boolean =
@@ -26,7 +28,7 @@ object SelfInstaller {
     /** The one-time "Allow from this source" switch for Firewatch. */
     fun canRequestInstalls(context: Context): Boolean = context.packageManager.canRequestPackageInstalls()
 
-    fun install(context: Context, apk: File, versionCode: Int) {
+    fun install(context: Context, apk: File, versionCode: Int, rollback: Boolean, installNow: Boolean) {
         val installer = context.packageManager.packageInstaller
         // Leftover sessions from interrupted attempts would only get in the way.
         installer.mySessions.forEach { runCatching { installer.abandonSession(it.sessionId) } }
@@ -51,6 +53,8 @@ object SelfInstaller {
             val intent = Intent(context, InstallResultReceiver::class.java)
                 .setPackage(context.packageName)
                 .putExtra(EXTRA_VERSION_CODE, versionCode)
+                .putExtra(EXTRA_ROLLBACK, rollback)
+                .putExtra(EXTRA_INSTALL_NOW, installNow)
             // Mutable: the system adds the result extras to this intent.
             val flags = PendingIntent.FLAG_UPDATE_CURRENT or
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) PendingIntent.FLAG_MUTABLE else 0

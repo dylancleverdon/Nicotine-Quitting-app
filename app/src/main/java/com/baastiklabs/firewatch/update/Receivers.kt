@@ -17,6 +17,20 @@ class InstallResultReceiver : BroadcastReceiver() {
         val message = intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE)
         when (status) {
             PackageInstaller.STATUS_PENDING_USER_ACTION -> {
+                // Android briefly throttles back-to-back silent updates and then asks for a tap.
+                // When silent installs are possible, quietly try again a minute later instead.
+                val versionCode = intent.getIntExtra(SelfInstaller.EXTRA_VERSION_CODE, -1)
+                if (SelfInstaller.canInstallSilently(context) && state.bumpSilentRetry(versionCode) <= MAX_SILENT_RETRIES) {
+                    val sessionId = intent.getIntExtra(PackageInstaller.EXTRA_SESSION_ID, -1)
+                    runCatching { context.packageManager.packageInstaller.abandonSession(sessionId) }
+                    state.setStatus("Update finishes in a minute")
+                    UpdateScheduler.retryLater(
+                        context,
+                        rollback = intent.getBooleanExtra(SelfInstaller.EXTRA_ROLLBACK, false),
+                        installNow = intent.getBooleanExtra(SelfInstaller.EXTRA_INSTALL_NOW, false),
+                    )
+                    return
+                }
                 // Older Android, or "install unknown apps" not allowed yet: Android wants one tap.
                 val confirm = IntentCompat.getParcelableExtra(intent, Intent.EXTRA_INTENT, Intent::class.java)
                     ?: return
@@ -35,6 +49,10 @@ class InstallResultReceiver : BroadcastReceiver() {
                 state.recordError("Install failed: ${message ?: "status $status"}")
             }
         }
+    }
+
+    private companion object {
+        const val MAX_SILENT_RETRIES = 3
     }
 }
 

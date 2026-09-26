@@ -71,7 +71,7 @@ class UpdateEngine(
 
             state.setStatus("Installing $label")
             state.pendingInstall = false
-            SelfInstaller.install(app, apk, target.versionCode)
+            SelfInstaller.install(app, apk, target.versionCode, rollback, installNow)
             Outcome.INSTALLING
         } catch (e: Exception) {
             Log.w(TAG, "Update run failed", e)

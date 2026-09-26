@@ -52,6 +52,14 @@ class UpdateState(context: Context) {
         get() = prefs.getBoolean(KEY_PENDING, false)
         set(value) = prefs.edit().putBoolean(KEY_PENDING, value).apply()
 
+    /** Counts how often a silent install of [versionCode] fell back to asking for a tap. */
+    fun bumpSilentRetry(versionCode: Int): Int {
+        val key = "silent_retry_$versionCode"
+        val count = prefs.getInt(key, 0) + 1
+        prefs.edit().putInt(key, count).apply()
+        return count
+    }
+
     var lastSeenVersion: String?
         get() = prefs.getString(KEY_LAST_SEEN, null)
         set(value) = prefs.edit().putString(KEY_LAST_SEEN, value).apply()
