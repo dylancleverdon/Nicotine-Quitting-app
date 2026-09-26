@@ -204,6 +204,8 @@ fun SettingsScreen(
             }
         }
 
+        PlanSettings(vm, data)
+
         // --- Data ---
         SectionTitle("Your data")
         Text(

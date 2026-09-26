@@ -1,10 +1,12 @@
 package com.baastiklabs.firewatch.core.records
 
 import com.baastiklabs.firewatch.core.FirewatchJson
+import com.baastiklabs.firewatch.core.model.CheckIn
 import com.baastiklabs.firewatch.core.model.Craving
 import com.baastiklabs.firewatch.core.model.DefaultProducts
 import com.baastiklabs.firewatch.core.model.Dose
 import com.baastiklabs.firewatch.core.model.Product
+import com.baastiklabs.firewatch.core.model.RungChange
 import com.baastiklabs.firewatch.core.model.Settings
 import com.baastiklabs.firewatch.core.model.SleepEvent
 import com.baastiklabs.firewatch.core.Absorption
@@ -35,6 +37,8 @@ object RecordTypes {
     const val CRAVING = "craving"
     const val SLEEP = "sleep"
     const val SETTINGS = "settings"
+    const val RUNG = "rung"
+    const val CHECKIN = "checkin"
 
     const val SETTINGS_ID = "settings"
 }
@@ -82,6 +86,12 @@ object RecordCodec {
     fun sleep(s: SleepEvent, previousJson: String?, now: Long, deleted: Boolean = false) =
         encode(RecordTypes.SLEEP, s.id, s.at, s, SleepEvent.serializer(), previousJson, now, deleted)
 
+    fun rung(r: RungChange, previousJson: String?, now: Long, deleted: Boolean = false) =
+        encode(RecordTypes.RUNG, r.id, r.at, r, RungChange.serializer(), previousJson, now, deleted)
+
+    fun checkIn(c: CheckIn, previousJson: String?, now: Long, deleted: Boolean = false) =
+        encode(RecordTypes.CHECKIN, c.id, c.at, c, CheckIn.serializer(), previousJson, now, deleted)
+
     fun settings(s: Settings, previousJson: String?, now: Long) =
         encode(RecordTypes.SETTINGS, RecordTypes.SETTINGS_ID, null, s, Settings.serializer(), previousJson, now)
 }
@@ -93,7 +103,12 @@ data class FirewatchData(
     val cravings: List<Craving> = emptyList(),
     val sleepEvents: List<SleepEvent> = emptyList(),
     val settings: Settings = Settings(),
+    val rungChanges: List<RungChange> = emptyList(),
+    val checkIns: List<CheckIn> = emptyList(),
 ) {
+    /** The rung D is working at (pieces a day), or null before one is chosen. */
+    val targetPieces: Double? get() = rungChanges.lastOrNull()?.pieces
+
     val productsById: Map<String, Product> by lazy { products.associateBy { it.id } }
 
     /** Products for the home screen, in order. */
@@ -121,6 +136,8 @@ data class FirewatchData(
                 cravings = decodeAll(RecordTypes.CRAVING, Craving.serializer()).sortedBy { it.at },
                 sleepEvents = decodeAll(RecordTypes.SLEEP, SleepEvent.serializer()).sortedBy { it.at },
                 settings = settings,
+                rungChanges = decodeAll(RecordTypes.RUNG, RungChange.serializer()).sortedBy { it.at },
+                checkIns = decodeAll(RecordTypes.CHECKIN, CheckIn.serializer()).sortedBy { it.at },
             )
         }
     }

@@ -42,6 +42,10 @@ data class Product(
     /** Set when this is a friend's product (doses count as borrowed). */
     val borrowedFrom: String? = null,
     val createdAt: Long = 0,
+    /** What one unit (pouch, piece, lozenge, patch, session) costs, for "money saved". 0 = unknown. */
+    val unitPrice: Double = 0.0,
+    /** Units in a tin/box/pack, for "tins not bought". */
+    val unitsPerPack: Int = 0,
 )
 
 /** How long a pouch/gum/lozenge stayed in. */
@@ -106,6 +110,44 @@ data class Settings(
     /** Default wake/sleep times, in minutes after midnight. */
     val wakeMinutes: Int = 7 * 60,
     val sleepMinutes: Int = 23 * 60,
+    /** Days to hold at or under the target before a step down is offered. */
+    val holdDays: Int = 7,
+    /** No "clear for one" in the last hour before bed. */
+    val windDown: Boolean = true,
+    /** Optional goal: minutes after waking before the first piece (0 = off). */
+    val morningDelayMinutes: Int = 0,
+    /** Last time a step-down offer was dismissed ("Not yet"), epoch ms. */
+    val stepDownSnoozedAt: Long = 0,
+    val currency: String = "$",
+    /** A reward D is saving toward with the money not spent. */
+    val rewardName: String = "",
+    val rewardCost: Double = 0.0,
+    /** Offer the optional daily check-in on the home screen. */
+    val dailyCheckIn: Boolean = false,
+    /** Step-up offers are snoozed until this time. */
+    val stepUpSnoozedAt: Long = 0,
+    /** Show the watch (Health Connect) overlay. */
+    val watchOverlay: Boolean = false,
+)
+
+/** Optional daily check-in: three quick 1–5 taps. */
+@Serializable
+data class CheckIn(
+    val id: String,
+    val at: Long,
+    val craving: Int = 3,
+    val mood: Int = 3,
+    val sleep: Int = 3,
+)
+
+/** D moved the target to a new rung (pieces a day). The latest one is the current target. */
+@Serializable
+data class RungChange(
+    val id: String,
+    val at: Long,
+    val pieces: Double,
+    /** "start", "down" or "up". */
+    val reason: String = "",
 )
 
 object DefaultProducts {

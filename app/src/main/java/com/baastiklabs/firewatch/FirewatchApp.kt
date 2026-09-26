@@ -29,6 +29,15 @@ class FirewatchApp : Application() {
         // Keep this minimal: if it ever crashes, the crash guard can't help.
         CrashGuard.install(this)
         graph = AppGraph(this)
+        // Keep home-screen widgets in step with the data (debounced).
+        var pending: kotlinx.coroutines.Job? = null
+        graph.repository.onChange = {
+            pending?.cancel()
+            pending = graph.appScope.launch {
+                kotlinx.coroutines.delay(400)
+                com.baastiklabs.firewatch.widget.refreshWidgets(this@FirewatchApp)
+            }
+        }
         registerActivityLifecycleCallbacks(ForegroundTracker())
         if (!CrashGuard.rollbackIfCrashLooping(this)) {
             UpdateScheduler.ensureScheduled(this)

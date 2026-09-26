@@ -3,4 +3,8 @@
     <string name="app_name">Firewatch</string>
     <string name="update_channel_name">App updates</string>
     <string name="update_channel_description">Only used when an update needs a tap to finish.</string>
+    <string name="widget_quicklog_name">Firewatch quick log</string>
+    <string name="widget_quicklog_description">One-tap logging, the next-piece battery and a puff counter.</string>
+    <string name="widget_craving_name">Firewatch cravings</string>
+    <string name="widget_craving_description">Log a craving and how strong it is in one tap.</string>
 </resources>

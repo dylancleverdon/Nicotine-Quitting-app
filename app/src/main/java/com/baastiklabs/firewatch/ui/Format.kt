@@ -56,6 +56,13 @@ object Fmt {
     fun shortDate(date: LocalDate): String =
         date.format(DateTimeFormatter.ofPattern("d MMM yyyy", Locale.getDefault()))
 
+    fun shortDateK(date: kotlinx.datetime.LocalDate): String =
+        shortDate(LocalDate.of(date.year, date.monthNumber, date.dayOfMonth))
+
+    fun shortDateK(day: com.baastiklabs.firewatch.core.engine.DayStat): String = shortDateK(day.date)
+
+    fun shortDateK(ms: Long): String = shortDate(ms.toLocalDateTime().toLocalDate())
+
     fun monthTitle(month: YearMonth): String =
         month.format(DateTimeFormatter.ofPattern("MMMM yyyy", Locale.getDefault()))
 

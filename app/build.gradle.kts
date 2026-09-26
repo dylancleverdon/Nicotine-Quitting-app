@@ -111,6 +111,8 @@ dependencies {
     implementation(libs.core.ktx)
     implementation(libs.core.splashscreen)
     implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.glance.appwidget)
+    implementation(libs.health.connect)
 
     testImplementation(libs.junit)
 }

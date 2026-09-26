@@ -170,6 +170,8 @@ private fun ProductDialog(
     }
     var absorptionEdited by remember { mutableStateOf(initial != null) }
     var speed by remember { mutableStateOf(initial?.speed ?: DefaultProducts.defaultSpeed(kind)) }
+    var priceText by remember { mutableStateOf(initial?.unitPrice?.takeIf { it > 0 }?.toString() ?: "") }
+    var packText by remember { mutableStateOf(initial?.unitsPerPack?.takeIf { it > 0 }?.toString() ?: "") }
 
     val mg = mgText.replace(',', '.').toDoubleOrNull()
     val absorption = absorptionText.toIntOrNull()
@@ -224,6 +226,20 @@ private fun ProductDialog(
                         FilterChip(selected = speed == s, onClick = { speed = s }, label = { Text(label) })
                     }
                 }
+                OutlinedTextField(
+                    value = priceText,
+                    onValueChange = { priceText = it },
+                    label = { Text("Price of one (optional, for money saved)") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                )
+                OutlinedTextField(
+                    value = packText,
+                    onValueChange = { packText = it.filter(Char::isDigit).take(4) },
+                    label = { Text("How many in a tin/box (optional)") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                )
                 if (onRemove != null) {
                     TextButton(onClick = onRemove) { Text("Remove this product") }
                 }
@@ -241,6 +257,8 @@ private fun ProductDialog(
                             labelMg = mg ?: 0.0,
                             absorption = (absorption ?: 50) / 100.0,
                             speed = speed,
+                            unitPrice = priceText.replace(',', '.').toDoubleOrNull() ?: 0.0,
+                            unitsPerPack = packText.toIntOrNull() ?: 0,
                         ),
                     )
                 },

@@ -51,6 +51,15 @@ import com.baastiklabs.firewatch.core.Cravings
 import com.baastiklabs.firewatch.core.DaySummary
 import com.baastiklabs.firewatch.core.Days
 import com.baastiklabs.firewatch.core.localDate
+import com.baastiklabs.firewatch.core.engine.Coach
+import com.baastiklabs.firewatch.core.engine.Insights
+import com.baastiklabs.firewatch.core.engine.Ladder
+import com.baastiklabs.firewatch.core.engine.Progress
+import com.baastiklabs.firewatch.core.engine.Quality
+import com.baastiklabs.firewatch.core.engine.Waking
+import com.baastiklabs.firewatch.core.model.CheckIn
+import com.baastiklabs.firewatch.core.model.ProductKind
+import com.baastiklabs.firewatch.core.model.SpeedProfile
 import com.baastiklabs.firewatch.core.model.Craving
 import com.baastiklabs.firewatch.core.model.CravingOutcome
 import com.baastiklabs.firewatch.core.model.Dose
@@ -90,6 +99,36 @@ fun HomeScreen(vm: FirewatchViewModel, data: FirewatchData, now: Long, snackbar:
     var editing by remember { mutableStateOf<Dose?>(null) }
     var cravingSheet by remember { mutableStateOf(false) }
     var sleepPicker by remember { mutableStateOf<SleepKind?>(null) }
+    var vapeFor by remember { mutableStateOf<Product?>(null) }
+    var friendVape by remember { mutableStateOf(false) }
+    var checkIn by remember { mutableStateOf(false) }
+
+    val revealed = baseline is BaselineStatus.Complete
+    val measured = remember(data, minute) { if (revealed) Progress.measuredRung(data, today, tz) else null }
+    val target = data.targetPieces?.let { Ladder.rung(it) }
+    val battery = remember(data, minute) { target?.let { Progress.battery(data, if (it.pieces > 0) it.pieces else 1.0 / 3.0, now, tz) } }
+    val stepDown = remember(data, minute) { if (revealed) Progress.stepDownOffer(data, now, tz) else null }
+    val readiness = remember(data, minute) { data.targetPieces?.let { Coach.readiness(data, it, now) } }
+    val stepUp = remember(data, minute) { if (revealed && stepDown == null) Coach.stepUpOffer(data, now, tz) else null }
+    val headsUps = remember(data, minute) { Progress.headsUps(data, now, tz) }
+    val wave = remember(data, minute) { Insights(data, tz, now).todayCurve(10) }
+    val todayWake = remember(data, minute) { Waking.day(data, today, tz) }
+    val quality = remember(data, minute) { Quality.of(todayDoses, data.referenceMg) }
+    val checkedInToday = data.checkIns.any { it.at.localDate(tz) == today }
+
+    fun moveTarget(pieces: Double, reason: String) {
+        scope.launch {
+            repo.setTarget(pieces, reason)
+            val r = Ladder.rung(pieces)
+            snackbar.showSnackbar(
+                when (reason) {
+                    "down" -> "New rung: ${r.label}. That's real progress."
+                    "up" -> "Stepped back to ${r.label}. That's normal; it's how the climb down works."
+                    else -> "Starting at ${r.label}."
+                },
+            )
+        }
+    }
 
     fun logNow(product: Product, draft: DoseDraft? = null) {
         scope.launch {
@@ -140,7 +179,67 @@ fun HomeScreen(vm: FirewatchViewModel, data: FirewatchData, now: Long, snackbar:
             }
         }
         item {
-            StatusCard(todaySummary, baseline, summaries, lastDoseAt, now)
+            if (revealed) {
+                TierStatusCard(
+                    measured = measured,
+                    target = target,
+                    battery = battery,
+                    today = todaySummary,
+                    lastDoseAt = lastDoseAt,
+                    now = now,
+                    wave = wave,
+                    sleepShade = listOf(wave.firstOrNull()?.first.let { (it ?: 0L) to todayWake.wakeAt }, todayWake.sleepAt to (wave.lastOrNull()?.first ?: 0L)),
+                    quality = quality,
+                )
+            } else {
+                StatusCard(todaySummary, baseline, summaries, lastDoseAt, now)
+            }
+        }
+        if (revealed && target == null && measured != null) {
+            item {
+                OfferCard(
+                    title = "Your starting point: ${measured.tier.title}",
+                    body = "${measured.plainLine} Work from here? Firewatch will suggest your next piece at this pace, and offer a small step down once you've held it.",
+                    primary = "Start here",
+                    onPrimary = { moveTarget(measured.pieces, "start") },
+                    secondary = null,
+                    onSecondary = {},
+                )
+            }
+        }
+        if (stepDown != null && target != null) {
+            item {
+                val ready = readiness?.ready ?: true
+                OfferCard(
+                    title = "Ready for ${stepDown.label}?",
+                    body = "You've held ${target.label} for ${data.settings.holdDays} days." + if (readiness?.confident == true) {
+                        if (ready) " From your cravings, the next rung should feel like about a ${readiness.predictedNext.toInt()} out of 10, and you ride out ${readiness.capacity}s."
+                        else " Heads-up: your cravings suggest the next rung may feel like a ${readiness.predictedNext.toInt()}, above the ${readiness.capacity} you usually ride out. Holding a bit longer is fine too."
+                    } else "",
+                    primary = "Step down",
+                    onPrimary = { moveTarget(stepDown.pieces, "down") },
+                    secondary = "Not yet",
+                    onSecondary = { scope.launch { repo.updateSettings { it.copy(stepDownSnoozedAt = repo.now()) } } },
+                )
+            }
+        }
+        if (stepUp != null && target != null) {
+            item {
+                OfferCard(
+                    title = "This rung is tough right now",
+                    body = "Your cravings have been beating you at ${target.label}. Stepping up to ${stepUp.label} for a while is normal and keeps you on gum rather than something worse. Come back down when it's ready.",
+                    primary = "Step up",
+                    onPrimary = { moveTarget(stepUp.pieces, "up") },
+                    secondary = "I'm OK",
+                    onSecondary = { scope.launch { repo.updateSettings { it.copy(stepUpSnoozedAt = repo.now()) } } },
+                )
+            }
+        }
+        if (headsUps.isNotEmpty()) item { HeadsUpCard(headsUps) }
+        if (data.settings.dailyCheckIn && !checkedInToday) {
+            item {
+                OutlinedButton(onClick = { checkIn = true }, modifier = Modifier.fillMaxWidth()) { Text("Daily check-in (3 taps)") }
+            }
         }
         item {
             if (activeCraving != null) {
@@ -149,14 +248,29 @@ fun HomeScreen(vm: FirewatchViewModel, data: FirewatchData, now: Long, snackbar:
                     now = now,
                     onPassed = { scope.launch { repo.finishCraving(activeCraving.id, CravingOutcome.RODE_OUT) } },
                     onUsed = { scope.launch { repo.finishCraving(activeCraving.id, CravingOutcome.USED) } },
+                    onTag = { tag ->
+                        scope.launch {
+                            val tags = if (tag in activeCraving.tags) activeCraving.tags - tag else activeCraving.tags + tag
+                            repo.saveCraving(activeCraving.copy(tags = tags))
+                        }
+                    },
                 )
             } else {
-                OutlinedButton(
-                    onClick = { cravingSheet = true },
-                    modifier = Modifier.fillMaxWidth().height(56.dp),
-                    shape = RoundedCornerShape(16.dp),
-                ) {
-                    Text("Craving? Log the urge", style = MaterialTheme.typography.titleSmall)
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    OutlinedButton(
+                        onClick = { cravingSheet = true },
+                        modifier = Modifier.weight(1.4f).height(56.dp),
+                        shape = RoundedCornerShape(16.dp),
+                    ) {
+                        Text("Craving? Log it", style = MaterialTheme.typography.titleSmall)
+                    }
+                    OutlinedButton(
+                        onClick = { friendVape = true },
+                        modifier = Modifier.weight(1f).height(56.dp),
+                        shape = RoundedCornerShape(16.dp),
+                    ) {
+                        Text("Friend's vape", style = MaterialTheme.typography.titleSmall)
+                    }
                 }
             }
         }
@@ -179,7 +293,7 @@ fun HomeScreen(vm: FirewatchViewModel, data: FirewatchData, now: Long, snackbar:
                         modifier = Modifier.weight(1f),
                         onTap = {
                             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            logNow(product)
+                            if (product.kind == ProductKind.VAPE && product.borrowedFrom != null) vapeFor = product else logNow(product)
                         },
                         onLongPress = {
                             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -244,6 +358,75 @@ fun HomeScreen(vm: FirewatchViewModel, data: FirewatchData, now: Long, snackbar:
 
     editing?.let { dose ->
         EditDoseSheet(vm, dose, data.referenceMg, snackbar, onDone = { editing = null })
+    }
+
+    fun logVape(v: VapeLog, name: String, savedId: String?) {
+        scope.launch {
+            val now2 = repo.now()
+            var productId = savedId ?: "friends-vape"
+            if (v.saveAs != null && v.strength != null) {
+                val p = Product(
+                    id = repo.newId(),
+                    name = "${v.saveAs}'s vape",
+                    kind = ProductKind.VAPE,
+                    labelMg = v.strength,
+                    absorption = 1.0,
+                    speed = SpeedProfile.SPIKE,
+                    onHome = true,
+                    order = 100,
+                    borrowedFrom = v.saveAs,
+                    createdAt = now2,
+                )
+                repo.saveProduct(p)
+                productId = p.id
+            }
+            val dose = Dose(
+                id = repo.newId(),
+                productId = productId,
+                at = now2,
+                productName = name + if (v.what.isNotBlank()) " (${v.what})" else "",
+                kind = ProductKind.VAPE,
+                speed = SpeedProfile.SPIKE,
+                rangeLowMg = v.lowMg,
+                rangeHighMg = v.highMg,
+                borrowed = true,
+                loggedAt = now2,
+            )
+            repo.logDose(dose)
+            val result = snackbar.showSnackbar("Logged ${dose.productName} as a range", actionLabel = "Undo", duration = SnackbarDuration.Short)
+            if (result == SnackbarResult.ActionPerformed) repo.deleteDose(dose.id)
+        }
+    }
+
+    if (friendVape) {
+        FriendVapeSheet(
+            title = "Friend's vape",
+            presetStrength = null,
+            referenceMg = data.referenceMg,
+            onDismiss = { friendVape = false },
+            onLog = { v ->
+                friendVape = false
+                logVape(v, v.saveAs?.let { "$it's vape" } ?: "Friend's vape", null)
+            },
+        )
+    }
+    vapeFor?.let { p ->
+        FriendVapeSheet(
+            title = p.name,
+            presetStrength = p.labelMg,
+            referenceMg = data.referenceMg,
+            onDismiss = { vapeFor = null },
+            onLog = { v ->
+                vapeFor = null
+                logVape(v, p.name, p.id)
+            },
+        )
+    }
+    if (checkIn) {
+        CheckInDialog(onDismiss = { checkIn = false }, onSave = { c, m, sl ->
+            checkIn = false
+            scope.launch { repo.saveCheckIn(CheckIn(repo.newId(), repo.now(), c, m, sl)) }
+        })
     }
 
     if (cravingSheet) {
@@ -384,8 +567,18 @@ private fun StatusCard(
     }
 }
 
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
-private fun ActiveCravingCard(craving: Craving, now: Long, onPassed: () -> Unit, onUsed: () -> Unit) {
+private fun ActiveCravingCardTags(craving: Craving, onTag: (String) -> Unit) {
+    androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        DoseTags.forEach { tag ->
+            androidx.compose.material3.FilterChip(selected = tag in craving.tags, onClick = { onTag(tag) }, label = { Text(tag) })
+        }
+    }
+}
+
+@Composable
+private fun ActiveCravingCard(craving: Craving, now: Long, onPassed: () -> Unit, onUsed: () -> Unit, onTag: (String) -> Unit) {
     val level = CravingScale.level(craving.intensity)
     Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
@@ -408,9 +601,10 @@ private fun ActiveCravingCard(craving: Craving, now: Long, onPassed: () -> Unit,
                 }
             }
             Text(
-                "Most cravings pass within a few minutes. Tap when it does.",
+                "Most cravings pass within a few minutes. Tap when it does. What's going on? (optional)",
                 style = MaterialTheme.typography.bodySmall,
             )
+            ActiveCravingCardTags(craving, onTag)
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Button(onClick = onPassed, modifier = Modifier.weight(1f)) { Text("It passed") }
                 OutlinedButton(onClick = onUsed, modifier = Modifier.weight(1f)) { Text("I used") }

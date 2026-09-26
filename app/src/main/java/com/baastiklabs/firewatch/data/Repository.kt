@@ -1,11 +1,13 @@
 package com.baastiklabs.firewatch.data
 
 import com.baastiklabs.firewatch.core.Ids
+import com.baastiklabs.firewatch.core.model.CheckIn
 import com.baastiklabs.firewatch.core.model.Craving
 import com.baastiklabs.firewatch.core.model.CravingOutcome
 import com.baastiklabs.firewatch.core.model.DefaultProducts
 import com.baastiklabs.firewatch.core.model.Dose
 import com.baastiklabs.firewatch.core.model.Product
+import com.baastiklabs.firewatch.core.model.RungChange
 import com.baastiklabs.firewatch.core.model.Settings
 import com.baastiklabs.firewatch.core.model.SleepEvent
 import com.baastiklabs.firewatch.core.model.SleepKind
@@ -35,6 +37,8 @@ class Repository(
     private val doses = HashMap<String, Dose>()
     private val cravings = HashMap<String, Craving>()
     private val sleepEvents = HashMap<String, SleepEvent>()
+    private val rungChanges = HashMap<String, RungChange>()
+    private val checkIns = HashMap<String, CheckIn>()
     private var settings = Settings()
 
     private val _data = MutableStateFlow(FirewatchData())
@@ -106,6 +110,18 @@ class Repository(
 
     suspend fun deleteSleep(id: String) = tombstone(id)
 
+    // --- Rungs & check-ins ---
+
+    /** Moves the target rung. [reason] is "start", "down" or "up". */
+    suspend fun setTarget(pieces: Double, reason: String) {
+        val now = clock()
+        mutate { t -> listOf(RecordCodec.rung(RungChange(Ids.newId(now), now, pieces, reason), null, t)) }
+    }
+
+    suspend fun saveCheckIn(checkIn: CheckIn) {
+        mutate { now -> listOf(RecordCodec.checkIn(checkIn, records[checkIn.id]?.json, now)) }
+    }
+
     // --- Products & settings ---
 
     suspend fun saveProduct(product: Product) {
@@ -171,6 +187,8 @@ class Repository(
             RecordTypes.DOSE -> put(doses, env, Dose.serializer())
             RecordTypes.CRAVING -> put(cravings, env, Craving.serializer())
             RecordTypes.SLEEP -> put(sleepEvents, env, SleepEvent.serializer())
+            RecordTypes.RUNG -> put(rungChanges, env, RungChange.serializer())
+            RecordTypes.CHECKIN -> put(checkIns, env, CheckIn.serializer())
             RecordTypes.SETTINGS -> settings =
                 (if (env.deleted) null else RecordCodec.decode(env.json, Settings.serializer())) ?: Settings()
             else -> Unit // A newer version's record type: kept in storage and backups, ignored here.
@@ -189,6 +207,12 @@ class Repository(
             cravings = cravings.values.sortedBy { it.at },
             sleepEvents = sleepEvents.values.sortedBy { it.at },
             settings = settings,
+            rungChanges = rungChanges.values.sortedBy { it.at },
+            checkIns = checkIns.values.sortedBy { it.at },
         )
+        onChange?.invoke()
     }
+
+    /** Called after every change (the app uses it to refresh home-screen widgets). */
+    var onChange: (() -> Unit)? = null
 }

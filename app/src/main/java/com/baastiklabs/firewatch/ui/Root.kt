@@ -10,6 +10,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
@@ -44,6 +45,7 @@ private data class Tab(val route: String, val label: String, val icon: ImageVect
 
 private val tabs = listOf(
     Tab("home", "Log", Icons.Filled.Home),
+    Tab("insights", "Insights", Icons.Filled.Star),
     Tab("calendar", "Calendar", Icons.Filled.DateRange),
     Tab("settings", "Settings", Icons.Filled.Settings),
 )
@@ -99,6 +101,9 @@ fun FirewatchRoot(vm: FirewatchViewModel) {
         Box(Modifier.padding(padding).fillMaxSize()) {
             when {
                 route == "home" -> HomeScreen(vm, data, now, snackbar)
+                route == "insights" -> com.baastiklabs.firewatch.ui.insights.InsightsScreen(data, now) {
+                    com.baastiklabs.firewatch.health.WatchOverlayCard(vm, data)
+                }
                 route == "calendar" -> CalendarScreen(data, now, onOpenDay = { route = "day/$it" })
                 route == "settings" -> SettingsScreen(
                     vm = vm,
