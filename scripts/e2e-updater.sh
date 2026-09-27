@@ -110,3 +110,9 @@ log "Pre-update backups were written"
 adb shell run-as "$PKG" ls files/backups 2>/dev/null || log "(backups dir not readable on release builds; skipped)"
 
 log "PASSED: silent update, data kept, rollback works"
+
+# Screenshots for a human to look at (never fail the run): the first screen after the updates,
+# e.g. the welcome tour. Uploaded as the "e2e-screenshots" artifact.
+mkdir -p build/e2e-screens
+( adb shell am start -W -n "$PKG/.MainActivity" >/dev/null && sleep 6 &&
+  adb exec-out screencap -p > build/e2e-screens/first-screen.png ) || log "(screenshot skipped)"

@@ -2,6 +2,9 @@
 
 Newest first. Each release is a "## <version>" heading; the app shows these notes in "What's new".
 
+## 0.5.1 · 2026-09-28
+- Fixed hard-to-read text on the welcome tour, Help and "Why Firewatch works this way" pages. You can reopen the tour from Help → Welcome tour.
+
 ## 0.5.0 · 2026-09-27
 - New: **Relapse prevention mode.** If you're new to gum, Firewatch can remind you to chew at a steady gap so cravings don't catch you off guard. The gap follows your tier (every 2 hours before you have one), never during sleeping hours, and a "Log it" button on the reminder logs the piece in one tap. It's off unless you turn it on, with the button at the bottom of the Log tab.
 - While it's on, the battery shows "Next scheduled piece at …" and stretch and pull take a break. Your tiers and figures stay just as honest. Those days get a ring in the calendar.

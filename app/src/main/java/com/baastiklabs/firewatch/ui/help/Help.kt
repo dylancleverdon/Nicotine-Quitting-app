@@ -53,8 +53,10 @@ fun TourScreen(onDone: () -> Unit, onWhy: () -> Unit) {
     var i by rememberSaveable { mutableIntStateOf(0) }
     val page = Help.tour[i]
     val last = i == Help.tour.lastIndex
+    // Surface sets the theme's text colour (without it, text defaults to black on the dark background).
+    androidx.compose.material3.Surface(color = MaterialTheme.colorScheme.background, modifier = Modifier.fillMaxSize()) {
     Column(
-        Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).statusBarsPadding().navigationBarsPadding().padding(24.dp),
+        Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) { TextButton(onClick = onDone) { Text("Skip") } }
@@ -76,17 +78,20 @@ fun TourScreen(onDone: () -> Unit, onWhy: () -> Unit) {
             Button(onClick = { if (last) onDone() else i++ }) { Text(if (last) "Let's go" else "Next") }
         }
     }
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun Screen(title: String, onBack: () -> Unit, content: @Composable () -> Unit) {
-    Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+    androidx.compose.material3.Surface(color = MaterialTheme.colorScheme.background, modifier = Modifier.fillMaxSize()) {
+    Column(Modifier.fillMaxSize()) {
         TopAppBar(
             title = { Text(title) },
             navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") } },
         )
         content()
+    }
     }
 }
 
