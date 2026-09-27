@@ -75,6 +75,8 @@ data class Dose(
     val borrowed: Boolean = false,
     val note: String? = null,
     val loggedAt: Long = 0,
+    /** Back-dated rough estimate (no real time). Counts toward totals, not toward timing stats. */
+    val estimated: Boolean = false,
 )
 
 @Serializable
@@ -128,6 +130,9 @@ data class Settings(
     val stepUpSnoozedAt: Long = 0,
     /** Show the watch (Health Connect) overlay. */
     val watchOverlay: Boolean = false,
+    /** Opt-in, neutral reminders (off by default). Never "time for your next piece". */
+    val remindCheckIn: Boolean = false,
+    val remindBackup: Boolean = false,
 )
 
 /** Optional daily check-in: three quick 1–5 taps. */
@@ -155,6 +160,7 @@ object DefaultProducts {
     const val ZYN_6MG = "zyn-6"
     const val GUM_2MG = "gum-2"
     const val GUM_4MG = "gum-4"
+    const val CIGARETTE = "cigarette"
 
     /** Absorbed mg of the default reference piece (4 mg gum at about 50%). */
     const val REFERENCE_MG = 2.0
@@ -164,7 +170,11 @@ object DefaultProducts {
         Product(ZYN_6MG, "Zyn 6 mg", ProductKind.POUCH, 6.0, defaultAbsorption(ProductKind.POUCH), SpeedProfile.BUILD, onHome = true, order = 1),
         Product(GUM_2MG, "Nicotine gum 2 mg", ProductKind.GUM, 2.0, defaultAbsorption(ProductKind.GUM), SpeedProfile.BUILD, onHome = true, order = 2),
         Product(GUM_4MG, "Nicotine gum 4 mg", ProductKind.GUM, 4.0, defaultAbsorption(ProductKind.GUM), SpeedProfile.BUILD, onHome = true, order = 3),
+        cigarette(),
     )
+
+    /** Off the home screen by default; used by the back-dated week and available to add. */
+    fun cigarette() = Product(CIGARETTE, "Cigarette", ProductKind.CIGARETTE, 10.0, defaultAbsorption(ProductKind.CIGARETTE), SpeedProfile.SPIKE, onHome = false, order = 50)
 
     /**
      * Research-based starting points; every product's value is editable.

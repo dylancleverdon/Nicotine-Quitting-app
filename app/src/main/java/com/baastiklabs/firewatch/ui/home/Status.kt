@@ -81,7 +81,10 @@ fun TierStatusCard(
                 Stat("${today.doseCount}", if (today.doseCount == 1) "dose" else "doses")
                 Stat(lastDoseAt?.let { Fmt.duration(now - it) } ?: "–", "since last")
                 Stat("${today.cravingsRodeOut}/${today.cravings}", "urges beaten")
-                quality?.let { Stat(com.baastiklabs.firewatch.core.engine.Quality.grade(it), "quality") }
+                quality?.let {
+                    val food = com.baastiklabs.firewatch.core.engine.Quality.food(it)
+                    Stat("${food.emoji} ${it.toInt()}", "quality: ${food.title.lowercase()}")
+                }
             }
             if (wave.size > 2) {
                 WaveChart(wave, shaded = sleepShade, now = now, height = 64.dp, compact = true)

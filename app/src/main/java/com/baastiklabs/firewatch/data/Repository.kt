@@ -53,9 +53,11 @@ class Repository(
             if (_loaded.value) return
             val all = withContext(Dispatchers.IO) { store.all() }
             all.forEach { index(it) }
-            if (all.none { it.type == RecordTypes.PRODUCT }) {
+            // Add any default product this install has never had (new defaults arrive with updates).
+            val missing = DefaultProducts.all().filter { it.id !in records }
+            if (missing.isNotEmpty()) {
                 val now = clock()
-                writeLocked(DefaultProducts.all().map { RecordCodec.product(it.copy(createdAt = now), null, now) })
+                writeLocked(missing.map { RecordCodec.product(it.copy(createdAt = now), null, now) })
             }
             publish()
             _loaded.value = true
@@ -76,6 +78,11 @@ class Repository(
     }
 
     suspend fun updateDose(dose: Dose) = logDose(dose)
+
+    /** Writes many doses in one go (the back-dated week). */
+    suspend fun logDoses(doses: List<Dose>) {
+        mutate { now -> doses.map { RecordCodec.dose(it, records[it.id]?.json, now) } }
+    }
 
     suspend fun deleteDose(id: String) = tombstone(id)
 

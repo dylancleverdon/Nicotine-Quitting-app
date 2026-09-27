@@ -90,6 +90,7 @@ fun SettingsScreen(
     now: Long,
     snackbar: SnackbarHostState,
     onOpenProducts: () -> Unit,
+    onBackfill: () -> Unit = {},
     onOpenAbout: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -115,6 +116,7 @@ fun SettingsScreen(
                         ?: error("Couldn't open file")
                 }
             }.isSuccess
+            if (ok) BackupStore.markOffPhone(context)
             snackbar.showSnackbar(if (ok) "Exported. Keep that file somewhere safe." else "Export didn't work. Try another location.")
         }
     }
@@ -219,6 +221,33 @@ fun SettingsScreen(
                 Text("Import")
             }
             TextButton(onClick = { showBackups = true }) { Text("Auto backups") }
+        }
+        var folder by remember { mutableStateOf(BackupStore.folder(context)) }
+        val folderLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+            if (uri != null) {
+                runCatching { BackupStore.setFolder(context, uri) }
+                folder = BackupStore.folder(context)
+                scope.launch {
+                    BackupStore.write(context, vm.repository, "first-folder-backup")
+                    snackbar.showSnackbar("Backups will now also go to that folder, every day and before updates.")
+                }
+            }
+        }
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text("Automatic backup off the phone", style = MaterialTheme.typography.bodyLarge)
+            Text(
+                if (folder == null) "Pick a folder once (for example in Google Drive). A backup goes there every day and before every update."
+                else "On: backups go to ${folder?.lastPathSegment?.substringAfterLast(':') ?: "your folder"}.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = { folderLauncher.launch(null) }) { Text(if (folder == null) "Choose folder" else "Change folder") }
+                if (folder != null) TextButton(onClick = { BackupStore.setFolder(context, null); folder = null }) { Text("Stop") }
+            }
+        }
+        if (com.baastiklabs.firewatch.core.Baseline.status(data, java.time.LocalDate.now().let { kotlinx.datetime.LocalDate(it.year, it.monthValue, it.dayOfMonth) }, kotlinx.datetime.TimeZone.currentSystemDefault()) !is com.baastiklabs.firewatch.core.BaselineStatus.Complete) {
+            OutlinedButton(onClick = onBackfill) { Text("Back-date my baseline week") }
         }
 
         // --- Preferences ---

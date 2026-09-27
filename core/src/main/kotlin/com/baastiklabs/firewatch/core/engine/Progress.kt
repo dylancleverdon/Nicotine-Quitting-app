@@ -139,7 +139,7 @@ object Progress {
 
     fun headsUps(data: FirewatchData, now: Long, tz: TimeZone): List<HeadsUp> {
         val out = mutableListOf<HeadsUp>()
-        val recent = data.doses.filter { now - it.at in 0..(3 * 60 * MIN) }.sortedBy { it.at }
+        val recent = data.doses.filter { !it.estimated && now - it.at in 0..(3 * 60 * MIN) }.sortedBy { it.at }
         if (recent.size >= 2) {
             val last = recent.last()
             val prev = recent[recent.size - 2]

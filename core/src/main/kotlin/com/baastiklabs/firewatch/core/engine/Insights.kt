@@ -108,7 +108,8 @@ class Insights(private val data: FirewatchData, private val tz: TimeZone, privat
             t <= now && Kinetics.level(data.doses.filter { it.at in (t - 24 * 60 * MIN)..t }, t) >= Kinetics.CLEAR_THRESHOLD_MG
         }
         val sorted = doses.sortedBy { it.at }
-        val doubleUps = sorted.zipWithNext().count { (a, b) -> b.at - a.at < Kinetics.peakMinutes(a.speed) * MIN }
+        val timedToday = sorted.filter { !it.estimated }
+        val doubleUps = timedToday.zipWithNext().count { (a, b) -> b.at - a.at < Kinetics.peakMinutes(a.speed) * MIN }
         val prices = data.productsById
         return DayStat(
             date = date,
@@ -129,7 +130,7 @@ class Insights(private val data: FirewatchData, private val tz: TimeZone, privat
             mouthMinutes = doses.sumOf { mouthMinutes(it) },
             clearHours = clearMinutes / 60.0,
             awakeHours = awake / 60.0,
-            wakeToFirstMin = sorted.firstOrNull()?.let { (it.at - w.wakeAt) / 60_000.0 },
+            wakeToFirstMin = timedToday.firstOrNull()?.let { (it.at - w.wakeAt) / 60_000.0 },
             doubleUps = doubleUps,
             quality = Quality.of(doses, ref),
             costSpent = doses.sumOf { (prices[it.productId]?.unitPrice ?: 0.0) * it.multiplier },
@@ -174,7 +175,7 @@ class Insights(private val data: FirewatchData, private val tz: TimeZone, privat
 
     /** Average minutes between doses (awake gaps), per week, oldest first. */
     fun weeklyGaps(): List<Pair<LocalDate, Double>> = days.chunked(7).mapNotNull { week ->
-        val gaps = week.flatMap { d -> d.doses.zipWithNext().map { (a, b) -> (b.at - a.at) / 60_000.0 } }
+        val gaps = week.flatMap { d -> d.doses.filter { !it.estimated }.zipWithNext().map { (a, b) -> (b.at - a.at) / 60_000.0 } }
         if (gaps.isEmpty()) null else week.first().date to gaps.average()
     }
 
@@ -189,7 +190,7 @@ class Insights(private val data: FirewatchData, private val tz: TimeZone, privat
     /** [dayOfWeek 0=Mon..6][hour 0..23] -> pieces. */
     fun heatmap(): Array<DoubleArray> {
         val grid = Array(7) { DoubleArray(24) }
-        data.doses.forEach { d ->
+        data.doses.filter { !it.estimated }.forEach { d ->
             val dt = Instant.fromEpochMilliseconds(d.at).toLocalDateTime(tz)
             grid[dt.dayOfWeek.ordinal][dt.hour] += d.pieces(ref)
         }
@@ -269,8 +270,8 @@ class Insights(private val data: FirewatchData, private val tz: TimeZone, privat
 
     /** Minutes from last dose one night to first dose the next morning, per day. */
     fun overnightGaps(): List<Pair<LocalDate, Double>> = days.zipWithNext().mapNotNull { (a, b) ->
-        val last = a.doses.lastOrNull() ?: return@mapNotNull null
-        val first = b.doses.firstOrNull() ?: return@mapNotNull null
+        val last = a.doses.lastOrNull { !it.estimated } ?: return@mapNotNull null
+        val first = b.doses.firstOrNull { !it.estimated } ?: return@mapNotNull null
         b.date to (first.at - last.at) / 60_000.0
     }
 
@@ -343,7 +344,7 @@ class Insights(private val data: FirewatchData, private val tz: TimeZone, privat
     )
 
     fun records(): Records {
-        val sorted = data.doses.sortedBy { it.at }
+        val sorted = data.doses.filter { !it.estimated }.sortedBy { it.at }
         val gaps = sorted.zipWithNext().map { (a, b) -> (b.at - a.at) / 60_000.0 } +
             listOfNotNull(sorted.lastOrNull()?.let { (now - it.at) / 60_000.0 })
         val target = data.targetPieces
@@ -365,13 +366,13 @@ class Insights(private val data: FirewatchData, private val tz: TimeZone, privat
             val r = Ladder.rung(rc.pieces)
             out += Badge(r.label, if (rc.reason == "start") "Started the climb down" else "Reached a new rung", rc.at.localDate(tz))
         }
-        val sorted = data.doses.sortedBy { it.at }
+        val sorted = data.doses.filter { !it.estimated }.sortedBy { it.at }
         listOf(6 to "First 6-hour gap", 12 to "First 12-hour gap", 24 to "First full day gap", 72 to "Three days clear").forEach { (h, title) ->
             sorted.zipWithNext().firstOrNull { (a, b) -> b.at - a.at >= h * 60 * MIN }?.let {
                 out += Badge(title, "Between two doses", it.second.at.localDate(tz))
             }
         }
-        days.firstOrNull { d -> d.date < today && d.doses.none { it.at < d.wakeAt + 4 * 60 * MIN } && d.doses.isNotEmpty() }?.let {
+        days.firstOrNull { d -> d.date < today && d.doses.none { it.estimated } && d.doses.none { it.at < d.wakeAt + 4 * 60 * MIN } && d.doses.isNotEmpty() }?.let {
             out += Badge("Nicotine-free morning", "Nothing for 4 hours after waking", it.date)
         }
         days.firstOrNull { it.date < today && it.pieces == 0.0 }?.let { out += Badge("First clear day", "A whole day with no nicotine", it.date) }
@@ -415,24 +416,34 @@ class Insights(private val data: FirewatchData, private val tz: TimeZone, privat
         val cravingsRidden: Int,
     )
 
-    fun monthlyRecap(year: Int, month: Int): Recap? {
-        val inMonth = days.filter { it.date.year == year && it.date.monthNumber == month }
-        if (inMonth.isEmpty()) return null
-        val weeks = inMonth.chunked(7).map { w -> w.map { it.pieces }.average() }
+    fun monthlyRecap(year: Int, month: Int): Recap? =
+        recapFor(days.filter { it.date.year == year && it.date.monthNumber == month },
+            "${kotlinx.datetime.Month(month).name.lowercase().replaceFirstChar { it.uppercase() }} $year")
+
+    /** Year in review. */
+    fun yearRecap(year: Int): Recap? = recapFor(days.filter { it.date.year == year }, "$year in review")
+
+    /** Months with any data, newest first, as (year, month). */
+    fun months(): List<Pair<Int, Int>> = days.map { it.date.year to it.date.monthNumber }.distinct().reversed()
+
+    private fun recapFor(inRange: List<DayStat>, label: String): Recap? {
+        if (inRange.isEmpty()) return null
+        val weeks = inRange.chunked(7).map { w -> w.map { it.pieces }.average() }
         val drop = weeks.zipWithNext().maxOfOrNull { (a, b) -> if (a > 0) (a - b) / a * 100 else 0.0 }
-        val doses = inMonth.flatMap { it.doses }.sortedBy { it.at }
+        val doses = inRange.flatMap { it.doses }.filter { !it.estimated }.sortedBy { it.at }
         val gap = doses.zipWithNext().maxOfOrNull { (a, b) -> (b.at - a.at) / 60_000.0 } ?: 0.0
-        val rungs = data.rungChanges.filter { it.reason == "down" }.filter {
-            val d = it.at.localDate(tz); d.year == year && d.monthNumber == month
-        }.map { Ladder.rung(it.pieces).label }
+        val from = inRange.first().date
+        val to = inRange.last().date
+        val rungs = data.rungChanges.filter { it.reason == "down" }.filter { it.at.localDate(tz) in from..to }
+            .map { Ladder.rung(it.pieces).label }
         return Recap(
-            month = "${kotlinx.datetime.Month(month).name.lowercase().replaceFirstChar { it.uppercase() }} $year",
-            pieces = inMonth.sumOf { it.pieces },
+            month = label,
+            pieces = inRange.sumOf { it.pieces },
             biggestWeeklyDropPct = drop?.takeIf { it > 0 },
             longestGapMin = gap,
             mostBeatenTrigger = beatenTriggers().firstOrNull { it.second > 0 }?.first,
             rungsReached = rungs,
-            cravingsRidden = inMonth.sumOf { it.rodeOut },
+            cravingsRidden = inRange.sumOf { it.rodeOut },
         )
     }
 

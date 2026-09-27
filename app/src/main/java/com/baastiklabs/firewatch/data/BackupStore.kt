@@ -27,6 +27,7 @@ object BackupStore {
     private const val PUBLIC_KEEP = 5
     private const val PUBLIC_DIR = "Firewatch"
     private const val DAILY_MS = 24 * 60 * 60_000L
+    private const val FOLDER_KEEP = 30
 
     fun dir(context: Context): File = File(context.filesDir, "backups").apply { mkdirs() }
 
@@ -43,7 +44,69 @@ object BackupStore {
         out.writeText(text)
         list(context).drop(KEEP).forEach { it.delete() }
         runCatching { writePublicCopy(context, out.name, text) }
+        runCatching { writeToFolder(context, out.name, text) }
         out
+    }
+
+    // --- A folder D picked once (e.g. Google Drive): survives a lost or replaced phone. ---
+
+    private fun prefs(context: Context) = context.getSharedPreferences("fw_backup", Context.MODE_PRIVATE)
+
+    fun folder(context: Context): Uri? = prefs(context).getString("folder", null)?.let(Uri::parse)
+
+    fun setFolder(context: Context, tree: Uri?) {
+        if (tree != null) {
+            context.contentResolver.takePersistableUriPermission(
+                tree,
+                android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION or android.content.Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
+            )
+        }
+        prefs(context).edit().putString("folder", tree?.toString()).apply()
+    }
+
+    /** When a copy last left the phone (export or backup folder). */
+    fun lastOffPhone(context: Context): Long = prefs(context).getLong("last_off_phone", 0L)
+
+    fun markOffPhone(context: Context) = prefs(context).edit().putLong("last_off_phone", System.currentTimeMillis()).apply()
+
+    private fun writeToFolder(context: Context, name: String, text: String) {
+        val tree = folder(context) ?: return
+        val resolver = context.contentResolver
+        val parent = android.provider.DocumentsContract.buildDocumentUriUsingTree(
+            tree, android.provider.DocumentsContract.getTreeDocumentId(tree),
+        )
+        val doc = android.provider.DocumentsContract.createDocument(resolver, parent, "application/json", name) ?: return
+        resolver.openOutputStream(doc)?.use { it.write(text.toByteArray()) }
+        markOffPhone(context)
+        pruneFolder(context, tree)
+    }
+
+    private fun pruneFolder(context: Context, tree: Uri) {
+        val resolver = context.contentResolver
+        val children = android.provider.DocumentsContract.buildChildDocumentsUriUsingTree(
+            tree, android.provider.DocumentsContract.getTreeDocumentId(tree),
+        )
+        val found = ArrayList<Pair<String, Long>>()
+        resolver.query(
+            children,
+            arrayOf(
+                android.provider.DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+                android.provider.DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+                android.provider.DocumentsContract.Document.COLUMN_LAST_MODIFIED,
+            ),
+            null, null, null,
+        )?.use { c ->
+            while (c.moveToNext()) {
+                if (c.getString(1)?.startsWith("firewatch-backup-") == true) found += c.getString(0) to c.getLong(2)
+            }
+        }
+        found.sortedByDescending { it.second }.drop(FOLDER_KEEP).forEach { (id, _) ->
+            runCatching {
+                android.provider.DocumentsContract.deleteDocument(
+                    resolver, android.provider.DocumentsContract.buildDocumentUriUsingTree(tree, id),
+                )
+            }
+        }
     }
 
     /** A daily safety net, called on app start. */

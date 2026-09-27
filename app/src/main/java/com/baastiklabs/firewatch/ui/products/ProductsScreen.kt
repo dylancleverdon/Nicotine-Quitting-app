@@ -41,6 +41,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.baastiklabs.firewatch.core.Absorption
+import com.baastiklabs.firewatch.core.toDose
 import com.baastiklabs.firewatch.core.model.DefaultProducts
 import com.baastiklabs.firewatch.core.model.Product
 import com.baastiklabs.firewatch.core.model.ProductKind
@@ -89,7 +90,8 @@ fun ProductsScreen(vm: FirewatchViewModel, data: FirewatchData, onBack: () -> Un
                     supportingContent = {
                         Text(
                             "${DefaultProducts.kindLabel(product.kind)} · ${formatMg(product.labelMg)} mg · " +
-                                "~${(product.absorption * 100).roundToInt()}% absorbed · ${Fmt.piecesLabel(pieces)}",
+                                "~${(product.absorption * 100).roundToInt()}% absorbed · ${Fmt.piecesLabel(pieces)}\n" +
+                                "Quality ${com.baastiklabs.firewatch.core.engine.Quality.label(com.baastiklabs.firewatch.core.engine.Quality.doseScore(product.toDose("q", 0, 0), data.referenceMg, false))}",
                         )
                     },
                     trailingContent = {

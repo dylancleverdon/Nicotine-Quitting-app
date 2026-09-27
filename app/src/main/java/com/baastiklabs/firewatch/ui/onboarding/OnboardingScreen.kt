@@ -57,13 +57,25 @@ import com.baastiklabs.firewatch.update.SelfInstaller
 import kotlinx.coroutines.launch
 import java.time.LocalTime
 
-private const val STEPS = 4
+private const val STEPS = 5
 
 /** One-time setup. Each step is plain and skippable except the essentials. */
 @Composable
 fun OnboardingScreen(vm: FirewatchViewModel, data: FirewatchData) {
     val scope = rememberCoroutineScope()
     var step by rememberSaveable { mutableIntStateOf(0) }
+    var backfill by rememberSaveable { mutableStateOf(false) }
+    var backfilling by rememberSaveable { mutableStateOf(false) }
+
+    fun finish() {
+        vm.updateState.lastSeenVersion = BuildConfig.VERSION_NAME
+        scope.launch { vm.repository.updateSettings { it.copy(onboardingDone = true) } }
+    }
+
+    if (backfilling) {
+        BackfillScreen(vm, data, onDone = { finish() }, onCancel = { backfilling = false })
+        return
+    }
 
     Surface(color = MaterialTheme.colorScheme.background, modifier = Modifier.fillMaxSize()) {
         Column(
@@ -80,7 +92,8 @@ fun OnboardingScreen(vm: FirewatchViewModel, data: FirewatchData) {
                     0 -> WelcomeStep()
                     1 -> UpdatesStep()
                     2 -> ScheduleStep(vm, data)
-                    else -> ProductsStep(vm, data)
+                    3 -> ProductsStep(vm, data)
+                    else -> StartStep(backfill) { backfill = it }
                 }
             }
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -91,12 +104,54 @@ fun OnboardingScreen(vm: FirewatchViewModel, data: FirewatchData) {
                 Button(onClick = {
                     if (step < STEPS - 1) {
                         step++
+                    } else if (backfill) {
+                        backfilling = true
                     } else {
-                        vm.updateState.lastSeenVersion = BuildConfig.VERSION_NAME
-                        scope.launch { vm.repository.updateSettings { it.copy(onboardingDone = true) } }
+                        finish()
                     }
-                }) { Text(if (step < STEPS - 1) "Next" else "Start") }
+                }) { Text(if (step < STEPS - 1) "Next" else if (backfill) "Estimate my week" else "Start") }
             }
+        }
+    }
+}
+
+@Composable
+private fun StartStep(backfill: Boolean, onChoose: (Boolean) -> Unit) {
+    Text("How do you want to start?", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
+    Text(
+        "Firewatch needs about a week of history to work out your starting tier.",
+        style = MaterialTheme.typography.bodyLarge,
+    )
+    ChoiceCard(
+        selected = !backfill,
+        title = "Establish a baseline",
+        body = "Just log as usual for 7 days. Most accurate; your tier appears on day 8.",
+        onClick = { onChoose(false) },
+    )
+    ChoiceCard(
+        selected = backfill,
+        title = "Estimate my last week",
+        body = "Go through the last 7 days one at a time and tap roughly what you used each day. No times needed. Your starting tier shows up straight away.",
+        onClick = { onChoose(true) },
+    )
+}
+
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@Composable
+private fun ChoiceCard(selected: Boolean, title: String, body: String, onClick: () -> Unit) {
+    androidx.compose.material3.Card(
+        onClick = onClick,
+        colors = androidx.compose.material3.CardDefaults.cardColors(
+            containerColor = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh,
+        ),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                androidx.compose.material3.RadioButton(selected = selected, onClick = onClick)
+                Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            }
+            Text(body, style = MaterialTheme.typography.bodyMedium)
         }
     }
 }
@@ -118,7 +173,7 @@ private fun WelcomeStep() {
         )
         Text(
             "Everything is counted in pieces: what one 4 mg nicotine gum delivers into your blood. " +
-                "For the first week Firewatch just watches, then it shows where you're starting from.",
+                "Start with a baseline week, or estimate your last week and see your starting tier straight away.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

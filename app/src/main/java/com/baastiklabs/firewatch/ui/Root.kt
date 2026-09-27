@@ -74,6 +74,7 @@ fun FirewatchRoot(vm: FirewatchViewModel) {
     BackHandler(enabled = !isTab) {
         route = when {
             route.startsWith("day/") -> "calendar"
+            route == "backfill" -> "home"
             else -> "settings"
         }
     }
@@ -100,7 +101,10 @@ fun FirewatchRoot(vm: FirewatchViewModel) {
     ) { padding ->
         Box(Modifier.padding(padding).fillMaxSize()) {
             when {
-                route == "home" -> HomeScreen(vm, data, now, snackbar)
+                route == "home" -> HomeScreen(vm, data, now, snackbar, onBackfill = { route = "backfill" })
+                route == "backfill" -> com.baastiklabs.firewatch.ui.onboarding.BackfillScreen(
+                    vm, data, onDone = { route = "home" }, onCancel = { route = "home" },
+                )
                 route == "insights" -> com.baastiklabs.firewatch.ui.insights.InsightsScreen(data, now) {
                     com.baastiklabs.firewatch.health.WatchOverlayCard(vm, data)
                 }
@@ -113,6 +117,7 @@ fun FirewatchRoot(vm: FirewatchViewModel) {
                     snackbar = snackbar,
                     onOpenProducts = { route = "products" },
                     onOpenAbout = { route = "about" },
+                    onBackfill = { route = "backfill" },
                 )
                 route.startsWith("day/") -> DayScreen(
                     vm = vm,

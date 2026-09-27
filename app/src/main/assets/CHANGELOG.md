@@ -2,6 +2,15 @@
 
 Newest first. Each release is a "## <version>" heading; the app shows these notes in "What's new".
 
+## 0.3.0 · 2026-09-27
+- Nicotine quality is now a food scale, from 🥦 broccoli (90–100) down to 🍔 burger and fries (0–10). Gum, lozenges and patches are broccoli. Pouches, vapes and cigarettes score lower, and so do very big doses and doses stacked on top of each other. Using less of a vape doesn't raise it; switching to gum does. You'll see today's score on the home screen, with a tip when a swap would help.
+- New way to start: estimate your last week instead of waiting a week. Go through the last 7 days one page at a time, tap what you used, and your starting tier appears straight away. It's on the home screen and in Settings while your baseline week is still running.
+- Cigarettes are now a built-in product (off the home screen unless you add them).
+- Stepping down a rung gets a proper celebration.
+- Recaps for any month, plus a year in review. The day barcode is stacked month by month.
+- Automatic backup off the phone: pick a folder once (for example in Google Drive) and a backup goes there every day and before every update.
+- Optional, neutral reminders for the daily check-in and for keeping a backup. They're off unless you turn them on.
+
 ## 0.2.0 · 2026-09-27
 - Your tier: after the baseline week, the home screen shows where you are on the fire ladder, from Wildfire down to Clear Air. There are small steps one piece at a time, so stepping down is never a big jump.
 - Next-piece battery: shows when your next piece is recommended at your target pace, or that you're clear for one. It never nags, and it pauses while you sleep.

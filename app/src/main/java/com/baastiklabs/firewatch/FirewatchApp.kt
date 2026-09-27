@@ -46,6 +46,7 @@ class FirewatchApp : Application() {
         graph.appScope.launch {
             runCatching {
                 graph.repository.ensureLoaded()
+                com.baastiklabs.firewatch.reminders.Reminders.sync(this@FirewatchApp, graph.repository.data.value.settings)
                 BackupStore.dailyIfDue(this@FirewatchApp, graph.repository)
             }
         }

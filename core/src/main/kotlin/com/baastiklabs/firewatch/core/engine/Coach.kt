@@ -57,7 +57,7 @@ object Coach {
 
         // Intensity vs hours since the previous dose.
         val points = data.cravings.mapNotNull { c ->
-            val last = data.doses.lastOrNull { it.at < c.at } ?: return@mapNotNull null
+            val last = data.doses.lastOrNull { !it.estimated && it.at < c.at } ?: return@mapNotNull null
             ln(1.0 + (c.at - last.at) / 3_600_000.0) to c.intensity.toDouble()
         }
         var a = 2.5
@@ -117,42 +117,94 @@ object Coach {
     }
 }
 
-/** Rates delivery methods with nicotine gum as the gold standard (100). */
+/**
+ * Nicotine quality: HOW you use nicotine, on a food scale. Quit aids (gum, lozenge, patch) are
+ * broccoli; smoke is burger and fries. Using less of a vape doesn't raise it; switching does.
+ * Per dose: a base score by method, minus a dose-size penalty (one big hit is worse than a gentle
+ * one) and a stacking penalty (dosing while the last one is still peaking). The day's score is the
+ * pieces-weighted average.
+ */
 object Quality {
-    fun score(kind: ProductKind): Int = when (kind) {
-        ProductKind.GUM -> 100
-        ProductKind.PATCH -> 100
-        ProductKind.LOZENGE -> 95
-        ProductKind.POUCH -> 75
-        ProductKind.OTHER -> 60
-        ProductKind.VAPE -> 40
-        ProductKind.CIGARETTE -> 10
+    enum class Food(val emoji: String, val title: String, val min: Int) {
+        BROCCOLI("🥦", "Broccoli", 90),
+        APPLE("🍎", "Apple", 75),
+        SANDWICH("🥪", "Sandwich", 55),
+        PIZZA("🍕", "Pizza", 35),
+        DONUT("🍩", "Donut", 11),
+        BURGER("🍔", "Burger & fries", 0),
     }
+
+    /** Base score by delivery method (speed + whether it's a licensed quit aid). */
+    fun score(kind: ProductKind): Int = when (kind) {
+        ProductKind.GUM, ProductKind.PATCH, ProductKind.LOZENGE -> 100
+        ProductKind.POUCH -> 60
+        ProductKind.OTHER -> 50
+        ProductKind.VAPE -> 25
+        ProductKind.CIGARETTE -> 5
+    }
+
+    fun isQuitAid(kind: ProductKind) = kind == ProductKind.GUM || kind == ProductKind.PATCH || kind == ProductKind.LOZENGE
 
     fun why(kind: ProductKind): String = when (kind) {
         ProductKind.GUM, ProductKind.PATCH, ProductKind.LOZENGE -> "Licensed quit aid, slow and steady"
-        ProductKind.POUCH -> "Slow like gum, but stronger and not a licensed quit aid"
+        ProductKind.POUCH -> "Slow like gum, but not a quit aid"
         ProductKind.VAPE -> "Fast spikes are the most habit-forming kind"
         ProductKind.CIGARETTE -> "Fastest spike, plus smoke"
         ProductKind.OTHER -> "Unknown"
     }
 
+    const val SIZE_PENALTY_PER_PIECE = 8.0
+    const val STACK_PENALTY = 15.0
+    const val SMOKE_CAP = 10.0
+
+    /** Score of one dose. [stacked] = taken while the previous dose was still peaking. */
+    fun doseScore(dose: Dose, referenceMg: Double, stacked: Boolean): Double {
+        var s = score(dose.kind).toDouble()
+        val pieces = dose.pieces(referenceMg)
+        if (pieces > 1.5) s -= (pieces - 1.5) * SIZE_PENALTY_PER_PIECE
+        if (stacked) s -= STACK_PENALTY
+        if (dose.kind == ProductKind.CIGARETTE) s = minOf(s, SMOKE_CAP)
+        return s.coerceIn(0.0, 100.0)
+    }
+
     /** Pieces-weighted average score of these doses (null if none). */
     fun of(doses: List<Dose>, referenceMg: Double): Double? {
-        val total = doses.sumOf { it.pieces(referenceMg) }
+        val sorted = doses.sortedBy { it.at }
+        val total = sorted.sumOf { it.pieces(referenceMg) }
         if (total <= 0) return null
-        return doses.sumOf { it.pieces(referenceMg) * score(it.kind) } / total
+        return sorted.mapIndexed { i, d ->
+            val prev = sorted.getOrNull(i - 1)
+            val stacked = prev != null && !d.estimated && !prev.estimated &&
+                d.at - prev.at < Kinetics.peakMinutes(prev.speed) * 60_000L
+            d.pieces(referenceMg) * doseScore(d, referenceMg, stacked)
+        }.sum() / total
     }
 
-    fun grade(score: Double): String = when {
-        score >= 90 -> "A"
-        score >= 75 -> "B"
-        score >= 60 -> "C"
-        score >= 40 -> "D"
-        else -> "E"
-    }
+    fun food(score: Double): Food = Food.entries.first { score.roundToInt() >= it.min }
 
-    fun label(score: Double) = "${grade(score)} · ${score.roundToInt()}"
+    fun grade(score: Double): String = food(score).emoji
+
+    fun label(score: Double): String = food(score).let { "${it.emoji} ${it.title} · ${score.roundToInt()}" }
+
+    /** A nudge toward quit aids when today's mix isn't broccoli yet. */
+    fun swapTip(doses: List<Dose>, referenceMg: Double): String? {
+        val now = of(doses, referenceMg) ?: return null
+        if (food(now) == Food.BROCCOLI) return null
+        val worst = doses.filter { !isQuitAid(it.kind) }.groupBy { it.kind }.maxByOrNull { (_, v) -> v.sumOf { it.pieces(referenceMg) } }?.key ?: return null
+        val swapped = doses.map { if (it.kind == worst) it.copy(kind = ProductKind.GUM, speed = com.baastiklabs.firewatch.core.model.SpeedProfile.BUILD) else it }
+        val after = of(swapped, referenceMg) ?: return null
+        val name = DefaultProductsNames.plural(worst)
+        return "Swapping $name for gum would move today from ${food(now).emoji} to ${food(after).emoji}."
+    }
+}
+
+private object DefaultProductsNames {
+    fun plural(kind: ProductKind) = when (kind) {
+        ProductKind.POUCH -> "pouches"
+        ProductKind.VAPE -> "vaping"
+        ProductKind.CIGARETTE -> "cigarettes"
+        else -> "that"
+    }
 }
 
 /** Unknown doses (a friend's vape): a range instead of a made-up number. */

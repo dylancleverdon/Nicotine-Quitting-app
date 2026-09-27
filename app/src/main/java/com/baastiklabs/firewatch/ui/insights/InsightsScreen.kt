@@ -161,9 +161,16 @@ private fun TrendsSection(ins: Insights) = Col {
     val bands = listOf(
         1.0 to Color(0x2250A890), 3.0 to Color(0x1A8FC7B8), 5.0 to Color(0x14FFB35C), 8.0 to Color(0x14FF7A2F), 99.0 to Color(0x14E0443A),
     )
-    ChartCard("Daily totals", "Pieces a day, tier bands behind and the 7-day average on top. Hatched = unknown doses (range).") {
+    ChartCard("Daily totals", "Pieces a day, tier bands behind and the 7-day average on top. Hatched = unknown doses (range); faded = estimated (back-dated) days.") {
         BarChart(
-            days.map { Bar(it.pieces, if (it.hasRange) it.lowPieces else null, if (it.hasRange) it.highPieces else null) },
+            days.map { d ->
+                Bar(
+                    d.pieces,
+                    if (d.hasRange) d.lowPieces else null,
+                    if (d.hasRange) d.highPieces else null,
+                    color = if (d.doses.any { it.estimated }) MaterialTheme.colorScheme.primary.copy(alpha = 0.45f) else null,
+                )
+            },
             line = days.indices.map { ins.sevenDayAverage(it + offset) },
             bands = bands,
         )
@@ -262,10 +269,13 @@ private fun GoingDownSection(ins: Insights, data: FirewatchData, now: Long) = Co
         TrendLine(days.map { if (it.absorbedMg > 0) it.spikeMg / it.absorbedMg * 100 else 0.0 })
     }
     val quality = days.map { it.quality ?: 100.0 }
-    ChartCard("Nicotine quality", "Gum is the gold standard (100). Pouches score lower, vapes much lower.") {
+    ChartCard("Nicotine quality", "How you use nicotine, on a food scale. Gum, lozenges and patches are broccoli; smoke is burger and fries. Switching method raises it; using a vape less doesn't.") {
         TrendLine(quality, color = MaterialTheme.colorScheme.tertiary)
-        ins.days.last().quality?.let { Text("Today: ${Quality.label(it)}", style = MaterialTheme.typography.bodyMedium) }
-        ProductKind.entries.forEach { k -> Text("${k.name.lowercase().replaceFirstChar { it.uppercase() }}: ${Quality.score(k)} · ${Quality.why(k)}", style = MaterialTheme.typography.bodySmall) }
+        ins.days.last().quality?.let { Text("Today: ${Quality.label(it)}", style = MaterialTheme.typography.titleMedium) }
+        Quality.swapTip(ins.days.last().doses, data.referenceMg)?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+        Quality.Food.entries.forEach { f -> Text("${f.emoji} ${f.title}: ${f.min}+", style = MaterialTheme.typography.bodySmall) }
+        Text("Per dose: gum, lozenge, patch 100 · pouch 60 · vape 25 · cigarette 5 (max 10). Minus points for a big single dose and for stacking doses.",
+            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
     ChartCard("Heaviness score", "From how soon after waking you use and how much per day, the two things dependence tests weight most (0–6).") {
         val weekly = ins.fullDays.chunked(7).mapNotNull { ins.heaviness(it) }
@@ -385,10 +395,26 @@ private fun MilestonesSection(ins: Insights, now: Long) = Col {
         if (badges.isEmpty()) Text("Your first badges come with your first step down.", style = MaterialTheme.typography.bodySmall)
         badges.reversed().forEach { b -> Text("🔥 ${b.title} · ${b.detail} · ${Fmt.shortDateK(b.earnedOn)}", style = MaterialTheme.typography.bodyMedium) }
     }
-    val month = ins.today
-    ins.monthlyRecap(month.year, month.monthNumber)?.let { rc ->
-        ChartCard("${rc.month} recap") {
-            Text("≈ ${Fmt.pieces(rc.pieces)} pieces this month", style = MaterialTheme.typography.bodyMedium)
+    var recapKey by rememberSaveable { mutableStateOf("") }
+    val months = ins.months()
+    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        months.forEachIndexed { i, (y, m) ->
+            val key = "$y-$m"
+            FilterChip(selected = recapKey == key || (recapKey.isEmpty() && i == 0), onClick = { recapKey = key },
+                label = { Text(java.time.Month.of(m).getDisplayName(java.time.format.TextStyle.SHORT, Locale.getDefault()) + " $y") })
+        }
+        months.map { it.first }.distinct().forEach { y ->
+            FilterChip(selected = recapKey == "year-$y", onClick = { recapKey = "year-$y" }, label = { Text("$y in review") })
+        }
+    }
+    val recap = when {
+        recapKey.startsWith("year-") -> ins.yearRecap(recapKey.removePrefix("year-").toInt())
+        recapKey.isNotEmpty() -> recapKey.split("-").let { ins.monthlyRecap(it[0].toInt(), it[1].toInt()) }
+        else -> months.firstOrNull()?.let { ins.monthlyRecap(it.first, it.second) }
+    }
+    recap?.let { rc ->
+        ChartCard(if (rc.month.contains("review")) rc.month else "${rc.month} recap") {
+            Text("≈ ${Fmt.pieces(rc.pieces)} pieces", style = MaterialTheme.typography.bodyMedium)
             rc.biggestWeeklyDropPct?.let { Text("Biggest weekly drop: ${it.roundToInt()}%", style = MaterialTheme.typography.bodyMedium) }
             Text("Longest gap: ${Fmt.duration((rc.longestGapMin * 60_000).toLong())}", style = MaterialTheme.typography.bodyMedium)
             rc.mostBeatenTrigger?.let { Text("Most-beaten trigger: $it", style = MaterialTheme.typography.bodyMedium) }
@@ -396,8 +422,12 @@ private fun MilestonesSection(ins: Insights, now: Long) = Col {
             if (rc.rungsReached.isNotEmpty()) Text("Rungs reached: ${rc.rungsReached.joinToString()}", style = MaterialTheme.typography.bodyMedium)
         }
     }
-    ChartCard("Day barcode", "Each day a strip, oldest at top: dark where nicotine was in your system, light where clear. Watch the light spread.") {
-        DayBarcode(ins.days.takeLast(60).map { it.barcode })
+    ChartCard("Day barcode", "Each day a strip, stacked by month: dark where nicotine was in your system, light where clear. Watch the light spread.") {
+        ins.days.groupBy { it.date.year to it.date.monthNumber }.entries.toList().takeLast(4).forEach { (ym, ds) ->
+            Text(java.time.Month.of(ym.second).getDisplayName(java.time.format.TextStyle.FULL, Locale.getDefault()) + " ${ym.first}",
+                style = MaterialTheme.typography.labelMedium)
+            DayBarcode(ds.map { it.barcode })
+        }
     }
     val silly = ins.silly()
     ChartCard("Silly conversions") {

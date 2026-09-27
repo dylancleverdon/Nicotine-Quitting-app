@@ -111,10 +111,44 @@ class EngineTest {
     }
 
     @Test
-    fun `quality ranks gum above vapes`() {
-        assertTrue(Quality.score(ProductKind.GUM) > Quality.score(ProductKind.POUCH))
-        assertTrue(Quality.score(ProductKind.POUCH) > Quality.score(ProductKind.VAPE))
-        assertEquals("A", Quality.grade(100.0))
+    fun `quality food scale rewards quit aids not less vaping`() {
+        val products = DefaultProducts.all().associateBy { it.id }
+        val gum = listOf(gum4.toDose("g1", at(1, 9), 0), gum4.toDose("g2", at(1, 14), 0))
+        assertEquals(Quality.Food.BROCCOLI, Quality.food(Quality.of(gum, 2.0)!!))
+        val zyn3 = listOf(products.getValue(DefaultProducts.ZYN_3MG).toDose("z", at(1, 9), 0))
+        assertEquals(Quality.Food.SANDWICH, Quality.food(Quality.of(zyn3, 2.0)!!))
+        val cig = listOf(products.getValue(DefaultProducts.CIGARETTE).toDose("c", at(1, 9), 0))
+        assertEquals(Quality.Food.BURGER, Quality.food(Quality.of(cig, 2.0)!!))
+        // A big vape session is a donut; a small one isn't better than broccoli-level gum.
+        val vape = com.baastiklabs.firewatch.core.model.Dose("v", "x", at(1, 9), kind = ProductKind.VAPE, speed = SpeedProfile.SPIKE, rangeLowMg = 1.0, rangeHighMg = 3.0)
+        assertEquals(Quality.Food.DONUT, Quality.food(Quality.of(listOf(vape), 2.0)!!))
+        // Stacking costs points.
+        val stacked = listOf(gum4.toDose("a", at(1, 9), 0), gum4.toDose("b", at(1, 9, 10), 0))
+        assertTrue(Quality.of(stacked, 2.0)!! < 100.0)
+        assertNotNull(Quality.swapTip(zyn3, 2.0))
+        assertNull(Quality.swapTip(gum, 2.0))
+    }
+
+    @Test
+    fun `backfill spreads estimated doses across the waking day`() {
+        val data = FirewatchData(products = DefaultProducts.all())
+        val day = kotlinx.datetime.LocalDate(2026, 9, 20)
+        var n = 0
+        val doses = com.baastiklabs.firewatch.core.engine.Backfill.doses(
+            data, day,
+            com.baastiklabs.firewatch.core.engine.Backfill.DayEntry(mapOf(DefaultProducts.ZYN_3MG to 4, DefaultProducts.CIGARETTE to 2)),
+            tz, 0L, { "id${n++}" },
+        )
+        assertEquals(6, doses.size)
+        assertTrue(doses.all { it.estimated && it.at in at(20, 7)..at(20, 23) })
+        assertEquals(7, com.baastiklabs.firewatch.core.engine.Backfill.days(kotlinx.datetime.LocalDate(2026, 9, 27)).size)
+        // A back-filled week completes the baseline straight away.
+        val week = com.baastiklabs.firewatch.core.engine.Backfill.days(kotlinx.datetime.LocalDate(2026, 9, 27)).flatMap { d ->
+            com.baastiklabs.firewatch.core.engine.Backfill.doses(data, d, com.baastiklabs.firewatch.core.engine.Backfill.DayEntry(mapOf(DefaultProducts.GUM_4MG to 5)), tz, 0L, { "w${n++}" })
+        }
+        val full = data.copy(doses = week)
+        assertTrue(Progress.tiersRevealed(full, kotlinx.datetime.LocalDate(2026, 9, 27), tz))
+        assertEquals(5.0, Progress.measuredRung(full, kotlinx.datetime.LocalDate(2026, 9, 27), tz)?.pieces)
     }
 
     @Test

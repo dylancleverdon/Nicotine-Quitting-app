@@ -81,7 +81,7 @@ import java.time.LocalDate
 import java.time.LocalTime
 
 @Composable
-fun HomeScreen(vm: FirewatchViewModel, data: FirewatchData, now: Long, snackbar: SnackbarHostState) {
+fun HomeScreen(vm: FirewatchViewModel, data: FirewatchData, now: Long, snackbar: SnackbarHostState, onBackfill: () -> Unit = {}) {
     val repo = vm.repository
     val scope = rememberCoroutineScope()
     val haptic = LocalHapticFeedback.current
@@ -116,9 +116,15 @@ fun HomeScreen(vm: FirewatchViewModel, data: FirewatchData, now: Long, snackbar:
     val quality = remember(data, minute) { Quality.of(todayDoses, data.referenceMg) }
     val checkedInToday = data.checkIns.any { it.at.localDate(tz) == today }
 
+    var celebrate by remember { mutableStateOf<com.baastiklabs.firewatch.core.engine.Rung?>(null) }
+
     fun moveTarget(pieces: Double, reason: String) {
         scope.launch {
             repo.setTarget(pieces, reason)
+            if (reason == "down") {
+                celebrate = Ladder.rung(pieces)
+                return@launch
+            }
             val r = Ladder.rung(pieces)
             snackbar.showSnackbar(
                 when (reason) {
@@ -192,7 +198,7 @@ fun HomeScreen(vm: FirewatchViewModel, data: FirewatchData, now: Long, snackbar:
                     quality = quality,
                 )
             } else {
-                StatusCard(todaySummary, baseline, summaries, lastDoseAt, now)
+                StatusCard(todaySummary, baseline, summaries, lastDoseAt, now, onBackfill)
             }
         }
         if (revealed && target == null && measured != null) {
@@ -236,6 +242,11 @@ fun HomeScreen(vm: FirewatchViewModel, data: FirewatchData, now: Long, snackbar:
             }
         }
         if (headsUps.isNotEmpty()) item { HeadsUpCard(headsUps) }
+        Quality.swapTip(todayDoses, data.referenceMg)?.let { tip ->
+            item {
+                Text(tip, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
         if (data.settings.dailyCheckIn && !checkedInToday) {
             item {
                 OutlinedButton(onClick = { checkIn = true }, modifier = Modifier.fillMaxWidth()) { Text("Daily check-in (3 taps)") }
@@ -422,6 +433,21 @@ fun HomeScreen(vm: FirewatchViewModel, data: FirewatchData, now: Long, snackbar:
             },
         )
     }
+    celebrate?.let { r ->
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { celebrate = null },
+            icon = { Text("🔥", style = MaterialTheme.typography.displaySmall) },
+            title = { Text("New rung: ${r.tier.title}") },
+            text = {
+                Text(
+                    "${r.plainLine} You earned the ${r.label} badge. Every step down is one piece a day lighter, and badges are never taken away.",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            },
+            confirmButton = { androidx.compose.material3.TextButton(onClick = { celebrate = null }) { Text("Onward") } },
+        )
+    }
+
     if (checkIn) {
         CheckInDialog(onDismiss = { checkIn = false }, onSave = { c, m, sl ->
             checkIn = false
@@ -514,6 +540,7 @@ private fun StatusCard(
     summaries: Map<kotlinx.datetime.LocalDate, DaySummary>,
     lastDoseAt: Long?,
     now: Long,
+    onBackfill: () -> Unit,
 ) {
     Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
@@ -527,6 +554,7 @@ private fun StatusCard(
                         "Starts with your first log. For 7 days Firewatch just watches, then it shows your starting tier.",
                         style = MaterialTheme.typography.bodyMedium,
                     )
+                    OutlinedButton(onClick = onBackfill) { Text("Estimate my last week instead") }
                 }
                 is BaselineStatus.InProgress -> {
                     Text(
@@ -543,6 +571,7 @@ private fun StatusCard(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                    OutlinedButton(onClick = onBackfill) { Text("Estimate the days before instead") }
                 }
                 is BaselineStatus.Complete -> {
                     val avg = Baseline.averagePiecesPerDay(summaries, baseline.startedOn)
@@ -691,6 +720,7 @@ private fun SleepRow(
 @Composable
 fun DoseRow(dose: Dose, referenceMg: Double, onClick: () -> Unit) {
     val extras = buildList {
+        if (dose.estimated) add("estimated")
         if (dose.multiplier != 1.0) add("×${Fmt.pieces(dose.multiplier)}")
         if (dose.duration != com.baastiklabs.firewatch.core.model.Duration.FULL) add(dose.duration.name.lowercase())
         if (dose.acidicDrink) add("with coffee/soda")
