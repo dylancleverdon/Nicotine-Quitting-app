@@ -199,6 +199,7 @@ fun HomeScreen(vm: FirewatchViewModel, data: FirewatchData, now: Long, snackbar:
                     wave = wave,
                     sleepShade = listOf(wave.firstOrNull()?.first.let { (it ?: 0L) to todayWake.wakeAt }, todayWake.sleepAt to (wave.lastOrNull()?.first ?: 0L)),
                     quality = quality,
+                    fitsNow = battery?.let { com.baastiklabs.firewatch.core.engine.BatteryEngine.fitsNow(data, it)?.name },
                 )
             } else {
                 StatusCard(todaySummary, baseline, summaries, lastDoseAt, now, onBackfill)

@@ -1,7 +1,7 @@
 package com.baastiklabs.firewatch.core.engine
 
 import com.baastiklabs.firewatch.core.Absorption
-import com.baastiklabs.firewatch.core.absorbedMgHigh
+import com.baastiklabs.firewatch.core.absorbedMg
 import com.baastiklabs.firewatch.core.localDate
 import com.baastiklabs.firewatch.core.model.Dose
 import com.baastiklabs.firewatch.core.records.FirewatchData
@@ -24,13 +24,14 @@ data class DayBattery(val date: LocalDate, val stretchMin: Double, val pullMin: 
  * The next-piece battery.
  * - Fresh start: full when D wakes up; yesterday never counts against today.
  * - Every dose restarts the countdown from the moment it's taken: it drains by the dose's pieces
- *   (top of the range for unknown doses) and never below empty, so the wait is at most one gap.
+ *   (the same middle estimate as "pieces today") and never below empty, so the wait is at most one gap.
  * - Refills one piece per target interval while awake.
  * - No waiting overnight: if it wouldn't be full before bedtime, it's full when D wakes.
  * - After bedtime D is assumed asleep; opening the app or logging says "I'm up" and the battery
  *   catches up on the time since bedtime (that catch-up never counts as stretch).
- * - Stretch: minutes held off with a full battery (before bedtime). Pull: for a piece taken early,
- *   how long until the battery would have been full. Net = stretch − pull.
+ * - Stretch: minutes held off with a full battery (before bedtime). Pull: the part of each dose
+ *   that didn't fit in the battery, in minutes of refill; counted, then forgiven, so the wait
+ *   never exceeds one gap. Net = stretch − pull.
  */
 object BatteryEngine {
     private const val MIN = 60_000L
@@ -82,9 +83,11 @@ object BatteryEngine {
                 if (stopBefore != null && d.id == stopBefore.id) {
                     return Sim(charge, stretch, pull, charge >= 1.0 - 1e-9)
                 }
-                if (charge < 1.0 - 1e-9) pull += (1.0 - charge) * interval
+                // Size-honest pull: only the part of the dose that didn't fit in the battery.
+                val pieces = Absorption.pieces(d.absorbedMg(), ref)
+                pull += (pieces - charge).coerceAtLeast(0.0) * interval
                 fullBeforeLast = charge >= 1.0 - 1e-9
-                charge = (charge - Absorption.pieces(d.absorbedMgHigh(), ref)).coerceAtLeast(0.0)
+                charge = (charge - pieces).coerceAtLeast(0.0)
                 di++
             }
             if (t < awakeEnd) {
@@ -166,5 +169,19 @@ object BatteryEngine {
         if (!earlier) return false
         val sim = simulate(data, day, nextWake, intervalFor(target), dose.at, dose.at, stopBefore = dose)
         return sim.fullBeforeLast == true || sim.charge >= 1.0 - 1e-9
+    }
+
+    /**
+     * "A gum 2 mg fits now": while charging with at least half a piece of room, the biggest home
+     * product that fits the current charge (by its estimated pieces). Null otherwise.
+     */
+    fun fitsNow(data: FirewatchData, battery: Battery): com.baastiklabs.firewatch.core.model.Product? {
+        if (battery.state != BatteryState.CHARGING || battery.charge < 0.5) return null
+        val ref = data.referenceMg
+        return data.products
+            .filter { it.onHome && !it.archived && it.borrowedFrom == null }
+            .map { it to Absorption.pieces(Absorption.absorbedMg(it), ref) }
+            .filter { (_, p) -> p > 0.0 && p <= battery.charge + 1e-9 }
+            .maxByOrNull { it.second }?.first
     }
 }

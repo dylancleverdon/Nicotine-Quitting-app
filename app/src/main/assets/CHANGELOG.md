@@ -2,6 +2,12 @@
 
 Newest first. Each release is a "## <version>" heading; the app shows these notes in "What's new".
 
+## 0.4.1 · 2026-09-27
+- Pull now counts dose size: anything bigger than your battery had room for (like a Zyn 6 mg, or a double) shows up as pull, so your net stays honest. The wait is still never more than one gap.
+- Two small pieces now count the same as one big one.
+- The battery and "pieces today" now use the same estimate.
+- While the battery refills, a quiet line tells you when a smaller product already fits, like "A Nicotine gum 2 mg fits now".
+
 ## 0.4.0 · 2026-09-27
 - The next-piece battery is kinder:
   - It starts fresh every morning, and yesterday never counts against today.

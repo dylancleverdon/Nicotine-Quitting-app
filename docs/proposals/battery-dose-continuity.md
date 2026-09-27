@@ -1,6 +1,6 @@
 # Proposed update: battery ↔ dose-size continuity fix
 
-Status: **proposed, not built.** Written against Android 0.4.0 / web 0.2.0
+Status: **built in Android 0.4.1 / web 0.2.1** (fixes A, B and C). Written against Android 0.4.0 / web 0.2.0
 (`core/src/commonMain/kotlin/com/baastiklabs/firewatch/core/engine/BatteryEngine.kt`).
 
 ## Why

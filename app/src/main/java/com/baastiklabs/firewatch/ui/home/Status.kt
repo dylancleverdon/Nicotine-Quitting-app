@@ -46,6 +46,7 @@ fun TierStatusCard(
     wave: List<Pair<Long, Double>>,
     sleepShade: List<Pair<Long, Long>>,
     quality: Double?,
+    fitsNow: String? = null,
 ) {
     Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
@@ -72,7 +73,7 @@ fun TierStatusCard(
                     Text("Next rung down: ${next.label}", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
-            battery?.let { BatteryRow(it, now) }
+            battery?.let { BatteryRow(it, now, fitsNow) }
             Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
                 Stat("≈ ${Fmt.pieces(today.pieces)}", "pieces today", big = true)
                 Stat("≈ ${Fmt.mg(today.absorbedMg)}", "absorbed today", big = true)
@@ -95,7 +96,7 @@ fun TierStatusCard(
 }
 
 @Composable
-private fun BatteryRow(b: Battery, now: Long) {
+private fun BatteryRow(b: Battery, now: Long, fitsNow: String?) {
     val (title, detail) = when (b.state) {
         BatteryState.CLEAR -> "Clear for one if you want it" to "No rush. Every minute you wait counts as stretch."
         BatteryState.CHARGING -> "Next piece around ${b.readyAt?.let { Fmt.time(it) } ?: "later"}" to
@@ -109,6 +110,7 @@ private fun BatteryRow(b: Battery, now: Long) {
         Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
         LinearProgressIndicator(progress = { b.charge.coerceIn(0.0, 1.0).toFloat() }, modifier = Modifier.fillMaxWidth())
         Text(detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        fitsNow?.let { Text("A $it fits now", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
         StretchLine(b.stretchMinutesToday, b.pullMinutesToday)
     }
 }

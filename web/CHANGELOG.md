@@ -1,5 +1,11 @@
 # Firewatch web changelog
 
+## 0.2.1 · 2026-09-27
+- Pull now counts dose size: anything bigger than your battery had room for (like a Zyn 6 mg, or a double) shows up as pull, so your net stays honest. The wait is still never more than one gap.
+- Two small pieces now count the same as one big one.
+- The battery and "pieces today" now use the same estimate.
+- While the battery refills, a quiet line tells you when a smaller product already fits, like "A Nicotine gum 2 mg fits now".
+
 ## 0.2.0 · 2026-09-27
 - The next-piece battery starts fresh every morning, never goes into debt (the wait is never longer than one normal gap), and never makes you wait overnight.
 - Every piece restarts the countdown from when you take it.
