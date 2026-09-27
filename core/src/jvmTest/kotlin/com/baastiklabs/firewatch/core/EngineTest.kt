@@ -380,4 +380,95 @@ class EngineTest {
         assertTrue(data.relapseOn)
         assertTrue(com.baastiklabs.firewatch.core.Help.search("relapse").isNotEmpty())
     }
+
+    // ---- Craving forecast ----
+
+    private val CF = com.baastiklabs.firewatch.core.engine.CravingForecast
+
+    private fun cravingDays(days: IntRange, hour: Int, intensity: Int, doses: Boolean = true): FirewatchData {
+        val cr = days.map { d -> Craving("c$d", at(d, hour), intensity, outcome = com.baastiklabs.firewatch.core.model.CravingOutcome.RODE_OUT) }
+        val ds = if (doses) days.flatMap { d -> listOf(9, 13, 19).map { h -> gum4.toDose("d$d-$h", at(d, h), 0) } } else emptyList()
+        return FirewatchData(products = DefaultProducts.all(), doses = ds, cravings = cr, settings = com.baastiklabs.firewatch.core.model.Settings(onboardingDone = true))
+    }
+
+    @Test
+    fun `forecast peaks when cravings usually happen`() {
+        val data = cravingDays(1..20, 15, 6)
+        val o = CF.outlook(data, at(21, 8), tz)
+        assertTrue(!o.learning)
+        val next = o.next!!
+        val h = java.time.Instant.ofEpochMilli(next.peakAt).atZone(java.time.ZoneOffset.UTC).hour
+        assertTrue(h in 14..16, "peak hour $h")
+        assertTrue(next.strength in 5.0..8.0, "strength ${next.strength}")
+        // Asleep: no chance shown.
+        assertTrue(o.points.filter { it.asleep }.all { it.likelihood == 0.0 })
+        // The back-test finds most 3 PM cravings inside the predicted window.
+        assertTrue(o.tested >= 10 && o.hits >= o.tested * 3 / 4, "hits ${o.hits}/${o.tested}")
+    }
+
+    @Test
+    fun `strong past cravings forecast strong ones`() {
+        val mild = CF.outlook(cravingDays(1..20, 15, 3), at(21, 8), tz).next!!.strength
+        val strong = CF.outlook(cravingDays(1..20, 15, 8), at(21, 8), tz).next!!.strength
+        assertTrue(strong > mild + 3, "mild $mild strong $strong")
+    }
+
+    @Test
+    fun `falling nicotine raises the chance`() {
+        // Same craving pattern; one day D has had nothing since morning.
+        val base = cravingDays(1..20, 15, 6)
+        val withDose = base.copy(doses = base.doses + gum4.toDose("x", at(21, 11), 0))
+        val without = base
+        val p = { d: FirewatchData -> CF.outlook(d, at(21, 12, 5), tz).points.first { it.at == at(21, 12) }.likelihood }
+        assertTrue(p(without) > p(withDose), "without ${p(without)} with ${p(withDose)}")
+    }
+
+    @Test
+    fun `forecast is still learning with few cravings`() {
+        val data = cravingDays(1..3, 15, 6)
+        val o = CF.outlook(data, at(4, 8), tz)
+        assertTrue(o.learning)
+        assertEquals(3, o.cravingsUsed)
+        assertTrue(o.points.isNotEmpty())
+        // No cravings, no doses: nothing to go on, so no invented window.
+        val empty = CF.outlook(FirewatchData(products = DefaultProducts.all()), at(4, 8), tz)
+        assertNull(empty.next)
+    }
+
+    // ---- Receptors ----
+
+    private val RC = com.baastiklabs.firewatch.core.engine.Receptors
+
+    @Test
+    fun `receptor load heals on the research timescale after stopping`() {
+        var load = 1.0
+        repeat(42) { load = RC.step(load, 0.0) }
+        assertEquals(0.1, load, 0.01)
+        repeat(42) { load = RC.step(load, 0.0) }
+        assertTrue(load < 0.01)
+        // Heavy use heads to full load; more nicotine, more load.
+        assertEquals(1.0, RC.targetLoad(RC.HEAVY_MG), 1e-9)
+        assertTrue(RC.targetLoad(0.24) < RC.targetLoad(1.2))
+        var up = 0.0
+        repeat(21) { up = RC.step(up, 1.0) }
+        assertTrue(up > 0.9)
+    }
+
+    @Test
+    fun `following the plan heals sooner than staying`() {
+        val doses = (1..14).flatMap { d -> (0 until 6).map { i -> gum4.toDose("d$d-$i", at(d, 8 + i * 2), 0) } }
+        val data = withTarget(doses, 6.0).copy(rungChanges = listOf(RungChange("r", at(8, 8), 6.0, "start")))
+        val o = RC.outlook(data, at(15, 12), tz)!!
+        assertTrue(o.todayLoad in 0.3..1.0, "today ${o.todayLoad}")
+        assertNotNull(o.clearAirOnPlan)
+        assertNotNull(o.typicalOnPlan)
+        assertNull(o.typicalIfStay)
+        assertTrue(o.plan.last().load < o.stay.last().load)
+        // A step up is reflected: the plan starts from the heavier rung and takes longer.
+        val up = data.copy(rungChanges = data.rungChanges + RungChange("u", at(15, 9), 7.0, "up"))
+        val o2 = RC.outlook(up, at(15, 12), tz)!!
+        assertTrue(o2.typicalOnPlan!! > o.typicalOnPlan!!)
+        // Nothing logged: no guess.
+        assertNull(RC.outlook(FirewatchData(products = DefaultProducts.all()), at(15, 12), tz))
+    }
 }

@@ -49,6 +49,8 @@ import com.baastiklabs.firewatch.ui.Stat
 import com.baastiklabs.firewatch.ui.charts.AxisLabels
 import com.baastiklabs.firewatch.ui.charts.Bar
 import com.baastiklabs.firewatch.ui.charts.BarChart
+import com.baastiklabs.firewatch.ui.charts.CravingForecastChart
+import com.baastiklabs.firewatch.ui.charts.ReceptorChart
 import com.baastiklabs.firewatch.ui.charts.DayBarcode
 import com.baastiklabs.firewatch.ui.charts.DoseStrip
 import com.baastiklabs.firewatch.ui.charts.Heatmap
@@ -61,7 +63,7 @@ import kotlinx.datetime.TimeZone
 import java.util.Locale
 import kotlin.math.roundToInt
 
-private val sections = listOf("Today", "Stretch & pull", "Trends", "Patterns", "Going up", "Going down", "Mix", "Forecasts", "Milestones", "Ladder")
+private val sections = listOf("Today", "Cravings ahead", "Receptors", "Stretch & pull", "Trends", "Patterns", "Going up", "Going down", "Mix", "Forecasts", "Milestones", "Ladder")
 
 @Composable
 fun InsightsScreen(data: FirewatchData, now: Long, watch: @Composable () -> Unit) {
@@ -90,6 +92,8 @@ fun InsightsScreen(data: FirewatchData, now: Long, watch: @Composable () -> Unit
         LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             when (section) {
                 "Today" -> item { TodaySection(ins, data, now) }
+                "Cravings ahead" -> item { CravingsAheadSection(data, now, tz) }
+                "Receptors" -> item { ReceptorSection(data, now, tz) }
                 "Stretch & pull" -> item { StretchSection(ins) }
                 "Trends" -> item { TrendsSection(ins) }
                 "Patterns" -> item { PatternsSection(ins) }
@@ -152,6 +156,91 @@ private fun TodaySection(ins: Insights, data: FirewatchData, now: Long) = Col {
             Stat(fmt1(w.clearHours) + " h", "clear hours")
             Stat(Fmt.duration(((w.awakeHours * 60 - w.mouthMinutes).coerceAtLeast(0.0) * 60_000).toLong()), "mouth-free")
         }
+    }
+}
+
+@Composable
+private fun CravingsAheadSection(data: FirewatchData, now: Long, tz: TimeZone) = Col {
+    val minute = now / 60_000 / 5
+    val o = remember(data, minute) { com.baastiklabs.firewatch.core.engine.CravingForecast.outlook(data, now, tz) }
+    ChartCard(
+        "Cravings ahead",
+        "Chance of a craving over the next 24 hours, from your own logs and your estimated nicotine level. " +
+            "Dots show how strong one would probably be. Sleep is shaded. An estimate, not a promise.",
+    ) {
+        CravingForecastChart(o.points, now)
+        val first = o.points.firstOrNull()?.at ?: now
+        AxisLabels(listOf(Fmt.time(first), Fmt.time(first + 12 * 3_600_000L), Fmt.time(first + 24 * 3_600_000L)))
+        Text(
+            o.next?.let { "Next craving likely around ${Fmt.time(it.peakAt)} (strength about ${it.strength.roundToInt()})" }
+                ?: "No clear craving peak ahead right now.",
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
+        )
+        if (o.windows.size > 1) {
+            Text(
+                "Most likely: " + o.windows.joinToString(", ") { "${Fmt.time(it.peakAt)} (about ${it.strength.roundToInt()})" } +
+                    (o.quietestAt?.let { ". Quietest: around ${Fmt.time(it)}." } ?: "."),
+                style = MaterialTheme.typography.bodyMedium,
+            )
+        }
+        if (o.learning) {
+            Text(
+                "Still learning: based on ${o.cravingsUsed} logged ${if (o.cravingsUsed == 1) "craving" else "cravings"} so far, plus your nicotine curve. " +
+                    "Log cravings with \"Craving? Log it\" and this sharpens up.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        if (o.tested >= 3) {
+            Text(
+                "Last 2 weeks: ${o.hits} of ${o.tested} cravings came during a predicted high window (the likeliest quarter of waking time).",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ReceptorSection(data: FirewatchData, now: Long, tz: TimeZone) = Col {
+    val day = now / 86_400_000L
+    val o = remember(data, day) { com.baastiklabs.firewatch.core.engine.Receptors.outlook(data, now, tz) }
+    if (o == null) {
+        ChartCard("Receptors", "Appears after your first full day of logging.") {}
+        return@Col
+    }
+    val history = o.history.takeLast(90)
+    ChartCard(
+        "Receptors",
+        "Estimated nicotine receptor load. 100% is typical of heavy regular use; the shaded band is the typical non-user range. " +
+            "Solid: your past. Dashed: if you keep following the program. Faint: if you stayed on your current rung.",
+    ) {
+        ReceptorChart(history.map { it.load }, o.plan.map { it.load }, o.stay.map { it.load }, com.baastiklabs.firewatch.core.engine.Receptors.TYPICAL)
+        AxisLabels(listOfNotNull(history.firstOrNull()?.let { Fmt.shortDateK(it.date) }, "Today", o.plan.lastOrNull()?.let { Fmt.shortDateK(it.date) }))
+        Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+            Stat("≈ ${(o.todayLoad * 100).roundToInt()}%", "load today")
+            Stat(o.clearAirOnPlan?.let { Fmt.shortDateK(it) } ?: "over a year", "Clear Air on plan")
+            Stat(o.typicalOnPlan?.let { Fmt.shortDateK(it) } ?: "over a year", "typical range on plan")
+        }
+        if (o.typicalIfStay == null) {
+            Text(
+                "Staying on your current rung keeps the load around ${(o.stay.last().load * 100).roundToInt()}%. Each step down lets it fall further.",
+                style = MaterialTheme.typography.bodyMedium,
+            )
+        }
+        if (data.relapseOn) {
+            Text(
+                "Relapse prevention mode is on. The dashed line shows what tapering looks like once you're ready.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Text(
+            "An estimate from brain-imaging research averages and your logs, not a medical measurement. Everyone heals at their own pace.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 

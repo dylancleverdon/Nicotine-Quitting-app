@@ -52,6 +52,12 @@ test('back-dated start, logging and persistence', async ({ page }) => {
   // Insights and calendar render.
   await page.getByRole('button', { name: 'Insights' }).click()
   await expect(page.getByText('Blood-level wave')).toBeVisible()
+  await page.getByRole('button', { name: 'Cravings ahead' }).click()
+  await expect(page.getByText(/Next craving likely around|No clear craving peak/)).toBeVisible()
+  await page.screenshot({ path: 'test-results/cravings-ahead.png', fullPage: true })
+  await page.getByRole('button', { name: 'Receptors' }).click()
+  await expect(page.getByText('load today')).toBeVisible()
+  await page.screenshot({ path: 'test-results/receptors.png', fullPage: true })
   await page.getByRole('button', { name: 'Stretch & pull' }).click()
   await expect(page.getByText('Stretch & pull').last()).toBeVisible()
   await page.getByRole('button', { name: 'Calendar' }).click()

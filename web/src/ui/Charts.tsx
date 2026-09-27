@@ -83,3 +83,47 @@ export function Barcode({ rows }: { rows: boolean[][] }) {
 }
 
 export const Meter = ({ value }: { value: number }) => <div class="bar"><i style={{ width: `${Math.max(0, Math.min(1, value)) * 100}%` }} /></div>
+
+/** 24-hour craving forecast: likelihood curve, hourly dots coloured by likely strength, sleep shaded, now marked. */
+export function ForecastChart({ points, now, height = 130 }: { points: number[][]; now: number; height?: number }) {
+  if (points.length < 2) return null
+  const t0 = points[0][0], t1 = points[points.length - 1][0]
+  const max = Math.max(0.2, ...points.map((p) => p[1])) * 1.15
+  const x = (t: number) => ((t - t0) / Math.max(1, t1 - t0)) * W
+  const y = (v: number) => height - (v / max) * height
+  const line = points.map((p, i) => `${i ? 'L' : 'M'}${x(p[0]).toFixed(1)},${y(p[1]).toFixed(1)}`).join('')
+  const sleep: number[][] = []
+  points.forEach((p, i) => {
+    if (p[3] && (i === 0 || !points[i - 1][3])) sleep.push([p[0], p[0]])
+    if (p[3] && sleep.length) sleep[sleep.length - 1][1] = points[Math.min(i + 1, points.length - 1)][0]
+  })
+  const dot = (s: number) => `hsl(${160 - ((Math.min(10, Math.max(1, s)) - 1) / 9) * 160}, 45%, 55%)`
+  return (
+    <svg viewBox={`0 0 ${W} ${height}`} width="100%" height={height} preserveAspectRatio="none">
+      {sleep.map(([a, b]) => <rect x={x(a)} y={0} width={Math.max(0, x(b) - x(a))} height={height} fill="var(--line)" opacity={0.35} />)}
+      <path d={`${line}L${W},${height}L0,${height}Z`} fill="var(--primary)" opacity={0.2} />
+      <path d={line} fill="none" stroke="var(--primary)" stroke-width={2.5} />
+      {points.filter((p, i) => i % 4 === 0 && !p[3] && p[1] > 0.02).map((p) => <circle cx={x(p[0])} cy={y(p[1])} r={3.5} fill={dot(p[2])} />)}
+      {now >= t0 && now <= t1 && <line x1={x(now)} x2={x(now)} y1={0} y2={height} stroke="var(--muted)" />}
+    </svg>
+  )
+}
+
+/** Receptor load: past solid, plan dashed, "stay here" faint, typical non-user range shaded, today marked. */
+export function ReceptorChart({ history, plan, stay, typical, height = 150 }: { history: number[]; plan: number[]; stay: number[]; typical: number; height?: number }) {
+  const total = history.length + Math.max(plan.length, stay.length)
+  if (total < 2) return null
+  const x = (i: number) => (i / Math.max(1, total - 1)) * W
+  const y = (v: number) => height - (Math.max(0, Math.min(1.05, v)) / 1.05) * height
+  const today = Math.max(0, history.length - 1)
+  const path = (vs: number[], off: number) => vs.map((v, i) => `${i ? 'L' : 'M'}${x(off + i).toFixed(1)},${y(v).toFixed(1)}`).join('')
+  return (
+    <svg viewBox={`0 0 ${W} ${height}`} width="100%" height={height} preserveAspectRatio="none">
+      <rect x={0} y={y(typical)} width={W} height={height - y(typical)} fill="var(--tertiary)" opacity={0.15} />
+      {stay.length > 1 && <path d={path(stay, today)} fill="none" stroke="var(--muted)" stroke-width={2} stroke-dasharray="6 5" opacity={0.6} />}
+      {plan.length > 1 && <path d={path(plan, today)} fill="none" stroke="var(--primary)" stroke-width={2.5} stroke-dasharray="6 5" />}
+      {history.length > 1 && <path d={path(history, 0)} fill="none" stroke="var(--primary)" stroke-width={3} />}
+      <line x1={x(today)} x2={x(today)} y1={0} y2={height} stroke="var(--muted)" />
+    </svg>
+  )
+}

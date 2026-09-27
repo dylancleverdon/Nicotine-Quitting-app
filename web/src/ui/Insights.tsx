@@ -1,9 +1,10 @@
-import { useState } from 'preact/hooks'
+import { useMemo, useState } from 'preact/hooks'
+import { Core } from '../core'
 import * as S from '../store'
-import { Barcode, Bars, Heatmap, Line, Meter, Wave } from './Charts'
-import { duration, pieces, shortDate, signedDuration } from './format'
+import { Barcode, Bars, ForecastChart, Heatmap, Line, Meter, ReceptorChart, Wave } from './Charts'
+import { duration, pieces, shortDate, signedDuration, time } from './format'
 
-const SECTIONS = ['Today', 'Stretch & pull', 'Trends', 'Patterns', 'Going up', 'Going down', 'Mix', 'Forecasts', 'Milestones', 'Ladder']
+const SECTIONS = ['Today', 'Cravings ahead', 'Receptors', 'Stretch & pull', 'Trends', 'Patterns', 'Going up', 'Going down', 'Mix', 'Forecasts', 'Milestones', 'Ladder']
 const Card = ({ title, sub, children }: { title: string; sub?: string; children?: any }) => (
   <div class="card soft"><h3>{title}</h3>{sub && <div class="muted">{sub}</div>}{children}</div>
 )
@@ -14,6 +15,8 @@ export function Insights() {
   const ins = snap.insights
   const [sec, setSec] = useState('Today')
   const [recap, setRecap] = useState(0)
+  const tick = Math.floor(S.tick.value / 300000)
+  const out = useMemo(() => (sec === 'Cravings ahead' || sec === 'Receptors' ? Core.outlooks(S.json()) : null), [sec, S.json(), tick])
   const days = snap.days.slice(-42)
   const full = snap.days.slice(0, -1).slice(-42)
   if (!snap.days.length) return <main><h1>Insights</h1><div class="muted">Log a few doses and your graphs appear here.</div></main>
@@ -31,6 +34,32 @@ export function Insights() {
         <Card title="Today so far"><div class="stats"><Stat v={`≈ ${pieces(today.pieces)}`} l="pieces" /><Stat v={`${today.clearHours.toFixed(1)} h`} l="clear hours" />
           <Stat v={duration(Math.max(0, today.awakeHours * 60 - today.mouthMin) * 60000)} l="mouth-free" /></div></Card>
       </>}
+      {sec === 'Cravings ahead' && out && (() => {
+        const f = out.forecast
+        const first = f.points[0]?.[0] ?? Date.now()
+        return <Card title="Cravings ahead" sub="Chance of a craving over the next 24 hours, from your own logs and your estimated nicotine level. Dots show how strong one would probably be. Sleep is shaded. An estimate, not a promise.">
+          <ForecastChart points={f.points} now={Date.now()} />
+          <div class="row between muted"><span>{time(first)}</span><span>{time(first + 12 * 3600000)}</span><span>{time(first + 24 * 3600000)}</span></div>
+          <div class="next-craving"><b>{f.next ? `Next craving likely around ${time(f.next.peakAt)} (strength about ${Math.round(f.next.strength)})` : 'No clear craving peak ahead right now.'}</b></div>
+          {f.windows.length > 1 && <div class="small">Most likely: {f.windows.map((w) => `${time(w.peakAt)} (about ${Math.round(w.strength)})`).join(', ')}{f.quietestAt ? `. Quietest: around ${time(f.quietestAt)}.` : '.'}</div>}
+          {f.learning && <div class="muted">Still learning: based on {f.cravingsUsed} logged {f.cravingsUsed === 1 ? 'craving' : 'cravings'} so far, plus your nicotine curve. Log cravings with "Craving? Log it" and this sharpens up.</div>}
+          {f.tested >= 3 && <div class="muted">Last 2 weeks: {f.hits} of {f.tested} cravings came during a predicted high window (the likeliest quarter of waking time).</div>}
+        </Card>
+      })()}
+      {sec === 'Receptors' && out && (() => {
+        const r = out.receptors
+        if (!r) return <Card title="Receptors" sub="Appears after your first full day of logging." />
+        const pct = (v: number) => `${Math.round(v * 100)}%`
+        return <Card title="Receptors" sub="Estimated nicotine receptor load. 100% is typical of heavy regular use; the shaded band is the typical non-user range. Solid: your past. Dashed: if you keep following the program. Faint: if you stayed on your current rung.">
+          <ReceptorChart history={r.history.map((p) => p.value)} plan={r.plan.map((p) => p.value)} stay={r.stay.map((p) => p.value)} typical={r.typical} />
+          <div class="row between muted"><span>{r.history[0] ? shortDate(r.history[0].label) : ''}</span><span>Today</span><span>{r.plan.length ? shortDate(r.plan[r.plan.length - 1].label) : ''}</span></div>
+          <div class="stats"><Stat v={`≈ ${pct(r.todayLoad)}`} l="load today" /><Stat v={r.clearAirOnPlan ? shortDate(r.clearAirOnPlan) : 'over a year'} l="Clear Air on plan" />
+            <Stat v={r.typicalOnPlan ? shortDate(r.typicalOnPlan) : 'over a year'} l="typical range on plan" /></div>
+          {!r.typicalIfStay && r.stay.length > 0 && <div class="small">Staying on your current rung keeps the load around {pct(r.stay[r.stay.length - 1].value)}. Each step down lets it fall further.</div>}
+          {snap.relapse.on && <div class="muted">Relapse prevention mode is on. The dashed line shows what tapering looks like once you're ready.</div>}
+          <div class="muted">An estimate from brain-imaging research averages and your logs, not a medical measurement. Everyone heals at their own pace.</div>
+        </Card>
+      })()}
       {sec === 'Stretch & pull' && (() => {
         const sd = snap.stretchDays.slice(-42)
         if (!sd.length) return <Card title="Stretch & pull" sub="Starts once you're working at a target rung." />

@@ -266,3 +266,81 @@ fun StackedBars(columns: List<List<Pair<Double, Color>>>, modifier: Modifier = M
         }
     }
 }
+
+/**
+ * The 24-hour craving forecast: likelihood as a filled curve (0–100%), a dot every hour coloured
+ * by likely strength, sleep shaded, and a marker for now.
+ */
+@Composable
+fun CravingForecastChart(
+    points: List<com.baastiklabs.firewatch.core.engine.CravingPoint>,
+    now: Long,
+    modifier: Modifier = Modifier,
+    height: Dp = 140.dp,
+) {
+    val (primary, grid, muted) = chartColors()
+    if (points.size < 2) return
+    val t0 = points.first().at
+    val t1 = points.last().at
+    val yMax = points.maxOf { it.likelihood }.coerceAtLeast(0.2) * 1.15
+    Canvas(modifier.fillMaxWidth().height(height)) {
+        fun x(t: Long) = ((t - t0).toFloat() / (t1 - t0).coerceAtLeast(1)) * size.width
+        fun y(v: Double) = size.height - (v / yMax).toFloat() * size.height
+        // Sleep shading.
+        var start: Long? = null
+        points.forEachIndexed { i, p ->
+            if (p.asleep && start == null) start = p.at
+            if ((!p.asleep || i == points.lastIndex) && start != null) {
+                val xa = x(start!!); val xb = x(p.at)
+                if (xb > xa) drawRect(grid.copy(alpha = 0.35f), Offset(xa, 0f), Size(xb - xa, size.height))
+                start = null
+            }
+        }
+        for (i in 1..3) drawLine(grid.copy(alpha = 0.4f), Offset(0f, size.height * i / 4), Offset(size.width, size.height * i / 4))
+        val line = Path()
+        points.forEachIndexed { i, p -> if (i == 0) line.moveTo(x(p.at), y(p.likelihood)) else line.lineTo(x(p.at), y(p.likelihood)) }
+        val fill = Path().apply { addPath(line); lineTo(x(t1), size.height); lineTo(x(t0), size.height); close() }
+        drawPath(fill, primary.copy(alpha = 0.2f))
+        drawPath(line, primary, style = Stroke(2.5.dp.toPx(), cap = StrokeCap.Round))
+        points.filterIndexed { i, p -> i % 4 == 0 && !p.asleep && p.likelihood > 0.02 }.forEach { p ->
+            drawCircle(com.baastiklabs.firewatch.ui.theme.cravingColor(p.strength.toInt()), radius = 3.5.dp.toPx(), center = Offset(x(p.at), y(p.likelihood)))
+        }
+        if (now in t0..t1) drawLine(muted, Offset(x(now), 0f), Offset(x(now), size.height), strokeWidth = 1.5.dp.toPx())
+    }
+}
+
+/**
+ * Receptor load over time (0 = typical non-user, 1 = typical heavy use): the past as a solid line,
+ * the plan dashed, "stay here" faint and dashed, the typical non-user range shaded, today marked.
+ */
+@Composable
+fun ReceptorChart(
+    history: List<Double>,
+    plan: List<Double>,
+    stay: List<Double>,
+    typical: Double,
+    modifier: Modifier = Modifier,
+    height: Dp = 160.dp,
+) {
+    val (primary, grid, muted) = chartColors()
+    val tertiary = MaterialTheme.colorScheme.tertiary
+    val total = history.size + maxOf(plan.size, stay.size)
+    if (total < 2) return
+    Canvas(modifier.fillMaxWidth().height(height)) {
+        fun x(i: Int) = i.toFloat() / (total - 1).coerceAtLeast(1) * size.width
+        fun y(v: Double) = size.height - (v.coerceIn(0.0, 1.05) / 1.05).toFloat() * size.height
+        drawRect(tertiary.copy(alpha = 0.15f), Offset(0f, y(typical)), Size(size.width, size.height - y(typical)))
+        for (i in 1..3) drawLine(grid.copy(alpha = 0.4f), Offset(0f, size.height * i / 4), Offset(size.width, size.height * i / 4))
+        fun draw(vs: List<Double>, offset: Int, color: Color, dashed: Boolean, width: Float) {
+            if (vs.size < 2) return
+            val p = Path()
+            vs.forEachIndexed { i, v -> if (i == 0) p.moveTo(x(offset + i), y(v)) else p.lineTo(x(offset + i), y(v)) }
+            drawPath(p, color, style = Stroke(width, cap = StrokeCap.Round, pathEffect = if (dashed) PathEffect.dashPathEffect(floatArrayOf(12f, 9f)) else null))
+        }
+        val todayIndex = (history.size - 1).coerceAtLeast(0)
+        draw(stay, todayIndex, muted.copy(alpha = 0.6f), dashed = true, width = 2.dp.toPx())
+        draw(plan, todayIndex, primary, dashed = true, width = 2.5.dp.toPx())
+        draw(history, 0, primary, dashed = false, width = 3.dp.toPx())
+        drawLine(muted, Offset(x(todayIndex), 0f), Offset(x(todayIndex), size.height), strokeWidth = 1.5.dp.toPx())
+    }
+}

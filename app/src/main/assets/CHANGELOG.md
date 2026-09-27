@@ -2,6 +2,11 @@
 
 Newest first. Each release is a "## <version>" heading; the app shows these notes in "What's new".
 
+## 0.6.0 · 2026-09-28
+- New in Insights: **Cravings ahead.** A forecast of when cravings are likely over the next 24 hours and how strong they'd probably be, learned from your own logged cravings and your nicotine level. A line under the chart says when the next one is likely, and it tells you how often it's been right. The more cravings you log, the sharper it gets.
+- New in Insights: **Receptors.** An estimate of how your brain's nicotine receptors are healing, based on brain-imaging research and your logs, and where they'll be if you keep following the program. It shows when you'd reach Clear Air and the typical non-user range.
+- Help has new articles on both charts, and "Why Firewatch works this way" explains why tapering all the way to zero matters.
+
 ## 0.5.1 · 2026-09-28
 - Fixed hard-to-read text on the welcome tour, Help and "Why Firewatch works this way" pages. You can reopen the tour from Help → Welcome tour.
 

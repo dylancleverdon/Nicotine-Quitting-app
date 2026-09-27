@@ -1,5 +1,10 @@
 # Firewatch web changelog
 
+## 0.4.0 · 2026-09-28
+- New in Insights: **Cravings ahead.** A forecast of when cravings are likely over the next 24 hours and how strong they'd probably be, learned from your own logged cravings and your nicotine level. A line under the chart says when the next one is likely, and it tells you how often it's been right. The more cravings you log, the sharper it gets.
+- New in Insights: **Receptors.** An estimate of how your brain's nicotine receptors are healing, based on brain-imaging research and your logs, and where they'll be if you keep following the program. It shows when you'd reach Clear Air and the typical non-user range.
+- Help has new articles on both charts, and "Why Firewatch works this way" explains why tapering all the way to zero matters.
+
 ## 0.3.0 · 2026-09-27
 - New: **Relapse prevention mode.** If you're new to gum, Firewatch can remind you to chew at a steady gap so cravings don't catch you off guard. The gap follows your tier (every 2 hours before you have one), never during sleeping hours (reminders themselves are Android-only for now). It's off unless you turn it on, with the button at the bottom of the Log tab.
 - While it's on, the battery shows "Next scheduled piece at …" and stretch and pull take a break. Your tiers and figures stay just as honest. Those days get a ring in the calendar.

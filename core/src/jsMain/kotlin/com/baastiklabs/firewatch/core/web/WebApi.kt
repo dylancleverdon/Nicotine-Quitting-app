@@ -51,6 +51,17 @@ external object JsJodaTimeZoneModule
     /** Why the "try Relapse prevention mode" card shows (null = hidden). */
     val recommend: String?, val movingOn: Boolean, val modeDays: List<String>,
 )
+@Serializable data class WindowDto(val from: Double, val to: Double, val peakAt: Double, val likelihood: Double, val strength: Double)
+@Serializable data class ForecastDto(
+    /** [at, likelihood 0..1, strength 1..10, asleep 0/1] every 15 minutes. */
+    val points: List<List<Double>>, val learning: Boolean, val cravingsUsed: Int, val next: WindowDto?, val windows: List<WindowDto>,
+    val quietestAt: Double?, val hits: Int, val tested: Int,
+)
+@Serializable data class ReceptorsDto(
+    val history: List<NamedValue>, val plan: List<NamedValue>, val stay: List<NamedValue>, val todayLoad: Double,
+    val clearAirOnPlan: String?, val typicalOnPlan: String?, val typicalIfStay: String?, val typical: Double,
+)
+@Serializable data class OutlooksDto(val forecast: ForecastDto, val receptors: ReceptorsDto?)
 @Serializable data class HelpDto(val tour: List<com.baastiklabs.firewatch.core.Help.Page>, val why: List<com.baastiklabs.firewatch.core.Help.Page>, val articles: List<com.baastiklabs.firewatch.core.Help.Article>)
 @Serializable data class DoseView(val id: String, val at: Double, val name: String, val pieces: Double, val mg: Double, val estimated: Boolean, val tags: List<String>, val kind: String)
 @Serializable data class CravingView(val id: String, val at: Double, val intensity: Int, val name: String, val outcome: String, val endedAt: Double?, val tags: List<String>)
@@ -313,6 +324,31 @@ object FirewatchCore {
         val d = data(recordsJson)
         val dose = d.doses.firstOrNull { it.id == doseId } ?: return false
         return com.baastiklabs.firewatch.core.engine.BatteryEngine.waitedForFull(d, dose, TimeZone.currentSystemDefault())
+    }
+
+    /** The craving forecast and receptor healing charts (Insights only, so not in every compute). */
+    fun outlooks(recordsJson: String, nowMs: Double): String {
+        jsTypeOf(tzModule)
+        val d = data(recordsJson)
+        val tz = TimeZone.currentSystemDefault()
+        val now = nowMs.toLong()
+        val f = com.baastiklabs.firewatch.core.engine.CravingForecast.outlook(d, now, tz)
+        fun w(x: com.baastiklabs.firewatch.core.engine.CravingWindow) = WindowDto(x.from.toDouble(), x.to.toDouble(), x.peakAt.toDouble(), x.likelihood, x.strength)
+        val forecast = ForecastDto(
+            points = f.points.map { listOf(it.at.toDouble(), it.likelihood, it.strength, if (it.asleep) 1.0 else 0.0) },
+            learning = f.learning, cravingsUsed = f.cravingsUsed, next = f.next?.let { w(it) }, windows = f.windows.map { w(it) },
+            quietestAt = f.quietestAt?.toDouble(), hits = f.hits, tested = f.tested,
+        )
+        val r = com.baastiklabs.firewatch.core.engine.Receptors.outlook(d, now, tz)
+        val receptors = r?.let { o ->
+            fun pts(l: List<com.baastiklabs.firewatch.core.engine.ReceptorPoint>) = l.map { NamedValue(it.date.toString(), it.load) }
+            ReceptorsDto(
+                pts(o.history.takeLast(90)), pts(o.plan), pts(o.stay), o.todayLoad,
+                o.clearAirOnPlan?.toString(), o.typicalOnPlan?.toString(), o.typicalIfStay?.toString(),
+                com.baastiklabs.firewatch.core.engine.Receptors.TYPICAL,
+            )
+        }
+        return FirewatchJson.encodeToString(OutlooksDto.serializer(), OutlooksDto(forecast, receptors))
     }
 
     /** Help articles, the welcome tour and "Why Firewatch works this way" (shared with Android). */

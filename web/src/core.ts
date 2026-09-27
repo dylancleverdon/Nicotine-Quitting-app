@@ -7,6 +7,11 @@ export interface Rung { pieces: number; tier: string; label: string; plain: stri
 export interface Battery { charge: number; state: 'CLEAR' | 'CHARGING' | 'FULL_AT_WAKE' | 'MORNING_DELAY' | 'WIND_DOWN' | 'ASLEEP'; readyAt: number | null; stretchMin: number; pullMin: number; fitsNow?: string | null }
 export interface StretchDay { date: string; stretchMin: number; pullMin: number; paused?: boolean }
 export interface Relapse { on: boolean; nextAt: number | null; gapMin: number; productId: string | null; productName: string | null; recommend: string | null; movingOn: boolean; modeDays: string[] }
+export interface CravingWindow { from: number; to: number; peakAt: number; likelihood: number; strength: number }
+export interface Outlooks {
+  forecast: { points: number[][]; learning: boolean; cravingsUsed: number; next: CravingWindow | null; windows: CravingWindow[]; quietestAt: number | null; hits: number; tested: number }
+  receptors: { history: NamedValue[]; plan: NamedValue[]; stay: NamedValue[]; todayLoad: number; clearAirOnPlan: string | null; typicalOnPlan: string | null; typicalIfStay: string | null; typical: number } | null
+}
 export interface HelpPage { title: string; body: string }
 export interface HelpArticle { id: string; section: string; title: string; body: string }
 export interface DoseView { id: string; at: number; name: string; pieces: number; mg: number; estimated: boolean; tags: string[]; kind: string }
@@ -41,6 +46,7 @@ export interface Snapshot {
 }
 
 export const Core = {
+  outlooks: (records: string): Outlooks => JSON.parse(core.outlooks(records, Date.now())),
   help: (): { tour: HelpPage[]; why: HelpPage[]; articles: HelpArticle[] } => JSON.parse(core.help()),
   defaultProducts: (): any[] => JSON.parse(core.defaultProducts()),
   cravingScale: (): NamedValue[] => JSON.parse(core.cravingScale()),
