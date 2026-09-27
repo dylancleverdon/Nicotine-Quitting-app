@@ -119,6 +119,7 @@ fun HomeScreen(vm: FirewatchViewModel, data: FirewatchData, now: Long, snackbar:
 
     var celebrate by remember { mutableStateOf<com.baastiklabs.firewatch.core.engine.Rung?>(null) }
     var relapseDialog by remember { mutableStateOf(false) }
+    var feedback by remember { mutableStateOf(false) }
     val relapse = com.baastiklabs.firewatch.core.engine.Relapse
     val relapseNext = remember(data, minute) { relapse.nextAt(data, now, tz) }
     val relapseProduct = remember(data) { relapse.product(data)?.name }
@@ -394,6 +395,21 @@ fun HomeScreen(vm: FirewatchViewModel, data: FirewatchData, now: Long, snackbar:
             }
         }
         item { EstimateNote(Modifier.padding(top = 8.dp)) }
+        item {
+            androidx.compose.material3.TextButton(onClick = { feedback = true }, modifier = Modifier.fillMaxWidth()) {
+                Text("Suggest something / report a bug")
+            }
+        }
+    }
+
+    if (feedback) {
+        com.baastiklabs.firewatch.ui.feedback.FeedbackDialog(onDismiss = { feedback = false }) { type, text, details, name ->
+            feedback = false
+            scope.launch {
+                val sent = com.baastiklabs.firewatch.data.FeedbackSender.send(context, type, text, details, name)
+                snackbar.showSnackbar(if (sent) "Thanks, sent!" else "No connection. Saved, and it'll send next time Firewatch opens.")
+            }
+        }
     }
 
     if (relapseDialog) {

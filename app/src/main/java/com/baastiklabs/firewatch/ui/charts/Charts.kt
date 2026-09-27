@@ -6,6 +6,12 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -42,6 +48,104 @@ private fun chartColors() = Triple(
     MaterialTheme.colorScheme.onSurfaceVariant,
 )
 
+/** Round axis values: 0 up to a "nice" top at or above [max], about [n] steps. */
+fun niceTicks(max: Double, n: Int = 3): List<Double> {
+    val m = if (max > 0 && max.isFinite()) max else 1.0
+    val raw = m / n
+    val mag = Math.pow(10.0, kotlin.math.floor(kotlin.math.log10(raw)))
+    val step = listOf(1.0, 2.0, 2.5, 5.0, 10.0).map { it * mag }.first { it >= raw }
+    val out = ArrayList<Double>()
+    var v = 0.0
+    while (v < m + step * 0.999) { out += Math.round(v * 1e6) / 1e6; v += step }
+    return out
+}
+
+/** Whole-hour ticks between t0 and t1: position 0..1 and a label that follows the 12/24-hour setting. */
+fun timeTicks(t0: Long, t1: Long, max: Int = 5): List<Pair<Float, String>> {
+    val h = 3_600_000L
+    val step = listOf(1, 2, 3, 4, 6, 12, 24).firstOrNull { (t1 - t0) / (it * h).toDouble() <= max } ?: 24
+    val zone = java.time.ZoneId.systemDefault()
+    var t = java.time.Instant.ofEpochMilli(t0).atZone(zone).withMinute(0).withSecond(0).withNano(0)
+    val out = ArrayList<Pair<Float, String>>()
+    while (t.toInstant().toEpochMilli() <= t1) {
+        val ms = t.toInstant().toEpochMilli()
+        if (ms >= t0 && t.hour % step == 0) out += ((ms - t0).toFloat() / (t1 - t0).coerceAtLeast(1)) to com.baastiklabs.firewatch.ui.Fmt.hourLabel(t.hour)
+        t = t.plusHours(1)
+    }
+    return out
+}
+
+/** About [n] evenly spaced labels for index-based charts ([centred] for bars). */
+fun indexTicks(labels: List<String>, n: Int = 4, centred: Boolean = false): List<Pair<Float, String>> {
+    val len = labels.size
+    if (len == 0) return emptyList()
+    val k = minOf(n, len)
+    return (0 until k).map { i -> Math.round(i * (len - 1).toDouble() / (k - 1).coerceAtLeast(1)).toInt() }.distinct()
+        .map { i -> (if (centred) (i + 0.5f) / len else i.toFloat() / (len - 1).coerceAtLeast(1)) to labels[i] }
+}
+
+private const val Y_AXIS_DP = 40
+
+/** Axis frame: y values down the left (when [fmt] is given), x labels underneath. */
+@Composable
+fun ChartFrame(
+    ticks: List<Double>?,
+    fmt: ((Double) -> String)?,
+    height: Dp,
+    x: List<Pair<Float, String>>,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
+) {
+    val showY = ticks != null && fmt != null && ticks.isNotEmpty()
+    Column(modifier.fillMaxWidth()) {
+        Row(Modifier.fillMaxWidth()) {
+            if (showY) {
+                val top = ticks!!.last()
+                val style = MaterialTheme.typography.labelSmall
+                val color = MaterialTheme.colorScheme.onSurfaceVariant
+                Layout(
+                    content = { ticks.forEach { Text(fmt!!(it), style = style, color = color) } },
+                    modifier = Modifier.width(Y_AXIS_DP.dp).height(height),
+                ) { ms, c ->
+                    val ps = ms.map { it.measure(Constraints()) }
+                    layout(c.maxWidth, c.maxHeight) {
+                        ps.forEachIndexed { i, p ->
+                            val yc = (c.maxHeight * (1 - ticks[i] / top)).toInt()
+                            p.place(c.maxWidth - p.width, (yc - p.height / 2).coerceIn(0, (c.maxHeight - p.height).coerceAtLeast(0)))
+                        }
+                    }
+                }
+                Spacer(Modifier.width(6.dp))
+            }
+            Box(Modifier.weight(1f)) { content() }
+        }
+        if (x.isNotEmpty()) XAxis(x, Modifier.padding(start = if (showY) (Y_AXIS_DP + 6).dp else 0.dp))
+    }
+}
+
+@Composable
+private fun XAxis(labels: List<Pair<Float, String>>, modifier: Modifier = Modifier) {
+    val style = MaterialTheme.typography.labelSmall
+    val color = MaterialTheme.colorScheme.onSurfaceVariant
+    Layout(content = { labels.forEach { Text(it.second, style = style, color = color) } }, modifier = modifier.fillMaxWidth()) { ms, c ->
+        val ps = ms.map { it.measure(Constraints()) }
+        val h = ps.maxOfOrNull { it.height } ?: 0
+        layout(c.maxWidth, h) {
+            ps.forEachIndexed { i, p ->
+                val xc = (c.maxWidth * labels[i].first).toInt()
+                p.place((xc - p.width / 2).coerceIn(0, (c.maxWidth - p.width).coerceAtLeast(0)), 0)
+            }
+        }
+    }
+}
+
+private fun DrawScope.gridLines(ticks: List<Double>?, top: Double, color: Color) {
+    ticks?.drop(1)?.forEach { t ->
+        val y = size.height - (t / top).toFloat() * size.height
+        drawLine(color.copy(alpha = 0.5f), Offset(0f, y), Offset(size.width, y))
+    }
+}
+
 @Composable
 fun AxisLabels(labels: List<String>) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -67,17 +171,17 @@ fun WaveChart(
     if (points.size < 2) return
     val t0 = points.first().first
     val t1 = points.last().first
-    val yMax = max(points.maxOf { it.second }, typical.maxOfOrNull { it.second } ?: 0.0).coerceAtLeast(1.0) * 1.1
-    Canvas(modifier.fillMaxWidth().height(height)) {
+    val ticks = if (compact) null else niceTicks(max(points.maxOf { it.second }, typical.maxOfOrNull { it.second } ?: 0.0).coerceAtLeast(0.5))
+    val yMax = ticks?.last() ?: (max(points.maxOf { it.second }, typical.maxOfOrNull { it.second } ?: 0.0).coerceAtLeast(1.0) * 1.1)
+    ChartFrame(ticks, { "${fmtNum(it)} mg" }, height, timeTicks(t0, t1, if (compact) 4 else 5), modifier) {
+    Canvas(Modifier.fillMaxWidth().height(height)) {
         fun x(t: Long) = ((t - t0).toFloat() / (t1 - t0).coerceAtLeast(1)) * size.width
         fun y(v: Double) = size.height - (v / yMax).toFloat() * size.height
         shaded.forEach { (a, b) ->
             val xa = x(a.coerceIn(t0, t1)); val xb = x(b.coerceIn(t0, t1))
             if (xb > xa) drawRect(grid.copy(alpha = 0.35f), Offset(xa, 0f), Size(xb - xa, size.height))
         }
-        if (!compact) {
-            for (i in 1..3) drawLine(grid.copy(alpha = 0.5f), Offset(0f, size.height * i / 4), Offset(size.width, size.height * i / 4))
-        }
+        gridLines(ticks, yMax, grid)
         if (typical.size > 1) {
             val p = Path()
             typical.forEachIndexed { i, (t, v) -> if (i == 0) p.moveTo(x(t), y(v)) else p.lineTo(x(t), y(v)) }
@@ -97,7 +201,11 @@ fun WaveChart(
             drawLine(muted, Offset(x(it), 0f), Offset(x(it), size.height), strokeWidth = 1.5.dp.toPx())
         }
     }
+    }
 }
+
+/** Short number for axis labels: 0, 0.5, 2, 2.5, 10. */
+fun fmtNum(v: Double): String = if (v == Math.floor(v)) v.toLong().toString() else String.format(java.util.Locale.getDefault(), "%.1f", v).trimEnd('0').trimEnd('.', ',')
 
 data class Bar(val value: Double, val low: Double? = null, val high: Double? = null, val color: Color? = null)
 
@@ -113,11 +221,17 @@ fun BarChart(
     bands: List<Pair<Double, Color>> = emptyList(),
     height: Dp = 160.dp,
     lineColor: Color? = null,
+    yFmt: ((Double) -> String)? = null,
+    xLabels: List<String>? = null,
 ) {
     val (primary, grid, muted) = chartColors()
     if (bars.isEmpty()) return
-    val yMax = (bars.maxOf { max(it.value, it.high ?: 0.0) }.coerceAtLeast(line?.maxOrNull() ?: 0.0)).coerceAtLeast(1.0) * 1.1
-    Canvas(modifier.fillMaxWidth().height(height)) {
+    val dataMax = bars.maxOf { max(it.value, it.high ?: 0.0) }.coerceAtLeast(line?.maxOrNull() ?: 0.0)
+    val ticks = yFmt?.let { niceTicks(dataMax.coerceAtLeast(0.001)) }
+    val yMax = ticks?.last() ?: (dataMax.coerceAtLeast(1.0) * 1.1)
+    ChartFrame(ticks, yFmt, height, xLabels?.let { indexTicks(it, centred = true) } ?: emptyList(), modifier) {
+    Canvas(Modifier.fillMaxWidth().height(height)) {
+        gridLines(ticks, yMax, grid)
         fun y(v: Double) = size.height - (v / yMax).toFloat() * size.height
         var prev = 0.0
         bands.sortedBy { it.first }.forEach { (top, color) ->
@@ -144,6 +258,7 @@ fun BarChart(
         }
         drawLine(grid, Offset(0f, size.height), Offset(size.width, size.height))
     }
+    }
 }
 
 private fun DrawScope.hatch(left: Float, top: Float, w: Float, h: Float, color: Color) {
@@ -168,14 +283,20 @@ fun TrendLine(
     secondColor: Color? = null,
     stepped: Boolean = false,
     invert: Boolean = false,
+    yFmt: ((Double) -> String)? = null,
+    xLabels: List<String>? = null,
+    top: Double? = null,
 ) {
     val (primary, grid, muted) = chartColors()
     if (values.size < 2 && (second?.size ?: 0) < 2) return
     val all = values + (second ?: emptyList())
-    val yMax = all.maxOrNull()?.coerceAtLeast(0.001) ?: 1.0
-    Canvas(modifier.fillMaxWidth().height(height)) {
+    val ticks = if (yFmt != null && !invert) niceTicks(top ?: (all.maxOrNull()?.coerceAtLeast(0.001) ?: 1.0)) else null
+    val yTop = ticks?.last() ?: ((all.maxOrNull()?.coerceAtLeast(0.001) ?: 1.0) * 1.1)
+    ChartFrame(ticks, yFmt, height, xLabels?.let { indexTicks(it) } ?: emptyList(), modifier) {
+    Canvas(Modifier.fillMaxWidth().height(height)) {
+        gridLines(ticks, yTop, grid)
         fun y(v: Double): Float {
-            val f = (v / (yMax * 1.1)).toFloat()
+            val f = (v / yTop).toFloat()
             return if (invert) f * size.height else size.height - f * size.height
         }
         fun draw(vs: List<Double>, c: Color) {
@@ -193,6 +314,7 @@ fun TrendLine(
         second?.let { draw(it, secondColor ?: muted) }
         draw(values, color ?: primary)
     }
+    }
 }
 
 /** Hour of day (columns) against day of week (rows). */
@@ -200,8 +322,14 @@ fun TrendLine(
 fun Heatmap(grid: Array<DoubleArray>, modifier: Modifier = Modifier) {
     val (primary, gridColor, _) = chartColors()
     val maxV = grid.maxOf { row -> row.maxOrNull() ?: 0.0 }.coerceAtLeast(0.001)
-    Column(modifier) {
-        Canvas(Modifier.fillMaxWidth().height(150.dp)) {
+    val hours = listOf(0, 6, 12, 18).map { it / 24f to com.baastiklabs.firewatch.ui.Fmt.hourLabel(it) }
+    Column(modifier.fillMaxWidth()) {
+        Row(Modifier.fillMaxWidth()) {
+        Column(Modifier.height(150.dp).width(14.dp), verticalArrangement = Arrangement.SpaceAround) {
+            listOf("M", "T", "W", "T", "F", "S", "S").forEach { Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        }
+        Spacer(Modifier.width(6.dp))
+        Canvas(Modifier.weight(1f).height(150.dp)) {
             val cw = size.width / 24
             val ch = size.height / 7
             for (d in 0 until 7) for (h in 0 until 24) {
@@ -212,7 +340,8 @@ fun Heatmap(grid: Array<DoubleArray>, modifier: Modifier = Modifier) {
                 )
             }
         }
-        AxisLabels(listOf("12am", "6am", "12pm", "6pm", "12am"))
+        }
+        XAxis(hours, Modifier.padding(start = 20.dp))
     }
 }
 
@@ -221,7 +350,9 @@ fun Heatmap(grid: Array<DoubleArray>, modifier: Modifier = Modifier) {
 fun DayBarcode(days: List<List<Boolean>>, modifier: Modifier = Modifier) {
     val (primary, _, _) = chartColors()
     val clear = MaterialTheme.colorScheme.tertiary
-    Canvas(modifier.fillMaxWidth().height((days.size * 5).coerceIn(20, 400).dp)) {
+    val hours = listOf(0, 6, 12, 18).map { it / 24f to com.baastiklabs.firewatch.ui.Fmt.hourLabel(it) }
+    ChartFrame(null, null, 0.dp, hours, modifier) {
+    Canvas(Modifier.fillMaxWidth().height((days.size * 5).coerceIn(20, 400).dp)) {
         if (days.isEmpty()) return@Canvas
         val rowH = size.height / days.size
         days.forEachIndexed { r, cells ->
@@ -230,6 +361,7 @@ fun DayBarcode(days: List<List<Boolean>>, modifier: Modifier = Modifier) {
                 drawRect(if (on) primary.copy(alpha = 0.9f) else clear.copy(alpha = 0.35f), Offset(c * cw, r * rowH), Size(cw + 0.5f, rowH - 1f))
             }
         }
+    }
     }
 }
 
@@ -245,7 +377,7 @@ fun DoseStrip(dots: List<Triple<Float, Double, Color>>, modifier: Modifier = Mod
                 drawCircle(color, radius = (4 + 6 * pieces.coerceAtMost(2.0)).dp.toPx() / 2, center = Offset(frac * size.width, cy))
             }
         }
-        AxisLabels(listOf("12am", "6am", "12pm", "6pm", "12am"))
+        XAxis(listOf(0, 6, 12, 18).map { it / 24f to com.baastiklabs.firewatch.ui.Fmt.hourLabel(it) })
     }
 }
 
@@ -282,8 +414,11 @@ fun CravingForecastChart(
     if (points.size < 2) return
     val t0 = points.first().at
     val t1 = points.last().at
-    val yMax = points.maxOf { it.likelihood }.coerceAtLeast(0.2) * 1.15
-    Canvas(modifier.fillMaxWidth().height(height)) {
+    val ticks = niceTicks(points.maxOf { it.likelihood }.coerceAtLeast(0.1))
+    val yMax = ticks.last()
+    ChartFrame(ticks, { "${Math.round(it * 100)}%" }, height, timeTicks(t0, t1), modifier) {
+    Canvas(Modifier.fillMaxWidth().height(height)) {
+        gridLines(ticks, yMax, grid)
         fun x(t: Long) = ((t - t0).toFloat() / (t1 - t0).coerceAtLeast(1)) * size.width
         fun y(v: Double) = size.height - (v / yMax).toFloat() * size.height
         // Sleep shading.
@@ -296,7 +431,6 @@ fun CravingForecastChart(
                 start = null
             }
         }
-        for (i in 1..3) drawLine(grid.copy(alpha = 0.4f), Offset(0f, size.height * i / 4), Offset(size.width, size.height * i / 4))
         val line = Path()
         points.forEachIndexed { i, p -> if (i == 0) line.moveTo(x(p.at), y(p.likelihood)) else line.lineTo(x(p.at), y(p.likelihood)) }
         val fill = Path().apply { addPath(line); lineTo(x(t1), size.height); lineTo(x(t0), size.height); close() }
@@ -306,6 +440,7 @@ fun CravingForecastChart(
             drawCircle(com.baastiklabs.firewatch.ui.theme.cravingColor(p.strength.toInt()), radius = 3.5.dp.toPx(), center = Offset(x(p.at), y(p.likelihood)))
         }
         if (now in t0..t1) drawLine(muted, Offset(x(now), 0f), Offset(x(now), size.height), strokeWidth = 1.5.dp.toPx())
+    }
     }
 }
 
@@ -321,16 +456,19 @@ fun ReceptorChart(
     typical: Double,
     modifier: Modifier = Modifier,
     height: Dp = 160.dp,
+    dates: List<String> = emptyList(),
 ) {
     val (primary, grid, muted) = chartColors()
     val tertiary = MaterialTheme.colorScheme.tertiary
     val total = history.size + maxOf(plan.size, stay.size)
     if (total < 2) return
-    Canvas(modifier.fillMaxWidth().height(height)) {
+    val ticks = listOf(0.0, 0.25, 0.5, 0.75, 1.0)
+    ChartFrame(ticks, { "${Math.round(it * 100)}%" }, height, indexTicks(dates), modifier) {
+    Canvas(Modifier.fillMaxWidth().height(height)) {
         fun x(i: Int) = i.toFloat() / (total - 1).coerceAtLeast(1) * size.width
-        fun y(v: Double) = size.height - (v.coerceIn(0.0, 1.05) / 1.05).toFloat() * size.height
+        fun y(v: Double) = size.height - (v.coerceIn(0.0, 1.0)).toFloat() * size.height
         drawRect(tertiary.copy(alpha = 0.15f), Offset(0f, y(typical)), Size(size.width, size.height - y(typical)))
-        for (i in 1..3) drawLine(grid.copy(alpha = 0.4f), Offset(0f, size.height * i / 4), Offset(size.width, size.height * i / 4))
+        gridLines(ticks, 1.0, grid)
         fun draw(vs: List<Double>, offset: Int, color: Color, dashed: Boolean, width: Float) {
             if (vs.size < 2) return
             val p = Path()
@@ -342,5 +480,6 @@ fun ReceptorChart(
         draw(plan, todayIndex, primary, dashed = true, width = 2.5.dp.toPx())
         draw(history, 0, primary, dashed = false, width = 3.dp.toPx())
         drawLine(muted, Offset(x(todayIndex), 0f), Offset(x(todayIndex), size.height), strokeWidth = 1.5.dp.toPx())
+    }
     }
 }

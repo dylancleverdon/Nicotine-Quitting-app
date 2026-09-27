@@ -2,6 +2,10 @@
 
 Newest first. Each release is a "## <version>" heading; the app shows these notes in "What's new".
 
+## 0.7.0 · 2026-09-28
+- Every chart now has numbers: values up the side (mg, pieces, %, hours) and times or dates along the bottom, following your 12/24-hour setting.
+- New: **Suggest something / report a bug** at the very bottom of the Log tab. Ideas and bug reports go straight to a private list, with the app version attached, so nothing gets lost in texts. Works offline too (it sends later).
+
 ## 0.6.0 · 2026-09-28
 - New in Insights: **Cravings ahead.** A forecast of when cravings are likely over the next 24 hours and how strong they'd probably be, learned from your own logged cravings and your nicotine level. A line under the chart says when the next one is likely, and it tells you how often it's been right. The more cravings you log, the sharper it gets.
 - New in Insights: **Receptors.** An estimate of how your brain's nicotine receptors are healing, based on brain-imaging research and your logs, and where they'll be if you keep following the program. It shows when you'd reach Clear Air and the typical non-user range.

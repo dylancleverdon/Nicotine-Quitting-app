@@ -3,6 +3,7 @@ import { useRegisterSW } from 'virtual:pwa-register/preact'
 import * as S from './store'
 import { persist } from './db'
 import { markActivity } from './core'
+import { flushFeedback } from './feedback'
 import { setTimeFormat } from './ui/format'
 import { Home } from './ui/Home'
 import { Calendar } from './ui/Calendar'
@@ -23,7 +24,7 @@ export function App() {
   useRegisterSW({ immediate: true, onRegisteredSW: () => setChecked(`Last checked ${new Date().toLocaleTimeString()}`) })
 
   useEffect(() => {
-    S.load(); persist(); markActivity()
+    S.load(); persist(); markActivity(); flushFeedback()
     const onVisible = () => document.visibilityState === 'visible' && (markActivity(), (S.tick.value = Date.now()))
     document.addEventListener('visibilitychange', onVisible)
     const t = setInterval(() => (S.tick.value = Date.now()), 15000)

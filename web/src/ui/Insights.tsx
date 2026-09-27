@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'preact/hooks'
 import { Core } from '../core'
 import * as S from '../store'
-import { Barcode, Bars, ForecastChart, Heatmap, Line, Meter, ReceptorChart, Wave } from './Charts'
+import { Barcode, Bars, ForecastChart, Heatmap, Line, Meter, ReceptorChart, Wave, dateLabels } from './Charts'
 import { duration, pieces, shortDate, signedDuration, time } from './format'
 
 const SECTIONS = ['Today', 'Cravings ahead', 'Receptors', 'Stretch & pull', 'Trends', 'Patterns', 'Going up', 'Going down', 'Mix', 'Forecasts', 'Milestones', 'Ladder']
@@ -21,6 +21,9 @@ export function Insights() {
   const full = snap.days.slice(0, -1).slice(-42)
   if (!snap.days.length) return <main><h1>Insights</h1><div class="muted">Log a few doses and your graphs appear here.</div></main>
   const today = snap.days[snap.days.length - 1]
+  const dl = (ds: { date: string }[]) => dateLabels(ds.map((d) => d.date))
+  const h = (v: number) => `${v}h`
+  const n = (v: number) => `${v}`
   const dayStart = new Date(snap.today + 'T00:00').getTime()
   return (
     <main>
@@ -39,7 +42,6 @@ export function Insights() {
         const first = f.points[0]?.[0] ?? Date.now()
         return <Card title="Cravings ahead" sub="Chance of a craving over the next 24 hours, from your own logs and your estimated nicotine level. Dots show how strong one would probably be. Sleep is shaded. An estimate, not a promise.">
           <ForecastChart points={f.points} now={Date.now()} />
-          <div class="row between muted"><span>{time(first)}</span><span>{time(first + 12 * 3600000)}</span><span>{time(first + 24 * 3600000)}</span></div>
           <div class="next-craving"><b>{f.next ? `Next craving likely around ${time(f.next.peakAt)} (strength about ${Math.round(f.next.strength)})` : 'No clear craving peak ahead right now.'}</b></div>
           {f.windows.length > 1 && <div class="small">Most likely: {f.windows.map((w) => `${time(w.peakAt)} (about ${Math.round(w.strength)})`).join(', ')}{f.quietestAt ? `. Quietest: around ${time(f.quietestAt)}.` : '.'}</div>}
           {f.learning && <div class="muted">Still learning: based on {f.cravingsUsed} logged {f.cravingsUsed === 1 ? 'craving' : 'cravings'} so far, plus your nicotine curve. Log cravings with "Craving? Log it" and this sharpens up.</div>}
@@ -51,8 +53,8 @@ export function Insights() {
         if (!r) return <Card title="Receptors" sub="Appears after your first full day of logging." />
         const pct = (v: number) => `${Math.round(v * 100)}%`
         return <Card title="Receptors" sub="Estimated nicotine receptor load. 100% is typical of heavy regular use; the shaded band is the typical non-user range. Solid: your past. Dashed: if you keep following the program. Faint: if you stayed on your current rung.">
-          <ReceptorChart history={r.history.map((p) => p.value)} plan={r.plan.map((p) => p.value)} stay={r.stay.map((p) => p.value)} typical={r.typical} />
-          <div class="row between muted"><span>{r.history[0] ? shortDate(r.history[0].label) : ''}</span><span>Today</span><span>{r.plan.length ? shortDate(r.plan[r.plan.length - 1].label) : ''}</span></div>
+          <ReceptorChart history={r.history.map((p) => p.value)} plan={r.plan.map((p) => p.value)} stay={r.stay.map((p) => p.value)} typical={r.typical}
+            dates={[...r.history.map((p) => p.label), ...r.plan.map((p) => p.label)]} />
           <div class="stats"><Stat v={`≈ ${pct(r.todayLoad)}`} l="load today" /><Stat v={r.clearAirOnPlan ? shortDate(r.clearAirOnPlan) : 'over a year'} l="Clear Air on plan" />
             <Stat v={r.typicalOnPlan ? shortDate(r.typicalOnPlan) : 'over a year'} l="typical range on plan" /></div>
           {!r.typicalIfStay && r.stay.length > 0 && <div class="small">Staying on your current rung keeps the load around {pct(r.stay[r.stay.length - 1].value)}. Each step down lets it fall further.</div>}
@@ -68,9 +70,9 @@ export function Insights() {
         const avg = (f: (d: any) => number) => (week.length ? week.reduce((a, d) => a + f(d), 0) / week.length : 0)
         return <Card title="Stretch & pull" sub="Stretch: time you held off after the battery was full. Pull: nicotine that came before the battery had room for it. Net = stretch − pull; positive means you're living below your target pace. Every day starts clean.">
           <div class="muted">Stretch (teal) and pull (grey), hours a day</div>
-          <Line values={sd.map((d) => d.pullMin / 60)} second={sd.map((d) => d.stretchMin / 60)} color="var(--muted)" />
+          <Line values={sd.map((d) => d.pullMin / 60)} second={sd.map((d) => d.stretchMin / 60)} color="var(--muted)" fmt={h} x={dl(sd)} />
           <div class="muted">Net, hours a day</div>
-          <Bars values={sd.map((d) => Math.max(0, (d.stretchMin - d.pullMin) / 60))} height={80} />
+          <Bars values={sd.map((d) => Math.max(0, (d.stretchMin - d.pullMin) / 60))} height={80} fmt={h} x={dl(sd)} />
           {week.length > 0 && <div class="stats"><Stat v={duration(avg((d) => d.stretchMin) * 60000)} l="stretch, 7-day avg" /><Stat v={duration(avg((d) => d.pullMin) * 60000)} l="pull, 7-day avg" />
             <Stat v={signedDuration(avg((d) => d.stretchMin - d.pullMin))} l="net, 7-day avg" /></div>}
           {snap.stretchSummary && <div class="small">{snap.stretchSummary}</div>}
@@ -79,37 +81,36 @@ export function Insights() {
       })()}
       {sec === 'Trends' && <>
         <Card title="Daily totals" sub="Pieces a day with the 7-day average line. Hatched = unknown doses (range); faded = estimated days.">
-          <Bars values={days.map((d) => d.pieces)} highs={days.map((d) => (d.hasRange ? d.high : null))} faded={days.map((d) => d.estimated)} line={snap.sevenDayAverage.slice(-days.length)} />
-          <div class="muted">{shortDate(days[0].date)} – {shortDate(days[days.length - 1].date)}</div>
+          <Bars values={days.map((d) => d.pieces)} highs={days.map((d) => (d.hasRange ? d.high : null))} faded={days.map((d) => d.estimated)} line={snap.sevenDayAverage.slice(-days.length)} fmt={n} x={dl(days)} />
         </Card>
-        {ins.staircase.length > 1 && <Card title="Tier staircase" sub="Your measured tier week by week."><Line values={ins.staircase.map((s) => s.value)} stepped />
+        {ins.staircase.length > 1 && <Card title="Tier staircase" sub="Your measured tier week by week."><Line values={ins.staircase.map((s) => s.value)} stepped fmt={n} x={dateLabels(ins.staircase.map((s) => s.extra))} />
           <div class="muted">{ins.staircase.map((s) => s.label).join(' → ')}</div></Card>}
-        {ins.weeklyGaps.length > 1 && <Card title="Gap between pieces" sub="Average time between doses, week by week. This one should climb."><Line values={ins.weeklyGaps} color="var(--tertiary)" /></Card>}
+        {ins.weeklyGaps.length > 1 && <Card title="Gap between pieces" sub="Average time between doses, week by week. This one should climb."><Line values={ins.weeklyGaps.map((m) => m / 60)} color="var(--tertiary)" fmt={h} x={ins.weeklyGaps.map((_, i) => `Wk ${i + 1}`)} /></Card>}
       </>}
       {sec === 'Patterns' && <>
         <Card title="When it happens" sub="Hour of day across, Monday to Sunday down."><Heatmap grid={ins.heatmap} /></Card>
-        <Card title="Wake to first piece" sub="Minutes from waking to the first dose. Longer is better."><Line values={snap.days.map((d) => d.wakeToFirstMin ?? 0)} color="var(--tertiary)" /></Card>
+        <Card title="Wake to first piece" sub="Minutes from waking to the first dose. Longer is better."><Line values={snap.days.map((d) => d.wakeToFirstMin ?? 0)} color="var(--tertiary)" fmt={(v) => `${v}m`} x={dl(snap.days)} /></Card>
         <Card title="Triggers">{ins.triggers.length ? ins.triggers.map((t) => <div class="row small"><span class="grow">{t.label}</span>{t.value}</div>) : <div class="muted">Hold a product to tag what was going on.</div>}</Card>
         <Card title="Comparisons">{ins.comparisons.map((c) => <div class="small">{c.label}: ≈ {pieces(c.value)} vs {pieces(Number(c.extra))}</div>)}</Card>
       </>}
       {sec === 'Going up' && <>
-        <Card title="Clear hours" sub="Hours each day your level sat near zero while awake."><Line values={full.map((d) => d.clearHours)} color="var(--tertiary)" /></Card>
+        <Card title="Clear hours" sub="Hours each day your level sat near zero while awake."><Line values={full.map((d) => d.clearHours)} color="var(--tertiary)" fmt={h} x={dl(full)} /></Card>
         <Card title="Wins"><div class="stats"><Stat v={`≈ ${pieces(ins.avoidedPieces)}`} l="pieces avoided" /><Stat v={`${ins.avoidedMg.toFixed(1)} mg`} l="nicotine avoided" />
           <Stat v={ins.winRate != null ? `${Math.round(ins.winRate * 100)}%` : '–'} l="craving win rate" /><Stat v={ins.cravingMinutes != null ? `${Math.round(ins.cravingMinutes)} min` : '–'} l="typical craving" /></div></Card>
         <Card title="Money saved"><h2>{S.settings.value.currency}{ins.money.toFixed(2)}</h2>
           {S.settings.value.rewardCost > 0 && <><Meter value={ins.money / S.settings.value.rewardCost} /><div class="muted">Toward {S.settings.value.rewardName || 'your reward'}</div></>}</Card>
-        {ins.overnight.length > 1 && <Card title="Overnight gap"><Line values={ins.overnight} color="var(--tertiary)" /></Card>}
+        {ins.overnight.length > 1 && <Card title="Overnight gap"><Line values={ins.overnight.map((m) => m / 60)} color="var(--tertiary)" fmt={h} /></Card>}
         <Card title="Beaten triggers" sub="Of each trigger's last 10 appearances, how many passed without nicotine.">{ins.beaten.map((b) => <div class="row small"><span class="grow">{b.label}</span>{b.extra}</div>)}</Card>
       </>}
       {sec === 'Going down' && <>
         <Card title="Nicotine quality" sub="How you use nicotine, on a food scale. Gum, lozenges and patches are broccoli; smoke is burger and fries.">
-          <Line values={full.map((d) => d.quality ?? 100)} color="var(--tertiary)" />
+          <Line values={full.map((d) => d.quality ?? 100)} color="var(--tertiary)" fmt={n} top={100} x={dl(full)} />
           {snap.qualityLabel && <b>Today: {snap.qualityLabel}</b>}{snap.swapTip && <div class="small">{snap.swapTip}</div>}
           <div class="muted">🥦 90+ · 🍎 75+ · 🥪 55+ · 🍕 35+ · 🍩 11+ · 🍔 0–10</div></Card>
-        <Card title="Average dose size (mg)"><Line values={full.map((d) => (d.doses ? d.mg / d.doses : 0))} /></Card>
-        <Card title="Spike share (%)"><Line values={full.map((d) => (d.mg > 0 ? (d.spikeMg / d.mg) * 100 : 0))} /></Card>
-        <Card title="Background level" sub="Modelled on cotinine; drifts down even through messy days."><Line values={ins.background.slice(-42)} /></Card>
-        <Card title="Cravings vs doses" sub="Doses orange, urges teal."><Line values={full.map((d) => d.doses)} second={full.map((d) => d.cravings)} /></Card>
+        <Card title="Average dose size (mg)"><Line values={full.map((d) => (d.doses ? d.mg / d.doses : 0))} fmt={(v) => `${v} mg`} x={dl(full)} /></Card>
+        <Card title="Spike share (%)"><Line values={full.map((d) => (d.mg > 0 ? (d.spikeMg / d.mg) * 100 : 0))} fmt={(v) => `${v}%`} top={100} x={dl(full)} /></Card>
+        <Card title="Background level" sub="Modelled on cotinine; drifts down even through messy days."><Line values={ins.background.slice(-42)} fmt={(v) => `${v} mg`} x={dl(snap.days.slice(-42))} /></Card>
+        <Card title="Cravings vs doses" sub="Doses orange, urges teal."><Line values={full.map((d) => d.doses)} second={full.map((d) => d.cravings)} fmt={n} x={dl(full)} /></Card>
         <Card title="What you can ride out"><div class="small">{ins.coachConfident ? `You reliably ride out cravings up to about ${ins.capacity} out of 10.` : 'Log a few more cravings (and whether they passed) to personalise this.'}</div>
           {ins.coachLevels.map((l) => <div class="row small"><span class="grow">{l.label}</span>{l.extra}</div>)}{ins.honest && <div class="muted">Honest level: {ins.honest}</div>}</Card>
         <Card title="Heaviness score" sub="From time-to-first-use and amount (0–6)."><b>{ins.heaviness?.toFixed(1) ?? '–'} of 6</b></Card>

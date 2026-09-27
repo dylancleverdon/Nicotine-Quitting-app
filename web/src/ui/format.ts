@@ -9,6 +9,16 @@ export const time = (ms: number) => {
   if (timeFormat === '12h') return new Date(ms).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
   return new Date(ms).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
 }
+/** Axis label for a whole hour: "6 AM" / "18:00", following the time-format setting. */
+export const hourLabel = (ms: number) => {
+  const d = new Date(ms)
+  const use24 = timeFormat === '24h' || (timeFormat === 'system' && !/[AP]M/i.test(new Date(2000, 0, 1, 13).toLocaleTimeString([], { hour: 'numeric' })))
+  if (use24) return `${String(d.getHours()).padStart(2, '0')}:00`
+  const h = d.getHours() % 12 || 12
+  return `${h} ${d.getHours() < 12 ? 'AM' : 'PM'}`
+}
+/** "8 Sep" from an ISO date. */
+export const dayMonth = (iso: string) => new Date(iso + 'T12:00').toLocaleDateString([], { day: 'numeric', month: 'short' })
 export const signedDuration = (m: number) => `${m >= 0 ? '+' : '−'}${duration(Math.abs(m) * 60000)}`
 export const duration = (ms: number) => {
   const m = Math.max(0, Math.floor(ms / 60000)); const d = Math.floor(m / 1440); const h = Math.floor(m / 60) % 24

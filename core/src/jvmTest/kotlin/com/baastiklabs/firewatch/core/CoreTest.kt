@@ -210,4 +210,12 @@ class CoreTest {
         assertEquals(RecordTypes.SETTINGS_ID, env.id)
         assertTrue(RecordCodec.parseObject(env.json)!!.jsonObject.containsKey("referenceProductId"))
     }
+
+    @Test
+    fun `feedback form body encodes every field`() {
+        val body = Feedback.encode(Feedback.fields("Bug", "Crash on 3 & 4 mg ✓", "", "Sam", "Android 0.7.0 · Pixel"))
+        assertTrue(body.startsWith("entry.2010880696=Bug&entry.1095248491=Crash+on+3+%26+4+mg+%E2%9C%93"), body)
+        assertTrue("entry.610873672=Sam" in body && "entry.904750360=Android+0.7.0+%C2%B7+Pixel" in body)
+        assertTrue(Feedback.encode(Feedback.fields("Weird", "x", "", "", "")).startsWith("entry.2010880696=Other"))
+    }
 }

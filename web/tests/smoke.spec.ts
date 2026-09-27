@@ -31,6 +31,13 @@ test('back-dated start, logging and persistence', async ({ page }) => {
   await expect(page.getByText('Logged Nicotine gum 4 mg')).toBeVisible()
   await expect(page.locator('.list .item')).toHaveCount(1)
   await expect(page.getByText('in your system now')).toBeVisible()
+  await page.screenshot({ path: 'test-results/home.png', fullPage: true })
+
+  // Suggestions box opens; cancel without sending anything.
+  await page.getByRole('button', { name: 'Suggest something / report a bug' }).click()
+  await expect(page.getByPlaceholder('Your suggestion')).toBeVisible()
+  await page.screenshot({ path: 'test-results/suggest.png' })
+  await page.getByRole('button', { name: 'Cancel' }).click()
 
   // Relapse prevention mode: on, indicator, next scheduled piece, off.
   await page.getByRole('button', { name: 'Relapse prevention mode', exact: true }).click()
@@ -52,6 +59,11 @@ test('back-dated start, logging and persistence', async ({ page }) => {
   // Insights and calendar render.
   await page.getByRole('button', { name: 'Insights' }).click()
   await expect(page.getByText('Blood-level wave')).toBeVisible()
+  await page.screenshot({ path: 'test-results/today.png', fullPage: true })
+  for (const s of ['Trends', 'Patterns', 'Going down']) {
+    await page.getByRole('button', { name: s, exact: true }).click()
+    await page.screenshot({ path: `test-results/${s.replace(' ', '-').toLowerCase()}.png`, fullPage: true })
+  }
   await page.getByRole('button', { name: 'Cravings ahead' }).click()
   await expect(page.getByText(/Next craving likely around|No clear craving peak/)).toBeVisible()
   await page.screenshot({ path: 'test-results/cravings-ahead.png', fullPage: true })

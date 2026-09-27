@@ -47,6 +47,9 @@ export interface Snapshot {
 
 export const Core = {
   outlooks: (records: string): Outlooks => JSON.parse(core.outlooks(records, Date.now())),
+  feedbackUrl: (): string => core.feedbackUrl(),
+  feedbackBody: (type: string, s: string, d: string, n: string, info: string): string => core.feedbackBody(type, s, d, n, info),
+  feedbackPrivacy: (): string => core.feedbackPrivacy(),
   help: (): { tour: HelpPage[]; why: HelpPage[]; articles: HelpArticle[] } => JSON.parse(core.help()),
   defaultProducts: (): any[] => JSON.parse(core.defaultProducts()),
   cravingScale: (): NamedValue[] => JSON.parse(core.cravingScale()),

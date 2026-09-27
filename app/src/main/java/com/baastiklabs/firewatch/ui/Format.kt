@@ -44,6 +44,15 @@ object Fmt {
     fun time(t: LocalTime): String =
         t.format(DateTimeFormatter.ofPattern(if (use24h) "HH:mm" else "h:mm a", Locale.ENGLISH))
 
+    /** Axis label for a whole hour: "6 AM" or "18:00". */
+    fun hourLabel(hour: Int): String =
+        if (use24h) String.format(Locale.ENGLISH, "%02d:00", hour % 24)
+        else "${(hour % 12).let { if (it == 0) 12 else it }} ${if (hour % 24 < 12) "AM" else "PM"}"
+
+    /** "8 Sep" for axis labels. */
+    fun dayMonth(date: kotlinx.datetime.LocalDate): String =
+        LocalDate.of(date.year, date.monthNumber, date.dayOfMonth).format(DateTimeFormatter.ofPattern("d MMM", Locale.getDefault()))
+
     fun minutesOfDay(minutes: Int): String = time(LocalTime.of((minutes / 60) % 24, minutes % 60))
 
     fun duration(ms: Long): String {

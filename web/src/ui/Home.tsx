@@ -1,5 +1,6 @@
 import { useRef, useState } from 'preact/hooks'
 import { Core } from '../core'
+import { savedName, sendFeedback } from '../feedback'
 import * as S from '../store'
 import { Meter, Wave } from './Charts'
 import { CheckInSheet, CravingSheet, DoseSheet, VapeSheet, doseLine } from './Sheets'
@@ -14,6 +15,7 @@ export function Home({ toast, go }: { toast: (msg: string, undo?: () => void) =>
   const [checkIn, setCheckIn] = useState(false)
   const [celebrate, setCelebrate] = useState<any>(null)
   const [relapseSheet, setRelapseSheet] = useState(false)
+  const [fb, setFb] = useState<{ type: string; text: string; details: string; name: string } | null>(null)
   const rp = snap.relapse
   const press = useRef<number | null>(null)
   const longFired = useRef(false)
@@ -83,7 +85,7 @@ export function Home({ toast, go }: { toast: (msg: string, undo?: () => void) =>
           <div class="stat small"><b>{snap.todayRodeOut}/{snap.todayCravings}</b><span>urges beaten</span></div>
           {snap.qualityLabel && <div class="stat small"><b>{snap.qualityLabel.split(' · ')[0].split(' ')[0]} {Math.round(snap.qualityScore!)}</b><span>quality</span></div>}
         </div>
-        {snap.revealed && snap.wave.length > 2 && <Wave points={snap.wave} height={64} now={Date.now()} shade={[[snap.wave[0][0], snap.wakeAt], [snap.sleepAt, snap.wave[snap.wave.length - 1][0]]]} />}
+        {snap.revealed && snap.wave.length > 2 && <Wave points={snap.wave} height={64} axes={false} now={Date.now()} shade={[[snap.wave[0][0], snap.wakeAt], [snap.sleepAt, snap.wave[snap.wave.length - 1][0]]]} />}
         {snap.revealed && snap.wave.length > 2 && <div class="now-mg"><b>≈ {snap.nowMg.toFixed(1)} mg</b> in your system now</div>}
       </div>
 
@@ -160,6 +162,7 @@ export function Home({ toast, go }: { toast: (msg: string, undo?: () => void) =>
       ))}</div>
       <button class="btn outline" onClick={() => setRelapseSheet(true)}>{rp.on ? 'Relapse prevention mode: on' : 'Relapse prevention mode'}</button>
       <div class="muted">≈ All nicotine figures are estimates. Their real value is comparing your own numbers over time.</div>
+      <button class="btn text" onClick={() => setFb({ type: 'Idea', text: '', details: '', name: savedName() })}>Suggest something / report a bug</button>
 
       {options && <DoseSheet product={options} onClose={() => setOptions(null)} onLog={(at, opts) => { setOptions(null); logProduct(options, at, opts) }} />}
       {craving && <CravingSheet onClose={() => setCraving(false)} onPick={async (level) => {
@@ -173,6 +176,18 @@ export function Home({ toast, go }: { toast: (msg: string, undo?: () => void) =>
         } else if (vape !== true) dose.productId = vape.id
         await S.save('dose', dose); toast('Logged as a range', () => S.remove(dose.id))
       }} />}
+      {fb && <div class="sheet-bg" onClick={() => setFb(null)}><div class="sheet" onClick={(e) => e.stopPropagation()}>
+        <h2>Suggest something</h2>
+        <div class="row wrap">{['Idea', 'Bug', 'Other'].map((t) => <button class={`chip ${fb.type === t ? 'on' : ''}`} onClick={() => setFb({ ...fb, type: t })}>{t}</button>)}</div>
+        <textarea rows={4} placeholder={fb.type === 'Bug' ? 'What went wrong?' : 'Your suggestion'} value={fb.text} onInput={(e) => setFb({ ...fb, text: (e.target as HTMLTextAreaElement).value })} />
+        <textarea rows={2} placeholder={fb.type === 'Bug' ? 'What were you doing? (optional)' : 'Details (optional)'} value={fb.details} onInput={(e) => setFb({ ...fb, details: (e.target as HTMLTextAreaElement).value })} />
+        <input placeholder="Your name (optional)" value={fb.name} onInput={(e) => setFb({ ...fb, name: (e.target as HTMLInputElement).value })} />
+        <div class="muted">{Core.feedbackPrivacy()}</div>
+        <div class="row"><button class="btn" disabled={!fb.text.trim()} onClick={async () => {
+          const f = fb; setFb(null)
+          toast((await sendFeedback(f.type, f.text, f.details, f.name)) ? 'Thanks, sent!' : "No connection. Saved, and it'll send next time Firewatch opens.")
+        }}>Send</button><button class="btn outline" onClick={() => setFb(null)}>Cancel</button></div>
+      </div></div>}
       {relapseSheet && <div class="sheet-bg" onClick={() => setRelapseSheet(false)}><div class="sheet" onClick={(e) => e.stopPropagation()}>
         <h2>Relapse prevention mode</h2>
         <div class="small"><b>What it is:</b> a reminder to chew a piece at a steady gap: your tier's gap, or every 2 hours before you have a tier.</div>

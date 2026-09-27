@@ -51,7 +51,7 @@ nav.tabs button.on { color: var(--text); background: var(--primary-soft); }
 .cal .base::after { content: ""; position: absolute; bottom: 4px; width: 4px; height: 4px; border-radius: 50%; background: var(--secondary); }
 .scroll-x { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; }
 .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(86px + env(safe-area-inset-bottom)); background: var(--surface3); padding: 12px 16px; border-radius: 14px; display: flex; gap: 12px; align-items: center; z-index: 30; box-shadow: 0 6px 20px #0006; max-width: calc(100% - 32px); }
-input, select { font: inherit; color: var(--text); background: var(--surface2); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; width: 100%; }
+input, select, textarea { font: inherit; color: var(--text); background: var(--surface2); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; width: 100%; }
 svg text { fill: var(--muted); font-size: 10px; }
 .footer { text-align: center; color: var(--muted); font-size: 12px; padding: 12px; }
 .between { justify-content: space-between; }
@@ -62,3 +62,15 @@ svg text { fill: var(--muted); font-size: 10px; }
 input.search { width: 100%; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface, transparent); color: inherit; font-size: 15px; }
 .cal .mode { box-shadow: inset 0 0 0 2px var(--tertiary); }
 .next-craving { font-size: 15px; }
+textarea { resize: vertical; }
+.chart-frame { display: flex; flex-direction: column; gap: 2px; }
+.chart { display: flex; gap: 6px; align-items: stretch; }
+.chart .plot { position: relative; flex: 1; min-width: 0; }
+.yaxis { position: relative; width: 38px; flex: none; font-size: 10px; color: var(--muted); }
+.yaxis span { position: absolute; right: 0; transform: translateY(50%); white-space: nowrap; line-height: 1; }
+.yaxis span:first-child { transform: none; }
+.yaxis span:last-child { transform: translateY(100%); }
+.yaxis.days { width: 14px; display: flex; flex-direction: column; justify-content: space-around; }
+.yaxis.days span { position: static; transform: none; text-align: center; }
+.xaxis { position: relative; height: 14px; font-size: 10px; color: var(--muted); }
+.xaxis span { position: absolute; top: 0; white-space: nowrap; }

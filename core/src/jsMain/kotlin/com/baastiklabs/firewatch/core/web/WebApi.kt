@@ -351,6 +351,12 @@ object FirewatchCore {
         return FirewatchJson.encodeToString(OutlooksDto.serializer(), OutlooksDto(forecast, receptors))
     }
 
+    /** Suggestion / bug report: the form URL and encoded body (shared with Android). */
+    fun feedbackUrl(): String = com.baastiklabs.firewatch.core.Feedback.FORM_URL
+    fun feedbackBody(type: String, suggestion: String, details: String, name: String, appInfo: String): String =
+        com.baastiklabs.firewatch.core.Feedback.encode(com.baastiklabs.firewatch.core.Feedback.fields(type, suggestion, details, name, appInfo))
+    fun feedbackPrivacy(): String = com.baastiklabs.firewatch.core.Feedback.PRIVACY_NOTE
+
     /** Help articles, the welcome tour and "Why Firewatch works this way" (shared with Android). */
     fun help(): String = FirewatchJson.encodeToString(
         HelpDto.serializer(),

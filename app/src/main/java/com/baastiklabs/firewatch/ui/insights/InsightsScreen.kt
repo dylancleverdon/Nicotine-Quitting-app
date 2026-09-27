@@ -126,6 +126,15 @@ private fun Col(content: @Composable () -> Unit) = Column(verticalArrangement = 
 
 private fun fmt1(x: Double) = String.format(Locale.getDefault(), "%.1f", x)
 
+// Axis formatters and date labels.
+private val hrs: (Double) -> String = { "${com.baastiklabs.firewatch.ui.charts.fmtNum(it)}h" }
+private val num: (Double) -> String = { com.baastiklabs.firewatch.ui.charts.fmtNum(it) }
+private val mgs: (Double) -> String = { "${com.baastiklabs.firewatch.ui.charts.fmtNum(it)} mg" }
+private val pct: (Double) -> String = { "${com.baastiklabs.firewatch.ui.charts.fmtNum(it)}%" }
+private val mins: (Double) -> String = { "${com.baastiklabs.firewatch.ui.charts.fmtNum(it)}m" }
+private fun dates(ds: List<com.baastiklabs.firewatch.core.engine.DayStat>) = ds.map { Fmt.dayMonth(it.date) }
+private fun kdates(ds: List<kotlinx.datetime.LocalDate>) = ds.map { Fmt.dayMonth(it) }
+
 @Composable
 private fun TodaySection(ins: Insights, data: FirewatchData, now: Long) = Col {
     val curve = ins.todayCurve()
@@ -142,7 +151,6 @@ private fun TodaySection(ins: Insights, data: FirewatchData, now: Long) = Col {
             shaded = listOf(curve.first().first to w.wakeAt, w.sleepAt to curve.last().first),
             now = now,
         )
-        AxisLabels(listOf(Fmt.time(curve.first().first), Fmt.time(curve.last().first)))
     }
     ChartCard("Dose strip", "Today's doses across 24 hours, sized by amount and coloured by type.") {
         DoseStrip(w.doses.map { d ->
@@ -169,8 +177,6 @@ private fun CravingsAheadSection(data: FirewatchData, now: Long, tz: TimeZone) =
             "Dots show how strong one would probably be. Sleep is shaded. An estimate, not a promise.",
     ) {
         CravingForecastChart(o.points, now)
-        val first = o.points.firstOrNull()?.at ?: now
-        AxisLabels(listOf(Fmt.time(first), Fmt.time(first + 12 * 3_600_000L), Fmt.time(first + 24 * 3_600_000L)))
         Text(
             o.next?.let { "Next craving likely around ${Fmt.time(it.peakAt)} (strength about ${it.strength.roundToInt()})" }
                 ?: "No clear craving peak ahead right now.",
@@ -216,8 +222,10 @@ private fun ReceptorSection(data: FirewatchData, now: Long, tz: TimeZone) = Col 
         "Estimated nicotine receptor load. 100% is typical of heavy regular use; the shaded band is the typical non-user range. " +
             "Solid: your past. Dashed: if you keep following the program. Faint: if you stayed on your current rung.",
     ) {
-        ReceptorChart(history.map { it.load }, o.plan.map { it.load }, o.stay.map { it.load }, com.baastiklabs.firewatch.core.engine.Receptors.TYPICAL)
-        AxisLabels(listOfNotNull(history.firstOrNull()?.let { Fmt.shortDateK(it.date) }, "Today", o.plan.lastOrNull()?.let { Fmt.shortDateK(it.date) }))
+        ReceptorChart(
+            history.map { it.load }, o.plan.map { it.load }, o.stay.map { it.load }, com.baastiklabs.firewatch.core.engine.Receptors.TYPICAL,
+            dates = (history.map { it.date } + o.plan.map { it.date }).map { Fmt.dayMonth(it) },
+        )
         Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
             Stat("≈ ${(o.todayLoad * 100).roundToInt()}%", "load today")
             Stat(o.clearAirOnPlan?.let { Fmt.shortDateK(it) } ?: "over a year", "Clear Air on plan")
@@ -258,10 +266,10 @@ private fun StretchSection(ins: Insights) = Col {
     ) {
         Text("Stretch (teal) and pull (grey), hours a day", style = MaterialTheme.typography.labelMedium)
         TrendLine(days.map { it.stretchMin / 60 }, second = days.map { it.pullMin / 60 },
-            color = MaterialTheme.colorScheme.tertiary, secondColor = MaterialTheme.colorScheme.outline)
+            color = MaterialTheme.colorScheme.tertiary, secondColor = MaterialTheme.colorScheme.outline, yFmt = hrs, xLabels = kdates(days.map { it.date }))
         Text("Net, hours a day", style = MaterialTheme.typography.labelMedium)
         BarChart(days.map { Bar(kotlin.math.max(0.0, it.netMin / 60), color = if (it.netMin >= 0) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.outline) },
-            height = 90.dp)
+            height = 90.dp, yFmt = hrs, xLabels = kdates(days.map { it.date }))
         val week = days.filter { it.date < ins.today }.takeLast(7).filter { !it.paused }
         if (week.isNotEmpty()) {
             fun hm(m: Double) = Fmt.duration((kotlin.math.abs(m) * 60_000).toLong())
@@ -301,20 +309,21 @@ private fun TrendsSection(ins: Insights) = Col {
             },
             line = days.indices.map { ins.sevenDayAverage(it + offset) },
             bands = bands,
+            yFmt = num,
+            xLabels = dates(days),
         )
-        AxisLabels(listOf(Fmt.shortDateK(days.first()), Fmt.shortDateK(days.last())))
     }
     val stairs = ins.tierStaircase()
     if (stairs.size >= 2) {
         ChartCard("Tier staircase", "Your measured tier week by week. Stairs going down.") {
-            TrendLine(stairs.map { it.second.pieces }, stepped = true)
+            TrendLine(stairs.map { it.second.pieces }, stepped = true, yFmt = num, xLabels = kdates(stairs.map { it.first }))
             Text(stairs.joinToString(" → ") { it.second.tier.title }.takeLast(120), style = MaterialTheme.typography.bodySmall)
         }
     }
     val gaps = ins.weeklyGaps()
     if (gaps.size >= 2) {
         ChartCard("Gap between pieces", "Average time between doses, week by week. This one should climb.") {
-            TrendLine(gaps.map { it.second }, color = MaterialTheme.colorScheme.tertiary)
+            TrendLine(gaps.map { it.second / 60 }, color = MaterialTheme.colorScheme.tertiary, yFmt = hrs, xLabels = kdates(gaps.map { it.first }))
             Text("Latest: ${Fmt.duration((gaps.last().second * 60_000).toLong())}", style = MaterialTheme.typography.bodySmall)
         }
     }
@@ -326,7 +335,7 @@ private fun PatternsSection(ins: Insights) = Col {
     val ttf = ins.days.mapNotNull { it.wakeToFirstMin }
     if (ttf.size >= 2) {
         ChartCard("Wake to first piece", "Minutes from waking to the first dose. Longer is better.") {
-            TrendLine(ttf, color = MaterialTheme.colorScheme.tertiary)
+            TrendLine(ttf, color = MaterialTheme.colorScheme.tertiary, yFmt = mins)
             Text("Latest: ${Fmt.duration((ttf.last() * 60_000).toLong())}", style = MaterialTheme.typography.bodySmall)
         }
     }
@@ -347,12 +356,12 @@ private fun PatternsSection(ins: Insights) = Col {
 private fun GoingUpSection(ins: Insights, data: FirewatchData) = Col {
     val days = ins.fullDays.takeLast(42)
     ChartCard("Clear hours", "Hours each day your estimated level sat near zero while awake. Watch it rise.") {
-        TrendLine(days.map { it.clearHours }, color = MaterialTheme.colorScheme.tertiary)
+        TrendLine(days.map { it.clearHours }, color = MaterialTheme.colorScheme.tertiary, yFmt = hrs, xLabels = dates(days))
     }
     val overnight = ins.overnightGaps().takeLast(42)
     if (overnight.size >= 2) {
         ChartCard("Overnight gap", "Last dose at night to first the next morning.") {
-            TrendLine(overnight.map { it.second / 60 }, color = MaterialTheme.colorScheme.tertiary)
+            TrendLine(overnight.map { it.second / 60 }, color = MaterialTheme.colorScheme.tertiary, yFmt = hrs, xLabels = kdates(overnight.map { it.first }))
             Text("Latest: ${Fmt.duration((overnight.last().second * 60_000).toLong())}", style = MaterialTheme.typography.bodySmall)
         }
     }
@@ -378,7 +387,7 @@ private fun GoingUpSection(ins: Insights, data: FirewatchData) = Col {
         }
     }
     ChartCard("Mouth-free hours", "Awake time without a pouch or gum in.") {
-        TrendLine(days.map { ((it.awakeHours * 60 - it.mouthMinutes) / 60).coerceAtLeast(0.0) }, color = MaterialTheme.colorScheme.tertiary)
+        TrendLine(days.map { ((it.awakeHours * 60 - it.mouthMinutes) / 60).coerceAtLeast(0.0) }, color = MaterialTheme.colorScheme.tertiary, yFmt = hrs, xLabels = dates(days))
     }
     val beaten = ins.beatenTriggers()
     ChartCard("Beaten triggers", "Of each trigger's last 10 appearances, how many passed without nicotine (from tagged cravings).") {
@@ -391,14 +400,14 @@ private fun GoingUpSection(ins: Insights, data: FirewatchData) = Col {
 private fun GoingDownSection(ins: Insights, data: FirewatchData, now: Long) = Col {
     val days = ins.fullDays.takeLast(42)
     ChartCard("Average dose size", "Absorbed mg per dose. Catches moves like 6 mg to 3 mg.") {
-        TrendLine(days.map { if (it.doses.isEmpty()) 0.0 else it.absorbedMg / it.doses.size })
+        TrendLine(days.map { if (it.doses.isEmpty()) 0.0 else it.absorbedMg / it.doses.size }, yFmt = mgs, xLabels = dates(days))
     }
     ChartCard("Spike share", "Share of nicotine arriving as fast spikes (vapes). Shrinking is real progress.") {
-        TrendLine(days.map { if (it.absorbedMg > 0) it.spikeMg / it.absorbedMg * 100 else 0.0 })
+        TrendLine(days.map { if (it.absorbedMg > 0) it.spikeMg / it.absorbedMg * 100 else 0.0 }, yFmt = pct, top = 100.0, xLabels = dates(days))
     }
     val quality = days.map { it.quality ?: 100.0 }
     ChartCard("Nicotine quality", "How you use nicotine, on a food scale. Gum, lozenges and patches are broccoli; smoke is burger and fries. Switching method raises it; using a vape less doesn't.") {
-        TrendLine(quality, color = MaterialTheme.colorScheme.tertiary)
+        TrendLine(quality, color = MaterialTheme.colorScheme.tertiary, yFmt = num, top = 100.0, xLabels = dates(days))
         ins.days.last().quality?.let { Text("Today: ${Quality.label(it)}", style = MaterialTheme.typography.titleMedium) }
         Quality.swapTip(ins.days.last().doses, data.referenceMg)?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
         Quality.Food.entries.forEach { f -> Text("${f.emoji} ${f.title}: ${f.min}+", style = MaterialTheme.typography.bodySmall) }
@@ -407,17 +416,19 @@ private fun GoingDownSection(ins: Insights, data: FirewatchData, now: Long) = Co
     }
     ChartCard("Heaviness score", "From how soon after waking you use and how much per day, the two things dependence tests weight most (0–6).") {
         val weekly = ins.fullDays.chunked(7).mapNotNull { ins.heaviness(it) }
-        TrendLine(weekly)
+        TrendLine(weekly, yFmt = num, top = 6.0, xLabels = weekly.indices.map { "Wk ${it + 1}" })
         ins.heaviness()?.let { Text("Last 7 days: ${fmt1(it)} of 6", style = MaterialTheme.typography.bodyMedium) }
     }
     ChartCard("Background level", "A slow line modelled on cotinine, nicotine's breakdown product. It drifts down even through messy days.") {
-        TrendLine(ins.backgroundSeries().takeLast(42).map { it.second })
+        val bg = ins.backgroundSeries().takeLast(42)
+        TrendLine(bg.map { it.second }, yFmt = mgs, xLabels = kdates(bg.map { it.first }))
     }
     ChartCard("Double-ups", "Doses stacked while the last one was still peaking, per week.") {
-        TrendLine(ins.doubleUpsPerWeek().map { it.second.toDouble() })
+        val du = ins.doubleUpsPerWeek()
+        TrendLine(du.map { it.second.toDouble() }, yFmt = num, xLabels = kdates(du.map { it.first }))
     }
     ChartCard("Cravings vs doses", "Urges (teal) and doses (orange) per day. Ideally urges fade as doses drop.") {
-        TrendLine(days.map { it.doses.size.toDouble() }, second = days.map { it.cravings.toDouble() }, secondColor = MaterialTheme.colorScheme.tertiary)
+        TrendLine(days.map { it.doses.size.toDouble() }, second = days.map { it.cravings.toDouble() }, secondColor = MaterialTheme.colorScheme.tertiary, yFmt = num, xLabels = dates(days))
     }
     val coach = remember(data) { Coach.profile(data, now) }
     ChartCard("What you can ride out", "Personal: the strongest craving level you usually beat, learned from your logs.") {
@@ -434,7 +445,7 @@ private fun GoingDownSection(ins: Insights, data: FirewatchData, now: Long) = Co
     if (data.checkIns.size >= 2) {
         ChartCard("Daily check-in", "Craving strength (orange) and mood (teal), 1–5.") {
             val last = data.checkIns.takeLast(42)
-            TrendLine(last.map { it.craving.toDouble() }, second = last.map { it.mood.toDouble() }, secondColor = MaterialTheme.colorScheme.tertiary)
+            TrendLine(last.map { it.craving.toDouble() }, second = last.map { it.mood.toDouble() }, secondColor = MaterialTheme.colorScheme.tertiary, yFmt = num, top = 5.0)
         }
     }
 }
@@ -462,7 +473,7 @@ private fun MixSection(ins: Insights) = Col {
             Stat("${label.roundToInt()} mg", "on the labels")
             Stat("≈ ${absorbed.roundToInt()} mg", "absorbed")
         }
-        TrendLine(ins.days.takeLast(42).map { it.labelMg }, second = ins.days.takeLast(42).map { it.absorbedMg })
+        TrendLine(ins.days.takeLast(42).map { it.labelMg }, second = ins.days.takeLast(42).map { it.absorbedMg }, yFmt = mgs, xLabels = dates(ins.days.takeLast(42)))
     }
     val borrowed = ins.days.sumOf { it.borrowedPieces }
     val total = ins.days.sumOf { it.pieces }.coerceAtLeast(0.001)
@@ -496,8 +507,7 @@ private fun ForecastSection(ins: Insights) = Col {
         val then = ins.typicalCurve(ins.baselineDays)
         val nowC = ins.typicalCurve(ins.lastDays(7))
         ChartCard("Then vs now", "Your average baseline day (grey) over your average day now.") {
-            TrendLine(nowC, second = then)
-            AxisLabels(listOf("12am", "6am", "12pm", "6pm", "12am"))
+            TrendLine(nowC, second = then, yFmt = mgs, xLabels = (0 until 48).map { Fmt.hourLabel(it / 2) })
         }
     }
 }
