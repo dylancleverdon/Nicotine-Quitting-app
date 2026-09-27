@@ -63,32 +63,37 @@ battery much sooner, but the app only ever says "Next piece at …".
 
 ## Proposed fixes
 
-### A. Size-honest wait (fixes 1 and 4)
-Forgive earlier debt, never the dose just taken. When a dose lands, clear any leftover debt from
-earlier doses first, then subtract this dose in full:
+### A. Size-honest pull (fixes 1, 2, 3 and 4)
+Keep the wait as it is (never more than one gap, the "never a slog" promise). Instead, record the
+part of each dose that didn't fit in the battery as pull:
 
-`charge = max(charge, 0) − dosePieces`
+`pull += max(0, dosePieces − charge) × gap`, then `charge = max(0, charge − dosePieces)`
 
-The wait after any dose is then that dose's pieces × one gap (Zyn 6 mg ≈ 3h 50m, a double ≈ 6h 24m).
-Earlier pieces still never pile on, so the "never a slog" promise holds: the wait depends only on
-the last dose.
+The overage from a big or early dose is counted honestly as pull, then forgiven, so it never
+stretches the wait.
 
-### B. Size-honest pull (fixes 2 and 3)
-Pull = the part of *this dose* the battery didn't have yet, in minutes:
+| At Bonfire (gap 3h 12m) | Pull |
+|---|---|
+| Gum 4 mg with a full battery | 0 |
+| Gum 2 mg with a half-full battery | 0 (it fits) |
+| Two gum 2 mg together | 0 + 0 = 0, same as one gum 4 mg |
+| Zyn 6 mg with a full battery | 0.2 × gap ≈ 38m |
+| Zyn 6 mg with a half-full battery | 0.7 × gap ≈ 2h 14m |
+| 2 × gum 4 mg with a full battery | 1 × gap = 3h 12m |
 
-`pull += max(0, dosePieces − max(charge, 0)) × gap`
+Issue 4 example: five Zyn 6 mg a day, each at a full battery, now show about 3h 12m of pull
+(5 × 38m), roughly one piece's worth, which matches being 1 piece over Bonfire. Net goes negative
+instead of reading "on pace" or positive.
 
-- A gum 4 mg with a full battery: pull 0.
-- Two gum 2 mg together: 0 + 0 = 0, the same as one gum 4 mg.
-- A Zyn 6 mg with a full battery: 0.2 × gap ≈ 38m of pull, honest that it's over one piece.
-- A Zyn 6 mg with a half-full battery: 0.7 × gap ≈ 2h 14m.
+**Rejected alternative:** making the wait longer for bigger doses (wait = dose pieces × gap).
+Combined with size-honest pull, it counts the same overage twice. A Zyn 6 mg every 3h 50m is
+exactly 5 pieces a day, yet it would show pull on every dose. It also breaks "never more than one
+gap". So pull carries dose size and the wait stays capped.
 
-This also closes issue 4: five Zyn 6 mg a day now show a small, honest negative net.
-
-### C. One estimate everywhere (fixes 5)
+### B. One estimate everywhere (fixes 5)
 Battery, stretch and pull use the same middle estimate as "pieces today".
 
-### D. "What fits now" (fixes 6, optional)
+### C. "What fits now" (fixes 6, optional)
 When the battery holds at least half a piece, add a quiet line such as "A gum 2 mg fits now". It
 only lists products on the home screen whose size fits the current charge. There's no nagging:
 this appears only on the battery row, never as a notification.
@@ -101,14 +106,14 @@ this appears only on the battery row, never as a notification.
 - No stored data changes. This is maths only, so past days are simply recalculated.
 
 ## Tests to add
-- Wait after gum 2 / gum 4 / Zyn 6 / 2 × gum 4 from full = 0.5 / 1.0 / 1.2 / 2.0 gaps.
+- Pull from full for gum 2 / gum 4 / Zyn 6 / 2 × gum 4 = 0 / 0 / 0.2 / 1.0 gaps; the wait never exceeds one gap.
 - Two gum 2 mg together give the same pull and wait as one gum 4 mg.
-- Heavy earlier doses never make the wait longer than the last dose's size × gap.
+- A Zyn 6 mg taken each time the battery is full gives negative net, never positive.
 - A range dose uses the middle estimate for the battery.
 - Five Zyn 6 mg a day at full battery give a negative net.
 
 ## Release notes (plain language, draft)
-- The next-piece timer now matches your dose size: a Zyn 6 mg waits a bit longer than a 4 mg gum,
-  and a 2 mg gum a bit less.
-- Pull now counts how much nicotine came early, so two small pieces count the same as one big one.
+- Pull now counts dose size: anything bigger than your battery had room for (like a Zyn 6 mg, or a
+  double) shows up as pull, so your net stays honest. The wait is still never more than one gap.
+- Two small pieces now count the same as one big one.
 - The battery and "pieces today" now use the same estimate.
