@@ -133,6 +133,10 @@ data class Settings(
     /** Opt-in, neutral reminders (off by default). Never "time for your next piece". */
     val remindCheckIn: Boolean = false,
     val remindBackup: Boolean = false,
+    /** First-piece goal as a time of day, minutes after midnight (-1 = off; else morningDelayMinutes). */
+    val morningDelayClock: Int = -1,
+    /** "system" (follow the phone), "12h" or "24h". */
+    val timeFormat: String = "system",
 )
 
 /** Optional daily check-in: three quick 1–5 taps. */

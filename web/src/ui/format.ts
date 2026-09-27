@@ -1,7 +1,15 @@
 export const pieces = (x: number) => (Math.abs(x) < 0.05 ? '0' : x < 10 ? x.toFixed(1) : x.toFixed(0))
 export const piecesLabel = (x: number) => `≈ ${pieces(x)} ${Math.abs(x - 1) < 0.05 ? 'piece' : 'pieces'}`
 export const mg = (x: number) => `${x.toFixed(1)} mg`
-export const time = (ms: number) => new Date(ms).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+/** "system" follows the device; 12-hour always shows AM/PM. Set from Settings. */
+export let timeFormat = 'system'
+export const setTimeFormat = (f: string) => { timeFormat = f }
+export const time = (ms: number) => {
+  if (timeFormat === '24h') return new Date(ms).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false })
+  if (timeFormat === '12h') return new Date(ms).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
+  return new Date(ms).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+}
+export const signedDuration = (m: number) => `${m >= 0 ? '+' : '−'}${duration(Math.abs(m) * 60000)}`
 export const duration = (ms: number) => {
   const m = Math.max(0, Math.floor(ms / 60000)); const d = Math.floor(m / 1440); const h = Math.floor(m / 60) % 24
   return d > 0 ? `${d}d ${h}h` : h > 0 ? `${h}h ${m % 60}m` : `${m % 60}m`

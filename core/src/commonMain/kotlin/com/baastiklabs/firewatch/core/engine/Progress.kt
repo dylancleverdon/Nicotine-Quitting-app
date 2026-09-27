@@ -18,7 +18,7 @@ data class DayPace(val date: LocalDate, val pieces: Double, val awakeMinutes: Do
     val scaled: Double get() = if (awakeMinutes <= 0) pieces else pieces * Ladder.WAKING_MINUTES / awakeMinutes
 }
 
-enum class BatteryState { CLEAR, CHARGING, MORNING_DELAY, WIND_DOWN, ASLEEP }
+enum class BatteryState { CLEAR, CHARGING, FULL_AT_WAKE, MORNING_DELAY, WIND_DOWN, ASLEEP }
 
 data class Battery(
     val charge: Double,
@@ -28,7 +28,11 @@ data class Battery(
     /** Minutes today the battery sat full while D held off. */
     val stretchMinutesToday: Double,
     val intervalMinutes: Double,
-)
+    /** Minutes today pieces were taken before the battery was full. */
+    val pullMinutesToday: Double = 0.0,
+) {
+    val netMinutesToday: Double get() = stretchMinutesToday - pullMinutesToday
+}
 
 data class HeadsUp(val message: String)
 
@@ -65,60 +69,9 @@ object Progress {
     fun tiersRevealed(data: FirewatchData, today: LocalDate, tz: TimeZone): Boolean =
         Baseline.status(data, today, tz) is BaselineStatus.Complete
 
-    /**
-     * The next-piece battery. Refills one piece per target interval while awake, drains by each
-     * dose's pieces (top of range for unknown doses) and never holds more than one piece.
-     */
-    fun battery(data: FirewatchData, targetPieces: Double, now: Long, tz: TimeZone): Battery {
-        val interval = Ladder.WAKING_MINUTES / targetPieces.coerceAtLeast(0.2)
-        val today = now.localDate(tz)
-        val days = (-2..2).map { Waking.day(data, today.plus(it, DateTimeUnit.DAY), tz) }
-        val ref = data.referenceMg
-        val start = now - 36 * 60 * MIN
-        val doses = data.doses.filter { it.at in start..now }.sortedBy { it.at }
-        var charge = 1.0
-        var di = 0
-        var stretch = 0.0
-        val todayDay = days.first { it.date == today }
-        var t = start
-        while (t <= now) {
-            while (di < doses.size && doses[di].at <= t) {
-                charge -= Absorption.pieces(doses[di].absorbedMgHigh(), ref)
-                di++
-            }
-            if (Waking.isAwake(days, t)) {
-                if (charge >= 1.0 && t in todayDay) stretch += 1.0
-                charge = (charge + 1.0 / interval).coerceAtMost(1.0)
-            }
-            t += MIN
-        }
-        val awake = Waking.isAwake(days, now)
-        // Project forward to when it's full again.
-        var readyAt: Long? = null
-        if (charge < 1.0) {
-            var c = charge
-            var f = now
-            while (f < now + 4 * 24 * 60 * MIN) {
-                if (Waking.isAwake(days, f)) c += 1.0 / interval
-                if (c >= 1.0) { readyAt = f; break }
-                f += MIN
-            }
-        }
-        val current = days.firstOrNull { now in it }
-        val firstDoseToday = current?.let { d -> data.doses.any { it.at in d.wakeAt..now } } ?: false
-        val delay = data.settings.morningDelayMinutes
-        val state = when {
-            !awake -> BatteryState.ASLEEP
-            charge < 1.0 -> BatteryState.CHARGING
-            delay > 0 && current != null && !firstDoseToday && now < current.wakeAt + delay * MIN -> {
-                readyAt = current.wakeAt + delay * MIN
-                BatteryState.MORNING_DELAY
-            }
-            data.settings.windDown && current != null && now > current.sleepAt - 60 * MIN -> BatteryState.WIND_DOWN
-            else -> BatteryState.CLEAR
-        }
-        return Battery(charge.coerceAtLeast(-5.0), state, readyAt, stretch, interval)
-    }
+    /** The next-piece battery right now. See [BatteryEngine]. */
+    fun battery(data: FirewatchData, targetPieces: Double, now: Long, tz: TimeZone, lastActivityAt: Long = 0L): Battery =
+        BatteryEngine.now(data, targetPieces, now, tz, lastActivityAt)
 
     /** Offer the next rung down once D has held at or under the target for the chosen days. */
     fun stepDownOffer(data: FirewatchData, now: Long, tz: TimeZone): Rung? {

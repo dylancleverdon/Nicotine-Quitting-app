@@ -45,9 +45,15 @@ export function Settings({ toast, go, updateInfo }: { toast: (m: string) => void
       <div class="small">Hold each rung for</div>
       <div class="row wrap">{[[3, '3 days'], [7, '1 week'], [14, '2 weeks'], [21, '3 weeks']].map(([d, l]) =>
         <button class={`chip ${s.holdDays === d ? 'on' : ''}`} onClick={() => S.updateSettings({ holdDays: d })}>{l}</button>)}</div>
-      <div class="small">Morning delay goal</div>
-      <div class="row wrap">{[[0, 'Off'], [15, '15 min'], [30, '30 min'], [60, '1 hour'], [90, '1½ hours']].map(([m, l]) =>
-        <button class={`chip ${s.morningDelayMinutes === m ? 'on' : ''}`} onClick={() => S.updateSettings({ morningDelayMinutes: m })}>{l}</button>)}</div>
+      <div class="small">First-piece goal</div>
+      <div class="row wrap">{[[0, 'Off'], [15, '15 min after waking'], [30, '30 min after waking'], [60, '1 hour after waking'], [90, '1½ hours after waking']].map(([m, l]) =>
+        <button class={`chip ${(s.morningDelayClock ?? -1) < 0 && s.morningDelayMinutes === m ? 'on' : ''}`} onClick={() => S.updateSettings({ morningDelayMinutes: m, morningDelayClock: -1 })}>{l}</button>)}</div>
+      <div class="row wrap small">Custom:
+        <input style={{ width: 90 }} inputMode="decimal" placeholder="hours" onChange={(e) => { const h = Number((e.target as HTMLInputElement).value); if (h > 0) S.updateSettings({ morningDelayMinutes: Math.round(h * 60), morningDelayClock: -1 }) }} /> hours after waking, or at
+        <input type="time" style={{ width: 130 }} value={(s.morningDelayClock ?? -1) >= 0 ? toTime(s.morningDelayClock) : ''} onChange={(e) => { const v = (e.target as HTMLInputElement).value; if (v) S.updateSettings({ morningDelayClock: toMin(v), morningDelayMinutes: 0 }) }} /></div>
+      <div class="small">Time format</div>
+      <div class="row wrap">{[['system', 'Device setting'], ['12h', '12-hour (AM/PM)'], ['24h', '24-hour']].map(([v, l]) =>
+        <button class={`chip ${(s.timeFormat ?? 'system') === v ? 'on' : ''}`} onClick={() => S.updateSettings({ timeFormat: v })}>{l}</button>)}</div>
       <label class="row small"><input type="checkbox" style={{ width: 'auto' }} checked={s.windDown} onChange={() => S.updateSettings({ windDown: !s.windDown })} /> Wind down: no "clear for one" in the last hour before bed</label>
       <label class="row small"><input type="checkbox" style={{ width: 'auto' }} checked={s.dailyCheckIn} onChange={() => S.updateSettings({ dailyCheckIn: !s.dailyCheckIn })} /> Daily check-in (cravings, mood, sleep)</label>
       {snap.baselineState !== 'complete' && <button class="btn outline" onClick={() => go('backfill')}>Back-date my baseline week</button>}

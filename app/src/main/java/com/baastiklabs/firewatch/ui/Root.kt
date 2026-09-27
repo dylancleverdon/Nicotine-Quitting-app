@@ -67,6 +67,7 @@ fun FirewatchRoot(vm: FirewatchViewModel) {
     }
 
     WhatsNewGate(vm)
+    Fmt.applyTimeFormat(data.settings.timeFormat)
 
     var route by rememberSaveable { mutableStateOf("home") }
     val snackbar = remember { SnackbarHostState() }

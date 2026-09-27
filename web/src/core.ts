@@ -4,7 +4,8 @@ import { FirewatchCore } from 'firewatch-core'
 const core = FirewatchCore.getInstance()
 
 export interface Rung { pieces: number; tier: string; label: string; plain: string }
-export interface Battery { charge: number; state: 'CLEAR' | 'CHARGING' | 'MORNING_DELAY' | 'WIND_DOWN' | 'ASLEEP'; readyAt: number | null; stretchMin: number }
+export interface Battery { charge: number; state: 'CLEAR' | 'CHARGING' | 'FULL_AT_WAKE' | 'MORNING_DELAY' | 'WIND_DOWN' | 'ASLEEP'; readyAt: number | null; stretchMin: number; pullMin: number }
+export interface StretchDay { date: string; stretchMin: number; pullMin: number }
 export interface DoseView { id: string; at: number; name: string; pieces: number; mg: number; estimated: boolean; tags: string[]; kind: string }
 export interface CravingView { id: string; at: number; intensity: number; name: string; outcome: string; endedAt: number | null; tags: string[] }
 export interface DayView {
@@ -32,13 +33,15 @@ export interface Snapshot {
   todayPieces: number; todayMg: number; todayCravings: number; todayRodeOut: number; lastDoseAt: number | null
   todayDoses: DoseView[]; todayCravingList: CravingView[]; wave: number[][]; wakeAt: number; sleepAt: number; typical: number[]
   days: DayView[]; sevenDayAverage: number[]; insights: InsightsData; ladder: Rung[]; tiers: NamedValue[]
+  stretchDays: StretchDay[]; stretchSummary: string | null
 }
 
 export const Core = {
   defaultProducts: (): any[] => JSON.parse(core.defaultProducts()),
   cravingScale: (): NamedValue[] => JSON.parse(core.cravingScale()),
   newId: (): string => core.newId(Date.now()),
-  compute: (records: string): Snapshot => JSON.parse(core.compute(records, Date.now())),
+  compute: (records: string): Snapshot => JSON.parse(core.compute(records, Date.now(), lastActivity())),
+  waitedForFull: (records: string, doseId: string): boolean => core.waitedForFull(records, doseId),
   day: (records: string, iso: string): { doses: DoseView[]; cravings: CravingView[] } => JSON.parse(core.day(records, iso, Date.now())),
   piecesOf: (product: any, records: string): number => core.absorbedPieces(JSON.stringify(product), records),
   doseFor: (product: any, at: number, opts: { multiplier?: number; duration?: string; acidic?: boolean; tags?: string[] } = {}): any =>
@@ -49,3 +52,7 @@ export const Core = {
   backfillDay: (records: string, iso: string, counts: Record<string, number>, vapes: Record<string, number>): any[] =>
     JSON.parse(core.backfillDay(records, iso, JSON.stringify(counts), JSON.stringify(vapes), Date.now())),
 }
+
+/** When the app was last opened: after bedtime this tells the battery "I'm up". */
+export const lastActivity = (): number => Number(localStorage.getItem('fw_last_activity') ?? 0)
+export const markActivity = () => localStorage.setItem('fw_last_activity', String(Date.now()))

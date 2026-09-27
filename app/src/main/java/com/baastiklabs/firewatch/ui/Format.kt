@@ -16,6 +16,19 @@ object Fmt {
     @Volatile
     var use24h: Boolean = false
 
+    /** The phone's own 12/24-hour setting. */
+    @Volatile
+    var systemUse24h: Boolean = false
+
+    /** Applies the Settings choice: "system", "12h" or "24h". */
+    fun applyTimeFormat(choice: String) {
+        use24h = when (choice) {
+            "24h" -> true
+            "12h" -> false
+            else -> systemUse24h
+        }
+    }
+
     fun pieces(x: Double): String = when {
         abs(x) < 0.05 -> "0"
         x < 10 -> String.format(Locale.getDefault(), "%.1f", x)
@@ -29,7 +42,7 @@ object Fmt {
     fun time(ms: Long): String = time(ms.toLocalDateTime().toLocalTime())
 
     fun time(t: LocalTime): String =
-        t.format(DateTimeFormatter.ofPattern(if (use24h) "HH:mm" else "h:mm a", Locale.getDefault()))
+        t.format(DateTimeFormatter.ofPattern(if (use24h) "HH:mm" else "h:mm a", Locale.ENGLISH))
 
     fun minutesOfDay(minutes: Int): String = time(LocalTime.of((minutes / 60) % 24, minutes % 60))
 

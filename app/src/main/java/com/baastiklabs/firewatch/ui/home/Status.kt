@@ -97,19 +97,33 @@ fun TierStatusCard(
 @Composable
 private fun BatteryRow(b: Battery, now: Long) {
     val (title, detail) = when (b.state) {
-        BatteryState.CLEAR -> "Clear for one if you want it" to "No rush. Every minute you wait counts as stretch time."
+        BatteryState.CLEAR -> "Clear for one if you want it" to "No rush. Every minute you wait counts as stretch."
         BatteryState.CHARGING -> "Next piece around ${b.readyAt?.let { Fmt.time(it) } ?: "later"}" to
             "${b.readyAt?.let { Fmt.duration(it - now) } ?: ""} to go at your target pace"
-        BatteryState.MORNING_DELAY -> "Morning delay until ${b.readyAt?.let { Fmt.time(it) } ?: ""}" to "Your goal: push the first piece later"
+        BatteryState.FULL_AT_WAKE -> "Full when you wake up" to "No waiting overnight. Fresh start in the morning."
+        BatteryState.MORNING_DELAY -> "First piece goal: ${b.readyAt?.let { Fmt.time(it) } ?: ""}" to "Pushing the first piece later is one of the best signs of progress"
         BatteryState.WIND_DOWN -> "Winding down for bed" to "Nicotine is a stimulant; late doses can disrupt sleep"
-        BatteryState.ASLEEP -> "Sleeping hours" to "The battery pauses while you sleep"
+        BatteryState.ASLEEP -> "Sleeping hours" to "Fresh start when you wake up"
     }
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
         LinearProgressIndicator(progress = { b.charge.coerceIn(0.0, 1.0).toFloat() }, modifier = Modifier.fillMaxWidth())
-        Text(detail + if (b.stretchMinutesToday >= 1) " · Stretch today: ${Fmt.duration((b.stretchMinutesToday * 60_000).toLong())}" else "",
-            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        StretchLine(b.stretchMinutesToday, b.pullMinutesToday)
     }
+}
+
+/** "Stretch 2h 10m · Pull 45m · Net +1h 25m". A negative net is grey, never red. */
+@Composable
+fun StretchLine(stretchMin: Double, pullMin: Double) {
+    val net = stretchMin - pullMin
+    val sign = if (net >= 0) "+" else "−"
+    Text(
+        "Stretch ${Fmt.duration((stretchMin * 60_000).toLong())} · Pull ${Fmt.duration((pullMin * 60_000).toLong())} · " +
+            "Net $sign${Fmt.duration((kotlin.math.abs(net) * 60_000).toLong())}",
+        style = MaterialTheme.typography.labelMedium,
+        color = if (net >= 0) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.outline,
+    )
 }
 
 /** A prompt card with a primary and a secondary action. */

@@ -334,6 +334,24 @@ class Insights(private val data: FirewatchData, private val tz: TimeZone, privat
         return ((base - current) / base).coerceIn(0.0, 1.0)
     }
 
+    // ---- Stretch & pull ----
+
+    /** Stretch, pull and net per day (last 90 days), each judged against that day's tier. */
+    val stretchPull: List<DayBattery> by lazy {
+        days.takeLast(90).mapNotNull { BatteryEngine.day(data, it.date, tz, now) }
+    }
+
+    /** Plain-language summary of the last 7 days (full days only). */
+    fun stretchSummary(): String? {
+        val week = stretchPull.filter { it.date < today }.takeLast(7)
+        if (week.isEmpty()) return null
+        val s = week.map { it.stretchMin }.average()
+        val n = week.map { it.netMin }.average()
+        fun hm(m: Double): String { val t = kotlin.math.abs(m).toInt(); return if (t >= 60) "${t / 60}h ${t % 60}m" else "${t}m" }
+        return if (n >= 0) "This week you averaged ${hm(s)} of stretch a day, net +${hm(n)}: living below your target pace."
+        else "This week you averaged ${hm(s)} of stretch a day, net −${hm(n)}. Pieces came a little early on average; the battery resets every morning."
+    }
+
     // ---- Milestones ----
 
     data class Records(
@@ -347,10 +365,7 @@ class Insights(private val data: FirewatchData, private val tz: TimeZone, privat
         val sorted = data.doses.filter { !it.estimated }.sortedBy { it.at }
         val gaps = sorted.zipWithNext().map { (a, b) -> (b.at - a.at) / 60_000.0 } +
             listOfNotNull(sorted.lastOrNull()?.let { (now - it.at) / 60_000.0 })
-        val target = data.targetPieces
-        val interval = if (target != null && target > 0) Ladder.WAKING_MINUTES / target else null
-        val stretch = if (interval == null) 0.0 else sorted.filter { it.at >= (data.rungChanges.firstOrNull()?.at ?: Long.MAX_VALUE) }
-            .zipWithNext().sumOf { (a, b) -> max(0.0, (b.at - a.at) / 60_000.0 - interval) }
+        val stretch = stretchPull.sumOf { it.stretchMin }
         val since = data.rungChanges.lastOrNull()?.at
         return Records(
             longestGapMin = gaps.maxOrNull() ?: 0.0,

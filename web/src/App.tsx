@@ -2,6 +2,8 @@ import { useEffect, useState } from 'preact/hooks'
 import { useRegisterSW } from 'virtual:pwa-register/preact'
 import * as S from './store'
 import { persist } from './db'
+import { markActivity } from './core'
+import { setTimeFormat } from './ui/format'
 import { Home } from './ui/Home'
 import { Calendar } from './ui/Calendar'
 import { Insights } from './ui/Insights'
@@ -20,7 +22,9 @@ export function App() {
   useRegisterSW({ immediate: true, onRegisteredSW: () => setChecked(`Last checked ${new Date().toLocaleTimeString()}`) })
 
   useEffect(() => {
-    S.load(); persist()
+    S.load(); persist(); markActivity()
+    const onVisible = () => document.visibilityState === 'visible' && (markActivity(), (S.tick.value = Date.now()))
+    document.addEventListener('visibilitychange', onVisible)
     const t = setInterval(() => (S.tick.value = Date.now()), 15000)
     const seen = localStorage.getItem('fw_seen_version')
     if (seen && seen !== __APP_VERSION__) setWhatsNew(changelog.split('\n## ')[1] ?? null)
@@ -30,6 +34,7 @@ export function App() {
 
   const show = (msg: string, undo?: () => void) => { setToast({ msg, undo }); setTimeout(() => setToast((t) => (t?.msg === msg ? null : t)), 5000) }
   if (!S.loaded.value || !S.snapshot.value) return <main><div class="muted">Loading…</div></main>
+  setTimeFormat(S.settings.value.timeFormat ?? 'system')
   if (!S.settings.value.onboardingDone) return <Onboarding />
   return (
     <>

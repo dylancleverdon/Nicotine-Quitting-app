@@ -60,10 +60,39 @@ fun PlanSettings(vm: FirewatchViewModel, data: FirewatchData) {
                 FilterChip(selected = s.holdDays == d, onClick = { update { it.copy(holdDays = d) } }, label = { Text(label) })
             }
         }
-        Text("Morning delay goal (first piece after waking)", style = MaterialTheme.typography.titleSmall)
+        Text("First-piece goal", style = MaterialTheme.typography.titleSmall)
+        var customDelay by remember { mutableStateOf(false) }
+        val isPreset = s.morningDelayClock < 0 && s.morningDelayMinutes in listOf(0, 15, 30, 60, 90)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             listOf(0 to "Off", 15 to "15 min", 30 to "30 min", 60 to "1 hour", 90 to "1½ hours").forEach { (m, label) ->
-                FilterChip(selected = s.morningDelayMinutes == m, onClick = { update { it.copy(morningDelayMinutes = m) } }, label = { Text(label) })
+                FilterChip(
+                    selected = s.morningDelayClock < 0 && s.morningDelayMinutes == m,
+                    onClick = { update { it.copy(morningDelayMinutes = m, morningDelayClock = -1) } },
+                    label = { Text(if (m == 0) label else "$label after waking") },
+                )
+            }
+            FilterChip(
+                selected = !isPreset,
+                onClick = { customDelay = true },
+                label = {
+                    Text(
+                        when {
+                            s.morningDelayClock >= 0 -> "At ${com.baastiklabs.firewatch.ui.Fmt.minutesOfDay(s.morningDelayClock)}"
+                            !isPreset -> "${s.morningDelayMinutes / 60}h ${s.morningDelayMinutes % 60}m after waking"
+                            else -> "Custom…"
+                        },
+                    )
+                },
+            )
+        }
+        if (customDelay) CustomDelayDialog(s, onDismiss = { customDelay = false }) { minutes, clock ->
+            customDelay = false
+            update { it.copy(morningDelayMinutes = minutes, morningDelayClock = clock) }
+        }
+        Text("Time format", style = MaterialTheme.typography.titleSmall)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf("system" to "Phone setting", "12h" to "12-hour (AM/PM)", "24h" to "24-hour").forEach { (v, label) ->
+                FilterChip(selected = s.timeFormat == v, onClick = { update { it.copy(timeFormat = v) } }, label = { Text(label) })
             }
         }
         ToggleRow("Wind down before bed", "No \"clear for one\" in the last hour before bed", s.windDown) { v -> update { it.copy(windDown = v) } }
@@ -121,5 +150,49 @@ private fun ToggleRow(title: String, detail: String, checked: Boolean, onChange:
             Text(detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Switch(checked = checked, onCheckedChange = onChange)
+    }
+}
+
+/** Custom first-piece goal: a set time after waking, or a time of day. */
+@Composable
+private fun CustomDelayDialog(s: Settings, onDismiss: () -> Unit, onSave: (minutes: Int, clock: Int) -> Unit) {
+    var byClock by remember { mutableStateOf(s.morningDelayClock >= 0) }
+    var hours by remember { mutableStateOf(if (s.morningDelayClock < 0 && s.morningDelayMinutes > 0) s.morningDelayMinutes / 60.0 else 3.0) }
+    var clock by remember { mutableStateOf(if (s.morningDelayClock >= 0) s.morningDelayClock else 11 * 60) }
+    var pickTime by remember { mutableStateOf(false) }
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("First-piece goal") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(selected = !byClock, onClick = { byClock = false }, label = { Text("Time after waking") })
+                    FilterChip(selected = byClock, onClick = { byClock = true }, label = { Text("Time of day") })
+                }
+                if (byClock) {
+                    OutlinedButton(onClick = { pickTime = true }) { Text("At ${com.baastiklabs.firewatch.ui.Fmt.minutesOfDay(clock)}") }
+                } else {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(onClick = { hours = (hours - 0.5).coerceAtLeast(0.5) }) { Text("−") }
+                        Text("${if (hours % 1.0 == 0.0) hours.toInt().toString() else hours.toString()} h after waking", style = MaterialTheme.typography.titleMedium)
+                        OutlinedButton(onClick = { hours = (hours + 0.5).coerceAtMost(12.0) }) { Text("+") }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            androidx.compose.material3.TextButton(onClick = {
+                if (byClock) onSave(0, clock) else onSave((hours * 60).toInt(), -1)
+            }) { Text("Save") }
+        },
+        dismissButton = { androidx.compose.material3.TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
+    if (pickTime) {
+        com.baastiklabs.firewatch.ui.TimePickDialog(
+            title = "First piece at",
+            initial = java.time.LocalTime.of(clock / 60, clock % 60),
+            onDismiss = { pickTime = false },
+            onPick = { t -> clock = t.hour * 60 + t.minute; pickTime = false },
+        )
     }
 }

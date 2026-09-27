@@ -21,7 +21,7 @@ export function live(type: string): any[] {
 }
 export const settings = computed<any>(() => ({
   onboardingDone: false, referenceProductId: 'gum-4', wakeMinutes: 420, sleepMinutes: 1380, holdDays: 7, windDown: true,
-  morningDelayMinutes: 0, currency: '$', rewardName: '', rewardCost: 0, dailyCheckIn: false,
+  morningDelayMinutes: 0, morningDelayClock: -1, timeFormat: 'system', currency: '$', rewardName: '', rewardCost: 0, dailyCheckIn: false,
   ...(records.value.get('settings')?.data ?? {}),
 }))
 export const products = computed<any[]>(() => live('product').filter((p) => !p.archived).sort((a, b) => (a.order ?? 0) - (b.order ?? 0)))

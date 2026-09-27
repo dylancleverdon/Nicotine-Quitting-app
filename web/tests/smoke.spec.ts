@@ -21,6 +21,7 @@ test('back-dated start, logging and persistence', async ({ page }) => {
   await expect(page.getByText('Your starting point: Flicker')).toBeVisible()
   await page.getByRole('button', { name: 'Start here' }).click()
   await expect(page.locator('.tier')).toHaveText('Flicker')
+  await expect(page.getByText(/Stretch .* · Pull .* · Net/)).toBeVisible()
 
   // One tap logs a dose.
   await page.locator('.product', { hasText: 'Nicotine gum 4 mg' }).click()
@@ -35,6 +36,8 @@ test('back-dated start, logging and persistence', async ({ page }) => {
   // Insights and calendar render.
   await page.getByRole('button', { name: 'Insights' }).click()
   await expect(page.getByText('Blood-level wave')).toBeVisible()
+  await page.getByRole('button', { name: 'Stretch & pull' }).click()
+  await expect(page.getByText('Stretch & pull').last()).toBeVisible()
   await page.getByRole('button', { name: 'Calendar' }).click()
   await expect(page.getByText('A dot marks your baseline week', { exact: false })).toBeVisible()
 

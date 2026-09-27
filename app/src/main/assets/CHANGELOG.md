@@ -2,6 +2,19 @@
 
 Newest first. Each release is a "## <version>" heading; the app shows these notes in "What's new".
 
+## 0.4.0 · 2026-09-27
+- The next-piece battery is kinder:
+  - It starts fresh every morning, and yesterday never counts against today.
+  - It can't go into debt, so the wait is never longer than one normal gap.
+  - If it wouldn't be full before bedtime, it's simply full when you wake up.
+- Every piece restarts the countdown from when you take it. A piece at 6 PM at Bonfire means the next is around 9 PM.
+- Late nights: after bedtime Firewatch assumes you're asleep ("Fresh start when you wake up"). Opening the app or logging tells it you're up, so it catches up and gives proper guidance. The widget doesn't count.
+- New under the battery: stretch (time you held off with a full battery), pull (how early a piece came) and net. A negative net is just grey, never red.
+- New "Stretch & pull" section in Insights, with a daily chart, 7-day averages and a plain summary. Each day is judged against the tier you were on that day.
+- A little cheer when you wait for a full battery before your next piece.
+- Time format: follow the phone, or choose 12-hour (with AM/PM) or 24-hour, in Settings.
+- First-piece goal: choose a time of day (like 11 AM) or a custom time after waking (like 3 hours).
+
 ## 0.3.0 · 2026-09-27
 - Nicotine quality is now a food scale, from 🥦 broccoli (90–100) down to 🍔 burger and fries (0–10). Gum, lozenges and patches are broccoli. Pouches, vapes and cigarettes score lower, and so do very big doses and doses stacked on top of each other. Using less of a vape doesn't raise it; switching to gum does. You'll see today's score on the home screen, with a tip when a swap would help.
 - New way to start: estimate your last week instead of waiting a week. Go through the last 7 days one page at a time, tap what you used, and your starting tier appears straight away. It's on the home screen and in Settings while your baseline week is still running.

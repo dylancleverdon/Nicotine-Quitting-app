@@ -19,6 +19,8 @@ That schema is frozen at version 1.
 
 Dose field `estimated: true` marks back-dated rough entries (no real time): counted in totals and the tier, left out of timing stats.
 
+Settings fields `morningDelayClock` (minutes after midnight, -1 = off) and `timeFormat` (system/12h/24h) were added in 0.4.0.
+
 ## Compatibility rules (so updates and rollbacks never lose data)
 1. Every JSON field has a default. Never rename, remove or change the meaning of a field.
 2. Readers ignore unknown fields and unknown enum values (they fall back to defaults).

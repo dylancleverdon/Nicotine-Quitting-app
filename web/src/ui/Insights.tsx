@@ -1,9 +1,9 @@
 import { useState } from 'preact/hooks'
 import * as S from '../store'
 import { Barcode, Bars, Heatmap, Line, Meter, Wave } from './Charts'
-import { duration, pieces, shortDate } from './format'
+import { duration, pieces, shortDate, signedDuration } from './format'
 
-const SECTIONS = ['Today', 'Trends', 'Patterns', 'Going up', 'Going down', 'Mix', 'Forecasts', 'Milestones', 'Ladder']
+const SECTIONS = ['Today', 'Stretch & pull', 'Trends', 'Patterns', 'Going up', 'Going down', 'Mix', 'Forecasts', 'Milestones', 'Ladder']
 const Card = ({ title, sub, children }: { title: string; sub?: string; children?: any }) => (
   <div class="card soft"><h3>{title}</h3>{sub && <div class="muted">{sub}</div>}{children}</div>
 )
@@ -31,6 +31,21 @@ export function Insights() {
         <Card title="Today so far"><div class="stats"><Stat v={`≈ ${pieces(today.pieces)}`} l="pieces" /><Stat v={`${today.clearHours.toFixed(1)} h`} l="clear hours" />
           <Stat v={duration(Math.max(0, today.awakeHours * 60 - today.mouthMin) * 60000)} l="mouth-free" /></div></Card>
       </>}
+      {sec === 'Stretch & pull' && (() => {
+        const sd = snap.stretchDays.slice(-42)
+        if (!sd.length) return <Card title="Stretch & pull" sub="Starts once you're working at a target rung." />
+        const week = sd.filter((d) => d.date < snap.today).slice(-7)
+        const avg = (f: (d: any) => number) => (week.length ? week.reduce((a, d) => a + f(d), 0) / week.length : 0)
+        return <Card title="Stretch & pull" sub="Stretch: time you held off after the battery was full. Pull: how early a piece came before it was full. Net = stretch − pull; positive means you're living below your target pace. Every day starts clean.">
+          <div class="muted">Stretch (teal) and pull (grey), hours a day</div>
+          <Line values={sd.map((d) => d.pullMin / 60)} second={sd.map((d) => d.stretchMin / 60)} color="var(--muted)" />
+          <div class="muted">Net, hours a day</div>
+          <Bars values={sd.map((d) => Math.max(0, (d.stretchMin - d.pullMin) / 60))} height={80} />
+          {week.length > 0 && <div class="stats"><Stat v={duration(avg((d) => d.stretchMin) * 60000)} l="stretch, 7-day avg" /><Stat v={duration(avg((d) => d.pullMin) * 60000)} l="pull, 7-day avg" />
+            <Stat v={signedDuration(avg((d) => d.stretchMin - d.pullMin))} l="net, 7-day avg" /></div>}
+          {snap.stretchSummary && <div class="small">{snap.stretchSummary}</div>}
+        </Card>
+      })()}
       {sec === 'Trends' && <>
         <Card title="Daily totals" sub="Pieces a day with the 7-day average line. Hatched = unknown doses (range); faded = estimated days.">
           <Bars values={days.map((d) => d.pieces)} highs={days.map((d) => (d.hasRange ? d.high : null))} faded={days.map((d) => d.estimated)} line={snap.sevenDayAverage.slice(-days.length)} />

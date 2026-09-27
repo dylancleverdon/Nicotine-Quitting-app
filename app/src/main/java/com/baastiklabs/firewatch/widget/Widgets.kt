@@ -77,14 +77,17 @@ class QuickLogWidget : GlanceAppWidget() {
         val data = repo.data.value
         val now = System.currentTimeMillis()
         val tz = TimeZone.currentSystemDefault()
+        Fmt.systemUse24h = android.text.format.DateFormat.is24HourFormat(context)
+        Fmt.applyTimeFormat(data.settings.timeFormat)
         val status = data.targetPieces?.let { target ->
-            val b = Progress.battery(data, if (target > 0) target else 1.0 / 3.0, now, tz)
+            val b = Progress.battery(data, if (target > 0) target else 1.0 / 3.0, now, tz, com.baastiklabs.firewatch.data.AppActivity.last(context))
             when (b.state) {
                 BatteryState.CLEAR -> "Clear for one if you want it"
                 BatteryState.CHARGING -> "Next piece ~${b.readyAt?.let { Fmt.time(it) } ?: "later"}"
-                BatteryState.MORNING_DELAY -> "Morning delay"
+                BatteryState.FULL_AT_WAKE -> "Full when you wake up"
+                BatteryState.MORNING_DELAY -> "First piece goal ${b.readyAt?.let { Fmt.time(it) } ?: ""}"
                 BatteryState.WIND_DOWN -> "Winding down"
-                BatteryState.ASLEEP -> "Sleeping hours"
+                BatteryState.ASLEEP -> "Sleeping hours · fresh start at wake-up"
             } to b.charge.coerceIn(0.0, 1.0)
         }
         val products = data.homeProducts.filter { !(it.kind == ProductKind.VAPE && it.borrowedFrom != null) }.take(4)

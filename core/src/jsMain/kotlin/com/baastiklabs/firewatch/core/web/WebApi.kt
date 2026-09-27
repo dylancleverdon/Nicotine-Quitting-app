@@ -44,7 +44,8 @@ import kotlinx.serialization.json.JsonElement
 external object JsJodaTimeZoneModule
 
 @Serializable data class RungDto(val pieces: Double, val tier: String, val label: String, val plain: String)
-@Serializable data class BatteryDto(val charge: Double, val state: String, val readyAt: Double?, val stretchMin: Double)
+@Serializable data class BatteryDto(val charge: Double, val state: String, val readyAt: Double?, val stretchMin: Double, val pullMin: Double)
+@Serializable data class StretchDay(val date: String, val stretchMin: Double, val pullMin: Double)
 @Serializable data class DoseView(val id: String, val at: Double, val name: String, val pieces: Double, val mg: Double, val estimated: Boolean, val tags: List<String>, val kind: String)
 @Serializable data class CravingView(val id: String, val at: Double, val intensity: Int, val name: String, val outcome: String, val endedAt: Double?, val tags: List<String>)
 @Serializable data class DayView(
@@ -87,6 +88,8 @@ external object JsJodaTimeZoneModule
     val insights: InsightsDto,
     val ladder: List<RungDto>,
     val tiers: List<NamedValue>,
+    val stretchDays: List<StretchDay>,
+    val stretchSummary: String?,
 )
 @Serializable data class InsightsDto(
     val avoidedPieces: Double, val avoidedMg: Double, val money: Double, val winRate: Double?, val cravingMinutes: Double?,
@@ -165,7 +168,7 @@ object FirewatchCore {
     fun backfillDays(todayIso: String): String =
         FirewatchJson.encodeToString(ListSerializer(String.serializer()), Backfill.days(LocalDate.parse(todayIso)).map { it.toString() })
 
-    fun compute(recordsJson: String, nowMs: Double): String {
+    fun compute(recordsJson: String, nowMs: Double, lastActivityMs: Double): String {
         jsTypeOf(tzModule) // keeps the time zone data loaded
         val now = nowMs.toLong()
         val d = data(recordsJson)
@@ -177,7 +180,7 @@ object FirewatchCore {
         val revealed = baseline is BaselineStatus.Complete
         val measured = if (revealed) Progress.measuredRung(d, today, tz) else null
         val target = d.targetPieces?.let { Ladder.rung(it) }
-        val battery = target?.let { Progress.battery(d, if (it.pieces > 0) it.pieces else 1.0 / 3.0, now, tz) }
+        val battery = target?.let { Progress.battery(d, if (it.pieces > 0) it.pieces else 1.0 / 3.0, now, tz, lastActivityMs.toLong()) }
         val stepDown = if (revealed) Progress.stepDownOffer(d, now, tz) else null
         val readiness = d.targetPieces?.let { Coach.readiness(d, it, now) }
         val stepUp = if (revealed && stepDown == null) Coach.stepUpOffer(d, now, tz) else null
@@ -230,7 +233,7 @@ object FirewatchCore {
             revealed = revealed,
             measured = measured?.dto(),
             target = target?.dto(),
-            battery = battery?.let { BatteryDto(it.charge, it.state.name, it.readyAt?.toDouble(), it.stretchMinutesToday) },
+            battery = battery?.let { BatteryDto(it.charge, it.state.name, it.readyAt?.toDouble(), it.stretchMinutesToday, it.pullMinutesToday) },
             stepDown = stepDown?.dto(),
             stepDownNote = readiness?.takeIf { it.confident }?.let {
                 if (it.ready) "From your cravings, the next rung should feel like about a ${it.predictedNext.toInt()} out of 10, and you ride out ${it.capacity}s."
@@ -264,6 +267,8 @@ object FirewatchCore {
             insights = insights,
             ladder = (Ladder.rungs + Ladder.clearAir).map { it.dto() },
             tiers = Tier.entries.map { NamedValue(it.title, 0.0, it.pace) },
+            stretchDays = ins.stretchPull.map { StretchDay(it.date.toString(), it.stretchMin, it.pullMin) },
+            stretchSummary = ins.stretchSummary(),
         )
         return FirewatchJson.encodeToString(Snapshot.serializer(), snapshot)
     }
@@ -282,6 +287,13 @@ object FirewatchCore {
         }
         @Serializable data class DayDetail(val doses: List<DoseView>, val cravings: List<CravingView>)
         return FirewatchJson.encodeToString(DayDetail.serializer(), DayDetail(doses, cravings))
+    }
+
+    /** The cheer: was this dose taken with a full battery (and not the day's first)? */
+    fun waitedForFull(recordsJson: String, doseId: String): Boolean {
+        val d = data(recordsJson)
+        val dose = d.doses.firstOrNull { it.id == doseId } ?: return false
+        return com.baastiklabs.firewatch.core.engine.BatteryEngine.waitedForFull(d, dose, TimeZone.currentSystemDefault())
     }
 
     fun encodeElement(json: String): String = FirewatchJson.parseToJsonElement(json).toString()

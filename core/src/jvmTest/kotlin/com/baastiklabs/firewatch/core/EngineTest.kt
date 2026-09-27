@@ -66,25 +66,90 @@ class EngineTest {
         assertTrue(kotlin.math.abs(later / peak - 0.5) < 0.1)
     }
 
+    private fun withTarget(doses: List<com.baastiklabs.firewatch.core.model.Dose>, pieces: Double = 4.0, settings: com.baastiklabs.firewatch.core.model.Settings = com.baastiklabs.firewatch.core.model.Settings()) =
+        FirewatchData(products = DefaultProducts.all(), doses = doses, settings = settings, rungChanges = listOf(RungChange("r", at(1, 8), pieces, "start")))
+
     @Test
-    fun `battery refills per interval and never banks more than one`() {
-        val dose = gum4.toDose("a", at(10, 12), 0)
-        val data = FirewatchData(products = DefaultProducts.all(), doses = listOf(dose))
-        // Target 4 a day -> 240 min interval. One hour after a piece, not clear yet.
+    fun `a dose restarts the countdown one gap from when it's taken`() {
+        // Target 4 a day -> 4 h gap. A piece at 12:00 means the next is due at 16:00.
+        val data = withTarget(listOf(gum4.toDose("a", at(10, 12), 0)))
         val b = Progress.battery(data, 4.0, at(10, 13), tz)
         assertEquals(BatteryState.CHARGING, b.state)
-        assertNotNull(b.readyAt)
-        assertTrue(kotlin.math.abs(b.readyAt!! - at(10, 16)) < 3 * 60_000L, "ready ${b.readyAt}")
-        val later = Progress.battery(data, 4.0, at(10, 18), tz)
-        assertEquals(BatteryState.CLEAR, later.state)
-        assertTrue(later.charge <= 1.0)
+        assertTrue(kotlin.math.abs(b.readyAt!! - at(10, 16)) <= 2 * 60_000L, "ready ${b.readyAt}")
+        assertEquals(BatteryState.CLEAR, Progress.battery(data, 4.0, at(10, 17), tz).state)
+    }
+
+    @Test
+    fun `no debt - three quick pieces still only wait one gap`() {
+        val data = withTarget(listOf(gum4.toDose("a", at(10, 12), 0), gum4.toDose("b", at(10, 12, 5), 0), gum4.toDose("c", at(10, 12, 10), 0)))
+        val b = Progress.battery(data, 4.0, at(10, 12, 15), tz)
+        assertTrue(b.charge >= 0.0)
+        assertTrue(b.readyAt!! <= at(10, 16, 12), "ready ${b.readyAt}")
+    }
+
+    @Test
+    fun `fresh start every morning`() {
+        val data = withTarget(listOf(gum4.toDose("a", at(10, 21), 0), gum4.toDose("b", at(10, 22), 0)))
+        val morning = Progress.battery(data, 4.0, at(11, 7, 5), tz)
+        assertEquals(BatteryState.CLEAR, morning.state)
+    }
+
+    @Test
+    fun `full when you wake up instead of waiting overnight`() {
+        val data = withTarget(listOf(gum4.toDose("a", at(10, 21), 0)))
+        val b = Progress.battery(data, 4.0, at(10, 21, 30), tz)
+        assertEquals(BatteryState.FULL_AT_WAKE, b.state)
+        assertEquals(at(11, 7), b.readyAt)
+    }
+
+    @Test
+    fun `asleep after bedtime until the app is opened`() {
+        val data = withTarget(listOf(gum4.toDose("a", at(10, 22), 0)))
+        assertEquals(BatteryState.ASLEEP, Progress.battery(data, 4.0, at(11, 1), tz).state)
+        // Opened the app at 01:00: up since bedtime, the 22:00 piece is 3 h ago -> 1 h to go.
+        val up = Progress.battery(data, 4.0, at(11, 1), tz, lastActivityAt = at(11, 1))
+        assertEquals(BatteryState.CHARGING, up.state)
+        assertTrue(kotlin.math.abs(up.readyAt!! - at(11, 2)) <= 2 * 60_000L)
     }
 
     @Test
     fun `wind down hides clear in the last hour`() {
-        val data = FirewatchData(products = DefaultProducts.all())
+        val data = withTarget(emptyList())
         assertEquals(BatteryState.WIND_DOWN, Progress.battery(data, 4.0, at(10, 22, 30), tz).state)
-        assertEquals(BatteryState.ASLEEP, Progress.battery(data, 4.0, at(11, 3), tz).state)
+    }
+
+    @Test
+    fun `stretch pull and net`() {
+        // Wake 7:00, target 4 a day (4 h gap). Hold off until 9:00 (2 h stretch), piece; next at 11:00 (2 h early -> 2 h pull).
+        val data = withTarget(listOf(gum4.toDose("a", at(10, 9), 0), gum4.toDose("b", at(10, 11), 0)))
+        val d = com.baastiklabs.firewatch.core.engine.BatteryEngine.day(data, kotlinx.datetime.LocalDate(2026, 9, 10), tz, at(10, 12))!!
+        assertTrue(kotlin.math.abs(d.stretchMin - 120) <= 2, "stretch ${d.stretchMin}")
+        assertTrue(kotlin.math.abs(d.pullMin - 120) <= 2, "pull ${d.pullMin}")
+        assertTrue(kotlin.math.abs(d.netMin) <= 4)
+        // Late-night catch-up never counts as stretch.
+        val late = withTarget(listOf(gum4.toDose("x", at(10, 23, 30), 0)))
+        val ld = com.baastiklabs.firewatch.core.engine.BatteryEngine.day(late, kotlinx.datetime.LocalDate(2026, 9, 10), tz, at(11, 6))!!
+        assertTrue(ld.stretchMin <= 16 * 60 + 1)
+    }
+
+    @Test
+    fun `cheer only after waiting for a full battery and not for the first piece`() {
+        val first = gum4.toDose("a", at(10, 8), 0)
+        val waited = gum4.toDose("b", at(10, 13), 0)
+        val early = gum4.toDose("c", at(10, 14), 0)
+        val data = withTarget(listOf(first, waited, early))
+        val e = com.baastiklabs.firewatch.core.engine.BatteryEngine
+        assertTrue(!e.waitedForFull(data, first, tz))
+        assertTrue(e.waitedForFull(data, waited, tz))
+        assertTrue(!e.waitedForFull(data, early, tz))
+    }
+
+    @Test
+    fun `custom morning delay at a clock time`() {
+        val s = com.baastiklabs.firewatch.core.model.Settings(morningDelayClock = 11 * 60)
+        val b = Progress.battery(withTarget(emptyList(), settings = s), 4.0, at(10, 9), tz)
+        assertEquals(BatteryState.MORNING_DELAY, b.state)
+        assertEquals(at(10, 11), b.readyAt)
     }
 
     @Test

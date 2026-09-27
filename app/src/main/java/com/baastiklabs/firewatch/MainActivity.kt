@@ -19,7 +19,8 @@ class MainActivity : ComponentActivity() {
         val splash = installSplashScreen()
         super.onCreate(savedInstanceState)
         splash.setKeepOnScreenCondition { !vm.loaded.value }
-        Fmt.use24h = DateFormat.is24HourFormat(this)
+        Fmt.systemUse24h = DateFormat.is24HourFormat(this)
+        Fmt.use24h = Fmt.systemUse24h
         enableEdgeToEdge()
         setContent {
             FirewatchTheme {
@@ -30,6 +31,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
-        Fmt.use24h = DateFormat.is24HourFormat(this)
+        Fmt.systemUse24h = DateFormat.is24HourFormat(this)
+        Fmt.applyTimeFormat(vm.data.value.settings.timeFormat)
+        com.baastiklabs.firewatch.data.AppActivity.mark(this)
     }
 }

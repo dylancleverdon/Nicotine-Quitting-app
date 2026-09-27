@@ -106,7 +106,8 @@ fun HomeScreen(vm: FirewatchViewModel, data: FirewatchData, now: Long, snackbar:
     val revealed = baseline is BaselineStatus.Complete
     val measured = remember(data, minute) { if (revealed) Progress.measuredRung(data, today, tz) else null }
     val target = data.targetPieces?.let { Ladder.rung(it) }
-    val battery = remember(data, minute) { target?.let { Progress.battery(data, if (it.pieces > 0) it.pieces else 1.0 / 3.0, now, tz) } }
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val battery = remember(data, minute) { target?.let { Progress.battery(data, if (it.pieces > 0) it.pieces else 1.0 / 3.0, now, tz, com.baastiklabs.firewatch.data.AppActivity.last(context)) } }
     val stepDown = remember(data, minute) { if (revealed) Progress.stepDownOffer(data, now, tz) else null }
     val readiness = remember(data, minute) { data.targetPieces?.let { Coach.readiness(data, it, now) } }
     val stepUp = remember(data, minute) { if (revealed && stepDown == null) Coach.stepUpOffer(data, now, tz) else null }
@@ -150,8 +151,10 @@ fun HomeScreen(vm: FirewatchViewModel, data: FirewatchData, now: Long, snackbar:
                     tags = draft?.tags ?: emptyList(),
                 ),
             )
+            val waited = com.baastiklabs.firewatch.core.engine.BatteryEngine.waitedForFull(repo.data.value, dose, tz)
             val result = snackbar.showSnackbar(
-                message = "Logged ${product.name} · ${Fmt.piecesLabel(dose.pieces(data.referenceMg))}",
+                message = if (waited) "Logged ${product.name}. You waited for a full battery. Nice work!"
+                else "Logged ${product.name} · ${Fmt.piecesLabel(dose.pieces(data.referenceMg))}",
                 actionLabel = "Undo",
                 duration = SnackbarDuration.Short,
             )

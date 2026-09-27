@@ -61,7 +61,7 @@ import kotlinx.datetime.TimeZone
 import java.util.Locale
 import kotlin.math.roundToInt
 
-private val sections = listOf("Today", "Trends", "Patterns", "Going up", "Going down", "Mix", "Forecasts", "Milestones", "Ladder")
+private val sections = listOf("Today", "Stretch & pull", "Trends", "Patterns", "Going up", "Going down", "Mix", "Forecasts", "Milestones", "Ladder")
 
 @Composable
 fun InsightsScreen(data: FirewatchData, now: Long, watch: @Composable () -> Unit) {
@@ -90,6 +90,7 @@ fun InsightsScreen(data: FirewatchData, now: Long, watch: @Composable () -> Unit
         LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             when (section) {
                 "Today" -> item { TodaySection(ins, data, now) }
+                "Stretch & pull" -> item { StretchSection(ins) }
                 "Trends" -> item { TrendsSection(ins) }
                 "Patterns" -> item { PatternsSection(ins) }
                 "Going up" -> item { GoingUpSection(ins, data) }
@@ -151,6 +152,38 @@ private fun TodaySection(ins: Insights, data: FirewatchData, now: Long) = Col {
             Stat(fmt1(w.clearHours) + " h", "clear hours")
             Stat(Fmt.duration(((w.awakeHours * 60 - w.mouthMinutes).coerceAtLeast(0.0) * 60_000).toLong()), "mouth-free")
         }
+    }
+}
+
+@Composable
+private fun StretchSection(ins: Insights) = Col {
+    val days = ins.stretchPull.takeLast(42)
+    if (days.isEmpty()) {
+        ChartCard("Stretch & pull", "Starts once you're working at a target rung.") {}
+        return@Col
+    }
+    ChartCard(
+        "Stretch & pull",
+        "Stretch: time you held off after the battery was full. Pull: how early a piece came before it was full. " +
+            "Net = stretch − pull; positive means you're living below your target pace. Every day starts clean.",
+    ) {
+        Text("Stretch (teal) and pull (grey), hours a day", style = MaterialTheme.typography.labelMedium)
+        TrendLine(days.map { it.stretchMin / 60 }, second = days.map { it.pullMin / 60 },
+            color = MaterialTheme.colorScheme.tertiary, secondColor = MaterialTheme.colorScheme.outline)
+        Text("Net, hours a day", style = MaterialTheme.typography.labelMedium)
+        BarChart(days.map { Bar(kotlin.math.max(0.0, it.netMin / 60), color = if (it.netMin >= 0) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.outline) },
+            height = 90.dp)
+        val week = days.filter { it.date < ins.today }.takeLast(7)
+        if (week.isNotEmpty()) {
+            fun hm(m: Double) = Fmt.duration((kotlin.math.abs(m) * 60_000).toLong())
+            val net = week.map { it.netMin }.average()
+            Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+                Stat(hm(week.map { it.stretchMin }.average()), "stretch, 7-day avg")
+                Stat(hm(week.map { it.pullMin }.average()), "pull, 7-day avg")
+                Stat((if (net >= 0) "+" else "−") + hm(net), "net, 7-day avg")
+            }
+        }
+        ins.stretchSummary()?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
     }
 }
 

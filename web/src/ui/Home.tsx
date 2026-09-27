@@ -3,7 +3,7 @@ import { Core } from '../core'
 import * as S from '../store'
 import { Meter, Wave } from './Charts'
 import { CheckInSheet, CravingSheet, DoseSheet, VapeSheet, doseLine } from './Sheets'
-import { TAGS, cravingColor, duration, isoToday, mg, pieces, piecesLabel, time } from './format'
+import { TAGS, cravingColor, duration, isoToday, mg, pieces, piecesLabel, signedDuration, time } from './format'
 
 export function Home({ toast, go }: { toast: (msg: string, undo?: () => void) => void; go: (r: string) => void }) {
   const snap = S.snapshot.value!
@@ -18,7 +18,8 @@ export function Home({ toast, go }: { toast: (msg: string, undo?: () => void) =>
 
   const logProduct = async (p: any, at?: number, opts?: any) => {
     const d = await S.logProduct(p, at, opts)
-    toast(`Logged ${p.name}`, () => S.remove(d.id))
+    const waited = Core.waitedForFull(S.json(), d.id)
+    toast(waited ? `Logged ${p.name}. You waited for a full battery. Nice work!` : `Logged ${p.name}`, () => S.remove(d.id))
   }
   const tap = (p: any) => {
     if (p.kind === 'VAPE' && p.borrowedFrom) return setVape(p)
@@ -54,9 +55,11 @@ export function Home({ toast, go }: { toast: (msg: string, undo?: () => void) =>
           </>}
           {battery && <div>
             <b>{battery.state === 'CLEAR' ? 'Clear for one if you want it' : battery.state === 'CHARGING' ? `Next piece around ${battery.readyAt ? time(battery.readyAt) : 'later'}` :
-              battery.state === 'MORNING_DELAY' ? 'Morning delay' : battery.state === 'WIND_DOWN' ? 'Winding down for bed' : 'Sleeping hours'}</b>
+              battery.state === 'FULL_AT_WAKE' ? 'Full when you wake up' : battery.state === 'MORNING_DELAY' ? `First piece goal: ${battery.readyAt ? time(battery.readyAt) : ''}` :
+              battery.state === 'WIND_DOWN' ? 'Winding down for bed' : 'Sleeping hours · Fresh start when you wake up'}</b>
             <Meter value={battery.charge} />
-            {battery.stretchMin >= 1 && <div class="muted">Stretch today: {duration(battery.stretchMin * 60000)}</div>}
+            <div class="small stretch" style={{ color: battery.stretchMin - battery.pullMin >= 0 ? 'var(--tertiary)' : 'var(--muted)' }}>
+              Stretch {duration(battery.stretchMin * 60000)} · Pull {duration(battery.pullMin * 60000)} · Net {signedDuration(battery.stretchMin - battery.pullMin)}</div>
           </div>}
         </> : <>
           <div class="label">{snap.baselineState === 'progress' ? `Baseline week · day ${snap.baselineDay} of 7` : 'Baseline week'}</div>
