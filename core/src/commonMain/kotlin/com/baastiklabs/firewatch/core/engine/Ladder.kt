@@ -1,6 +1,7 @@
 package com.baastiklabs.firewatch.core.engine
 
 import kotlin.math.abs
+import kotlin.math.roundToLong
 
 /**
  * The tier ladder. Each tier answers: if all of D's nicotine came from gum, how often would D be
@@ -87,6 +88,6 @@ object Ladder {
         abs(p - 0.5) < 1e-6 -> "½"
         abs(p - 1.0 / 3.0) < 1e-3 -> "⅓"
         p == p.toLong().toDouble() -> p.toLong().toString()
-        else -> String.format("%.1f", p)
+        else -> ((p * 10).roundToLong() / 10.0).toString()
     }
 }

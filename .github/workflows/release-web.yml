@@ -1,0 +1,47 @@
+name: Release web
+
+# Every push to the `webapp` branch publishes the web app to GitHub Pages. The service worker
+# picks up the new version on the next open.
+on:
+  push:
+    branches: [webapp]
+  workflow_dispatch:
+
+concurrency:
+  group: release-web
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+jobs:
+  build:
+    uses: ./.github/workflows/web-build.yml
+
+  deploy:
+    name: Publish to GitHub Pages
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: firewatch-web
+          path: dist
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+      - id: deployment
+        uses: actions/deploy-pages@v4
+      - name: Tag this web version (for rollback)
+        run: |
+          v=$(node -p "require('./web/package.json').version")
+          if ! git ls-remote --exit-code --tags origin "web-v$v" >/dev/null; then
+            git tag "web-v$v" "$GITHUB_SHA" && git push origin "web-v$v"
+          fi

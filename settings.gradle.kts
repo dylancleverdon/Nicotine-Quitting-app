@@ -13,7 +13,8 @@ pluginManagement {
 }
 
 dependencyResolutionManagement {
-    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    // PREFER_PROJECT: Kotlin/JS adds its Node.js and Yarn download repos to the root project.
+    repositoriesMode.set(RepositoriesMode.PREFER_PROJECT)
     repositories {
         google {
             content {

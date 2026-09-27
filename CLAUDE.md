@@ -23,12 +23,16 @@ builds, releases and maintains everything.
   `release-apk.yml` publishes `apk-v<version>` and refreshes the rolling `apk-latest` release
   (`firewatch.apk` = first-install link, `update.json` = what the app polls).
 - A push to `apk` without a version bump publishes nothing.
-- The future web app releases from a separate `webapp` branch.
+- The web app (`web/`, Vite + Preact PWA) releases from the `webapp` branch via `release-web.yml`
+  to GitHub Pages (https://dylancleverdon.github.io/Nicotine-Quitting-app/). Bump `web/package.json`
+  version and `web/CHANGELOG.md` per web release. It uses the same record/backup format as Android.
+  Local check: `cd web && npm ci && npm run build && npx playwright test`.
 
 ## Data must survive updates and rollbacks
 - SQLite schema is frozen: one `records` table (id, type, ts, updated_at, deleted, json),
   DB version 1 forever. Never add columns or bump the version.
 - New data = new JSON fields (with defaults) or new record types. Never rename/repurpose a field.
+- Back-dated doses carry `estimated: true`: counted in totals and tiers, excluded from timing stats.
 - Decoders ignore unknown keys/enum values; writers merge into the stored JSON so older versions
   keep newer fields. Deletes are tombstones. See `docs/data-format.md`.
 
@@ -39,7 +43,8 @@ builds, releases and maintains everything.
 
 ## Layout
 - `core/`: pure Kotlin (no Android). Models, piece math, stats, backup format, update policy.
-  Tested locally with `./gradlew :core:test` (works without an Android SDK).
+  Kotlin Multiplatform: JVM target for Android, JS target for the web app (`jsMain/.../web/WebApi.kt`
+  is the web's JSON facade). Tested with `./gradlew :core:jvmTest` (works without an Android SDK).
 - `app/`: Android app (Compose). `data/` storage, `update/` self-updater, `ui/` screens.
   `app/src/e2e/` holds test-only hooks for the updater E2E test.
 - Android builds need the SDK; if this container can't reach dl.google.com, rely on CI.
