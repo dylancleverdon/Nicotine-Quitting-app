@@ -81,7 +81,7 @@ import java.time.LocalDate
 import java.time.LocalTime
 
 @Composable
-fun HomeScreen(vm: FirewatchViewModel, data: FirewatchData, now: Long, snackbar: SnackbarHostState, onBackfill: () -> Unit = {}) {
+fun HomeScreen(vm: FirewatchViewModel, data: FirewatchData, now: Long, snackbar: SnackbarHostState, onBackfill: () -> Unit = {}, onHelp: () -> Unit = {}) {
     val repo = vm.repository
     val scope = rememberCoroutineScope()
     val haptic = LocalHapticFeedback.current
@@ -118,6 +118,15 @@ fun HomeScreen(vm: FirewatchViewModel, data: FirewatchData, now: Long, snackbar:
     val checkedInToday = data.checkIns.any { it.at.localDate(tz) == today }
 
     var celebrate by remember { mutableStateOf<com.baastiklabs.firewatch.core.engine.Rung?>(null) }
+    var relapseDialog by remember { mutableStateOf(false) }
+    val relapse = com.baastiklabs.firewatch.core.engine.Relapse
+    val relapseNext = remember(data, minute) { relapse.nextAt(data, now, tz) }
+    val relapseProduct = remember(data) { relapse.product(data)?.name }
+    val relapseReason = remember(data, minute) { relapse.recommendation(data, now, tz) }
+    val movingOn = remember(data, minute) { relapse.movingOn(data, now) }
+    val switchRelapse = com.baastiklabs.firewatch.ui.relapse.rememberRelapseSwitch(vm) { on ->
+        scope.launch { snackbar.showSnackbar(if (on) "Relapse prevention mode turned on" else "Relapse prevention mode turned off") }
+    }
 
     fun moveTarget(pieces: Double, reason: String) {
         scope.launch {
@@ -177,7 +186,7 @@ fun HomeScreen(vm: FirewatchViewModel, data: FirewatchData, now: Long, snackbar:
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item {
-            Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("Firewatch", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
                 Text(
                     "by Baastik Labs",
@@ -185,8 +194,11 @@ fun HomeScreen(vm: FirewatchViewModel, data: FirewatchData, now: Long, snackbar:
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(bottom = 3.dp),
                 )
+                Spacer(Modifier.weight(1f))
+                OutlinedButton(onClick = onHelp, contentPadding = PaddingValues(0.dp), modifier = Modifier.height(36.dp).padding(0.dp)) { Text("?", fontWeight = FontWeight.Bold) }
             }
         }
+        if (data.relapseOn) item { com.baastiklabs.firewatch.ui.relapse.RelapseIndicator(relapseNext, relapseProduct) }
         item {
             if (revealed) {
                 TierStatusCard(
@@ -199,6 +211,8 @@ fun HomeScreen(vm: FirewatchViewModel, data: FirewatchData, now: Long, snackbar:
                     wave = wave,
                     sleepShade = listOf(wave.firstOrNull()?.first.let { (it ?: 0L) to todayWake.wakeAt }, todayWake.sleepAt to (wave.lastOrNull()?.first ?: 0L)),
                     quality = quality,
+                    nowDoses = data.doses,
+                    relapseNext = if (data.relapseOn) relapseNext else null,
                     fitsNow = battery?.let { com.baastiklabs.firewatch.core.engine.BatteryEngine.fitsNow(data, it)?.name },
                 )
             } else {
@@ -242,6 +256,30 @@ fun HomeScreen(vm: FirewatchViewModel, data: FirewatchData, now: Long, snackbar:
                     onPrimary = { moveTarget(stepUp.pieces, "up") },
                     secondary = "I'm OK",
                     onSecondary = { scope.launch { repo.updateSettings { it.copy(stepUpSnoozedAt = repo.now()) } } },
+                )
+            }
+        }
+        relapseReason?.let { reason ->
+            item {
+                OfferCard(
+                    title = "Try Relapse prevention mode?",
+                    body = "${relapse.reasonText(reason)} Chewing on a steady schedule early on keeps you ahead of cravings.",
+                    primary = "Tell me more",
+                    onPrimary = { relapseDialog = true },
+                    secondary = "Not now",
+                    onSecondary = { scope.launch { repo.updateSettings { it.copy(relapseCardDismissedAt = repo.now()) } } },
+                )
+            }
+        }
+        if (movingOn) {
+            item {
+                OfferCard(
+                    title = "You've been steady for 4 weeks",
+                    body = "Ready to switch to tapering? Relapse prevention mode turns off, and Firewatch helps you step down at your own pace.",
+                    primary = "Switch to tapering",
+                    onPrimary = { switchRelapse(false) },
+                    secondary = "Not yet",
+                    onSecondary = { scope.launch { repo.updateSettings { it.copy(movingOnDismissedAt = repo.now()) } } },
                 )
             }
         }
@@ -350,7 +388,23 @@ fun HomeScreen(vm: FirewatchViewModel, data: FirewatchData, now: Long, snackbar:
         items(todayDoses, key = { it.id }) { dose ->
             DoseRow(dose, data.referenceMg, onClick = { editing = dose })
         }
+        item {
+            OutlinedButton(onClick = { relapseDialog = true }, modifier = Modifier.fillMaxWidth()) {
+                Text(if (data.relapseOn) "Relapse prevention mode: on" else "Relapse prevention mode")
+            }
+        }
         item { EstimateNote(Modifier.padding(top = 8.dp)) }
+    }
+
+    if (relapseDialog) {
+        com.baastiklabs.firewatch.ui.relapse.RelapseDialog(
+            on = data.relapseOn,
+            onDismiss = {
+                relapseDialog = false
+                if (!data.relapseOn && relapseReason != null) scope.launch { repo.updateSettings { it.copy(relapseCardDismissedAt = repo.now()) } }
+            },
+            onSwitch = switchRelapse,
+        )
     }
 
     optionsFor?.let { product ->

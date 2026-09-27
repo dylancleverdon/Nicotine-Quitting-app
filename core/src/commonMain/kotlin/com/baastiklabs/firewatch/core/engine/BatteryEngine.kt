@@ -16,7 +16,8 @@ import kotlinx.datetime.toInstant
 import kotlin.math.ceil
 
 /** Stretch, pull and net for one waking day, in minutes. */
-data class DayBattery(val date: LocalDate, val stretchMin: Double, val pullMin: Double) {
+/** [paused]: a Relapse prevention mode day, where stretch and pull don't apply. */
+data class DayBattery(val date: LocalDate, val stretchMin: Double, val pullMin: Double, val paused: Boolean = false) {
     val netMin: Double get() = stretchMin - pullMin
 }
 
@@ -137,6 +138,8 @@ object BatteryEngine {
                 else -> state = BatteryState.CLEAR
             }
         }
+        // Relapse prevention mode: waiting longer isn't the goal, so stretch and pull pause.
+        if (Relapse.isModeDay(data, day.date, tz)) return Battery(charge, state, readyAt, 0.0, interval, 0.0)
         return Battery(charge, state, readyAt, sim.stretch, interval, sim.pull)
     }
 
@@ -158,6 +161,7 @@ object BatteryEngine {
         val nextWake = Waking.day(data, date.plus(1, DateTimeUnit.DAY), tz).wakeAt
         val lateDose = dayDoses(data, day, nextWake).lastOrNull { it.at >= day.sleepAt }?.at ?: 0L
         val sim = simulate(data, day, nextWake, intervalFor(target), now, lateDose)
+        if (Relapse.isModeDay(data, date, tz)) return DayBattery(date, 0.0, 0.0, paused = true)
         return DayBattery(date, sim.stretch, sim.pull)
     }
 

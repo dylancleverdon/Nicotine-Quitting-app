@@ -81,6 +81,14 @@ export async function finishCraving(c: any, outcome: 'RODE_OUT' | 'USED') {
   await save('craving', { ...stored, outcome, endedAt: stored.endedAt ?? Date.now() })
 }
 export const logSleep = (kind: 'WAKE' | 'SLEEP', at = Date.now()) => save('sleep', { id: Core.newId(), at, kind })
+export const setRelapse = (on: boolean) => save('mode', { id: Core.newId(), at: Date.now(), on, mode: 'relapse' })
+/** "Just starting gum": gum first on the home screen, then Relapse prevention mode on. */
+export async function startGum() {
+  const gum = products.value.filter((p) => p.kind === 'GUM')
+  await saveMany('product', gum.map((p, i) => ({ ...p, onHome: true, order: -10 + i })))
+  await updateSettings({ relapseProductId: gum.find((p) => p.id === 'gum-4')?.id ?? gum[0]?.id ?? 'gum-4' })
+  await setRelapse(true)
+}
 export const setTarget = (pieces: number, reason: string) => save('rung', { id: Core.newId(), at: Date.now(), pieces, reason })
 
 // --- Backup files: identical format to the Android app. ---

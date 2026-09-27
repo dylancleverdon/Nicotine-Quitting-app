@@ -99,6 +99,27 @@ fun PlanSettings(vm: FirewatchViewModel, data: FirewatchData) {
         ToggleRow("Daily check-in", "Three quick taps: craving strength, mood and sleep", s.dailyCheckIn) { v -> update { it.copy(dailyCheckIn = v) } }
     }
 
+    SectionTitle("Relapse prevention mode")
+    val switchRelapse = com.baastiklabs.firewatch.ui.relapse.rememberRelapseSwitch(vm)
+    Text(
+        "A reminder to chew at your tier's gap (every 2 hours before you have a tier), to stay ahead of cravings. Never during sleeping hours. Off unless you turn it on.",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    val gap = com.baastiklabs.firewatch.core.engine.Relapse.gapMinutes(data, System.currentTimeMillis())
+    ToggleRow(
+        "Relapse prevention mode",
+        if (data.relapseOn) "On · every ${com.baastiklabs.firewatch.ui.Fmt.duration((gap * 60_000).toLong())}" else "Off",
+        data.relapseOn,
+    ) { v -> switchRelapse(v) }
+    Text("Reminds me about", style = MaterialTheme.typography.titleSmall)
+    androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        val current = com.baastiklabs.firewatch.core.engine.Relapse.product(data)?.id
+        data.products.filter { !it.archived && it.borrowedFrom == null }.sortedWith(compareBy({ it.order }, { it.name })).forEach { p ->
+            FilterChip(selected = current == p.id, onClick = { update { it.copy(relapseProductId = p.id) } }, label = { Text(p.name) })
+        }
+    }
+
     SectionTitle("Reminders (optional)")
     val context = androidx.compose.ui.platform.LocalContext.current
     val permission = androidx.activity.compose.rememberLauncherForActivityResult(
@@ -112,7 +133,7 @@ fun PlanSettings(vm: FirewatchViewModel, data: FirewatchData) {
         }
     }
     Text(
-        "Neutral and off by default. Firewatch never sends \"time for your next piece\".",
+        "Neutral and off by default. Apart from Relapse prevention mode, Firewatch never sends \"time for your next piece\".",
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )

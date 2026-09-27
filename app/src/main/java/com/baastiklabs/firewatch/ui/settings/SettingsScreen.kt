@@ -92,6 +92,7 @@ fun SettingsScreen(
     onOpenProducts: () -> Unit,
     onBackfill: () -> Unit = {},
     onOpenAbout: () -> Unit,
+    onOpenHelp: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -267,6 +268,9 @@ fun SettingsScreen(
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+
+        SectionTitle("Help")
+        LabeledRow("Help", "›", Modifier.clickable(onClick = onOpenHelp).padding(vertical = 8.dp))
 
         SectionTitle("About")
         LabeledRow("About ${Branding.APP_NAME}", "›", Modifier.clickable(onClick = onOpenAbout).padding(vertical = 8.dp))

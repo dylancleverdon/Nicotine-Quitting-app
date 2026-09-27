@@ -6,6 +6,7 @@ import com.baastiklabs.firewatch.core.model.Craving
 import com.baastiklabs.firewatch.core.model.CravingOutcome
 import com.baastiklabs.firewatch.core.model.DefaultProducts
 import com.baastiklabs.firewatch.core.model.Dose
+import com.baastiklabs.firewatch.core.model.ModeChange
 import com.baastiklabs.firewatch.core.model.Product
 import com.baastiklabs.firewatch.core.model.RungChange
 import com.baastiklabs.firewatch.core.model.Settings
@@ -39,6 +40,7 @@ class Repository(
     private val sleepEvents = HashMap<String, SleepEvent>()
     private val rungChanges = HashMap<String, RungChange>()
     private val checkIns = HashMap<String, CheckIn>()
+    private val modeChanges = HashMap<String, ModeChange>()
     private var settings = Settings()
 
     private val _data = MutableStateFlow(FirewatchData())
@@ -125,6 +127,21 @@ class Repository(
         mutate { t -> listOf(RecordCodec.rung(RungChange(Ids.newId(now), now, pieces, reason), null, t)) }
     }
 
+    /** Switches Relapse prevention mode on or off (kept as history, so past days stay marked). */
+    suspend fun setRelapse(on: Boolean) {
+        val now = clock()
+        mutate { t -> listOf(RecordCodec.mode(ModeChange(Ids.newId(now), now, on), null, t)) }
+    }
+
+    /** "Just starting gum": gum first on the home screen, reminders for gum, then the mode on. */
+    suspend fun startGum() {
+        val gum = products.values.filter { it.kind == com.baastiklabs.firewatch.core.model.ProductKind.GUM && !it.archived }.sortedBy { it.labelMg }
+        gum.forEachIndexed { i, p -> saveProduct(p.copy(onHome = true, order = -10 + i)) }
+        val reminder = gum.firstOrNull { it.id == DefaultProducts.GUM_4MG } ?: gum.firstOrNull()
+        if (reminder != null) updateSettings { it.copy(relapseProductId = reminder.id) }
+        setRelapse(true)
+    }
+
     suspend fun saveCheckIn(checkIn: CheckIn) {
         mutate { now -> listOf(RecordCodec.checkIn(checkIn, records[checkIn.id]?.json, now)) }
     }
@@ -196,6 +213,7 @@ class Repository(
             RecordTypes.SLEEP -> put(sleepEvents, env, SleepEvent.serializer())
             RecordTypes.RUNG -> put(rungChanges, env, RungChange.serializer())
             RecordTypes.CHECKIN -> put(checkIns, env, CheckIn.serializer())
+            RecordTypes.MODE -> put(modeChanges, env, ModeChange.serializer())
             RecordTypes.SETTINGS -> settings =
                 (if (env.deleted) null else RecordCodec.decode(env.json, Settings.serializer())) ?: Settings()
             else -> Unit // A newer version's record type: kept in storage and backups, ignored here.
@@ -216,6 +234,7 @@ class Repository(
             settings = settings,
             rungChanges = rungChanges.values.sortedBy { it.at },
             checkIns = checkIns.values.sortedBy { it.at },
+            modeChanges = modeChanges.values.sortedBy { it.at },
         )
         onChange?.invoke()
     }

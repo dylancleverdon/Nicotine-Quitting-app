@@ -79,7 +79,8 @@ class QuickLogWidget : GlanceAppWidget() {
         val tz = TimeZone.currentSystemDefault()
         Fmt.systemUse24h = android.text.format.DateFormat.is24HourFormat(context)
         Fmt.applyTimeFormat(data.settings.timeFormat)
-        val status = data.targetPieces?.let { target ->
+        val relapseNext = com.baastiklabs.firewatch.core.engine.Relapse.nextAt(data, now, tz)
+        val status = if (relapseNext != null) "Next scheduled piece ${Fmt.time(relapseNext)}" to 1.0 else data.targetPieces?.let { target ->
             val b = Progress.battery(data, if (target > 0) target else 1.0 / 3.0, now, tz, com.baastiklabs.firewatch.data.AppActivity.last(context))
             when (b.state) {
                 BatteryState.CLEAR -> "Clear for one if you want it"

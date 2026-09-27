@@ -34,9 +34,10 @@ export function Insights() {
       {sec === 'Stretch & pull' && (() => {
         const sd = snap.stretchDays.slice(-42)
         if (!sd.length) return <Card title="Stretch & pull" sub="Starts once you're working at a target rung." />
-        const week = sd.filter((d) => d.date < snap.today).slice(-7)
+        const week = sd.filter((d) => d.date < snap.today).slice(-7).filter((d) => !d.paused)
+        const paused = sd.filter((d) => d.paused).length
         const avg = (f: (d: any) => number) => (week.length ? week.reduce((a, d) => a + f(d), 0) / week.length : 0)
-        return <Card title="Stretch & pull" sub="Stretch: time you held off after the battery was full. Pull: how early a piece came before it was full. Net = stretch − pull; positive means you're living below your target pace. Every day starts clean.">
+        return <Card title="Stretch & pull" sub="Stretch: time you held off after the battery was full. Pull: nicotine that came before the battery had room for it. Net = stretch − pull; positive means you're living below your target pace. Every day starts clean.">
           <div class="muted">Stretch (teal) and pull (grey), hours a day</div>
           <Line values={sd.map((d) => d.pullMin / 60)} second={sd.map((d) => d.stretchMin / 60)} color="var(--muted)" />
           <div class="muted">Net, hours a day</div>
@@ -44,6 +45,7 @@ export function Insights() {
           {week.length > 0 && <div class="stats"><Stat v={duration(avg((d) => d.stretchMin) * 60000)} l="stretch, 7-day avg" /><Stat v={duration(avg((d) => d.pullMin) * 60000)} l="pull, 7-day avg" />
             <Stat v={signedDuration(avg((d) => d.stretchMin - d.pullMin))} l="net, 7-day avg" /></div>}
           {snap.stretchSummary && <div class="small">{snap.stretchSummary}</div>}
+          {paused > 0 && <div class="muted">{paused} {paused === 1 ? 'day' : 'days'} in Relapse prevention mode: stretch and pull paused.</div>}
         </Card>
       })()}
       {sec === 'Trends' && <>

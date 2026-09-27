@@ -54,3 +54,10 @@ nav.tabs button.on { color: var(--text); background: var(--primary-soft); }
 input, select { font: inherit; color: var(--text); background: var(--surface2); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; width: 100%; }
 svg text { fill: var(--muted); font-size: 10px; }
 .footer { text-align: center; color: var(--muted); font-size: 12px; padding: 12px; }
+.between { justify-content: space-between; }
+.help-btn { width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--line); font-weight: 700; padding: 0; }
+.now-mg { font-size: 14px; margin-top: 4px; }
+.tour { text-align: center; } .tour .dots { display: flex; gap: 6px; justify-content: center; } .tour .dots span { width: 8px; height: 8px; border-radius: 50%; background: var(--line); } .tour .dots span.on { background: var(--primary); }
+.help-body { white-space: pre-wrap; }
+input.search { width: 100%; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface, transparent); color: inherit; font-size: 15px; }
+.cal .mode { box-shadow: inset 0 0 0 2px var(--tertiary); }

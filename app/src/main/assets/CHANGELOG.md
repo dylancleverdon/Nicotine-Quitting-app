@@ -2,6 +2,14 @@
 
 Newest first. Each release is a "## <version>" heading; the app shows these notes in "What's new".
 
+## 0.5.0 · 2026-09-27
+- New: **Relapse prevention mode.** If you're new to gum, Firewatch can remind you to chew at a steady gap so cravings don't catch you off guard. The gap follows your tier (every 2 hours before you have one), never during sleeping hours, and a "Log it" button on the reminder logs the piece in one tap. It's off unless you turn it on, with the button at the bottom of the Log tab.
+- While it's on, the battery shows "Next scheduled piece at …" and stretch and pull take a break. Your tiers and figures stay just as honest. Those days get a ring in the calendar.
+- Firewatch may suggest the mode after a cigarette or vape, early heavy gum use or a run of strong cravings, and after 4 steady weeks it offers the switch to tapering. Say "Not now" and it waits 2 weeks.
+- New: "I'm just starting gum" option when setting up.
+- New: a short welcome tour, a "Why Firewatch works this way" page, and Help for every feature (the **?** on the Log tab, or Settings).
+- New: under the nicotine graph on the Log tab, an estimate of how much nicotine is in your system right now.
+
 ## 0.4.1 · 2026-09-27
 - Pull now counts dose size: anything bigger than your battery had room for (like a Zyn 6 mg, or a double) shows up as pull, so your net stays honest. The wait is still never more than one gap.
 - Two small pieces now count the same as one big one.

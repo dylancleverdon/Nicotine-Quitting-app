@@ -9,6 +9,7 @@ import { Calendar } from './ui/Calendar'
 import { Insights } from './ui/Insights'
 import { Settings } from './ui/Settings'
 import { Backfill, Onboarding } from './ui/Onboarding'
+import { Help, Tour, Why } from './ui/Help'
 import changelog from '../CHANGELOG.md?raw'
 
 const TABS = [['home', 'Log'], ['insights', 'Insights'], ['calendar', 'Calendar'], ['settings', 'Settings']]
@@ -35,6 +36,8 @@ export function App() {
   const show = (msg: string, undo?: () => void) => { setToast({ msg, undo }); setTimeout(() => setToast((t) => (t?.msg === msg ? null : t)), 5000) }
   if (!S.loaded.value || !S.snapshot.value) return <main><div class="muted">Loading…</div></main>
   setTimeFormat(S.settings.value.timeFormat ?? 'system')
+  if (!S.settings.value.tourSeen && route !== 'why') return <Tour onDone={() => S.updateSettings({ tourSeen: true })} onWhy={() => setRoute('why')} />
+  if (route === 'why' && !S.settings.value.onboardingDone) return <Why onBack={() => setRoute('home')} />
   if (!S.settings.value.onboardingDone) return <Onboarding />
   return (
     <>
@@ -42,8 +45,11 @@ export function App() {
       {route === 'insights' && <Insights />}
       {route === 'calendar' && <Calendar />}
       {route === 'settings' && <Settings toast={show} go={setRoute} updateInfo={checked} />}
+      {route === 'help' && <Help go={setRoute} />}
+      {route === 'why' && <Why onBack={() => setRoute('help')} />}
+      {route === 'tour' && <Tour onDone={() => setRoute('help')} onWhy={() => setRoute('why')} />}
       {route === 'backfill' && <Backfill onDone={() => setRoute('home')} onCancel={() => setRoute('home')} />}
-      {route !== 'backfill' && <nav class="tabs">{TABS.map(([r, l]) => <button class={route === r ? 'on' : ''} onClick={() => setRoute(r)}>{l}</button>)}</nav>}
+      {!['backfill', 'tour'].includes(route) && <nav class="tabs">{TABS.map(([r, l]) => <button class={route === r ? 'on' : ''} onClick={() => setRoute(r)}>{l}</button>)}</nav>}
       {toast && <div class="toast">{toast.msg}{toast.undo && <button class="btn text" onClick={() => { toast.undo!(); setToast(null) }}>Undo</button>}</div>}
       {whatsNew && <div class="sheet-bg" onClick={() => setWhatsNew(null)}><div class="sheet"><h2>What's new</h2>
         <div class="small" style={{ whiteSpace: 'pre-wrap' }}>{'Version ' + whatsNew}</div><button class="btn" onClick={() => setWhatsNew(null)}>Got it</button></div></div>}

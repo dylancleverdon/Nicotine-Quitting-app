@@ -1,6 +1,6 @@
 # Proposed update: Relapse prevention mode, first-run guide and Help
 
-Status: **proposed, not built.** Covers the Android app and the web app.
+Status: **built in Android 0.5.0 / web 0.3.0.** The reminder gap follows the tier (2 hours before there's a tier); both optional extras are included. Covers the Android app and the web app.
 
 ## Summary
 1. **Relapse prevention mode**: an optional mode that reminds you to chew gum at a steady gap,

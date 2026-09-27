@@ -137,6 +137,26 @@ data class Settings(
     val morningDelayClock: Int = -1,
     /** "system" (follow the phone), "12h" or "24h". */
     val timeFormat: String = "system",
+    /** Relapse prevention mode: the product the reminders are for. */
+    val relapseProductId: String = DefaultProducts.GUM_4MG,
+    /** When the "try Relapse prevention mode" card was last dismissed (epoch ms). */
+    val relapseCardDismissedAt: Long = 0,
+    /** When the "ready to switch to tapering?" card was last dismissed (epoch ms). */
+    val movingOnDismissedAt: Long = 0,
+    /** The first-launch welcome tour has been seen. */
+    val tourSeen: Boolean = false,
+)
+
+/**
+ * A mode was switched on or off. The latest one is the current state; the history marks which
+ * days were in the mode. [mode] is "relapse" (Relapse prevention mode).
+ */
+@Serializable
+data class ModeChange(
+    val id: String,
+    val at: Long,
+    val on: Boolean,
+    val mode: String = "relapse",
 )
 
 /** Optional daily check-in: three quick 1–5 taps. */

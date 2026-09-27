@@ -58,6 +58,13 @@ export function Settings({ toast, go, updateInfo }: { toast: (m: string) => void
       <label class="row small"><input type="checkbox" style={{ width: 'auto' }} checked={s.dailyCheckIn} onChange={() => S.updateSettings({ dailyCheckIn: !s.dailyCheckIn })} /> Daily check-in (cravings, mood, sleep)</label>
       {snap.baselineState !== 'complete' && <button class="btn outline" onClick={() => go('backfill')}>Back-date my baseline week</button>}
 
+      <h3 class="label">Relapse prevention mode</h3>
+      <div class="muted">A reminder to chew at your tier's gap (every 2 hours before you have a tier), to stay ahead of cravings. Reminders are Android-only for now.</div>
+      <label class="row small"><input type="checkbox" style={{ width: 'auto' }} checked={snap.relapse.on} onChange={() => S.setRelapse(!snap.relapse.on)} /> Relapse prevention mode{snap.relapse.on ? ` · every ${Math.round(snap.relapse.gapMin)} min` : ''}</label>
+      <div class="row"><span class="grow small">Reminds me about</span>
+        <select style={{ width: 200 }} value={snap.relapse.productId ?? ''} onChange={(e) => S.updateSettings({ relapseProductId: (e.target as HTMLSelectElement).value })}>
+          {S.products.value.map((p) => <option value={p.id}>{p.name}</option>)}</select></div>
+
       <h3 class="label">Usual sleep schedule</h3>
       <div class="row"><span class="grow small">Wake up</span><input type="time" style={{ width: 130 }} value={toTime(s.wakeMinutes)} onChange={(e) => S.updateSettings({ wakeMinutes: toMin((e.target as HTMLInputElement).value) })} /></div>
       <div class="row"><span class="grow small">Go to bed</span><input type="time" style={{ width: 130 }} value={toTime(s.sleepMinutes)} onChange={(e) => S.updateSettings({ sleepMinutes: toMin((e.target as HTMLInputElement).value) })} /></div>
@@ -81,6 +88,10 @@ export function Settings({ toast, go, updateInfo }: { toast: (m: string) => void
       <div class="muted">Everything stays in this browser. Export now and then (to Files, iCloud Drive or email). The same file works in the Android app.</div>
       <div class="row"><button class="btn" onClick={exportNow}>Export</button>
         <label class="btn outline">Import<input type="file" accept="application/json,.json" style={{ display: 'none' }} onChange={(e) => { const f = (e.target as HTMLInputElement).files?.[0]; if (f) importFrom(f) }} /></label></div>
+
+      <h3 class="label">Help</h3>
+      <div class="row wrap"><button class="btn outline" onClick={() => go('help')}>Help</button>
+        <button class="btn outline" onClick={() => go('why')}>Why Firewatch works this way</button></div>
 
       <div class="footer">Firewatch by Baastik Labs · © 2026 Baastik Labs<br />≈ All nicotine figures are estimates.</div>
       {editing && <ProductEditor product={editing} onClose={() => setEditing(null)} />}

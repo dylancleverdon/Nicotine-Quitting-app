@@ -8,7 +8,7 @@ Every piece of data is a record:
 | field | meaning |
 | --- | --- |
 | `id` | unique id (time-prefixed random string) |
-| `type` | `product`, `dose`, `craving`, `sleep`, `settings`, `rung` (target changes), `checkin` (more may be added) |
+| `type` | `product`, `dose`, `craving`, `sleep`, `settings`, `rung` (target changes), `checkin`, `mode` (Relapse prevention mode switched on/off: `at`, `on`, `mode: "relapse"`) (more may be added) |
 | `ts` | main timestamp, epoch milliseconds (null for settings) |
 | `updatedAt` | epoch ms of the last change; newest wins when merging |
 | `deleted` | tombstone; deleted records are kept so undo and merging work |

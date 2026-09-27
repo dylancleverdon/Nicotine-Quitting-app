@@ -296,4 +296,88 @@ class EngineTest {
         assertNotNull(ins.monthlyRecap(2026, 9))
         assertTrue(ins.typicalCurve().size == 48)
     }
+
+    // ---- Relapse prevention mode ----
+
+    private val R = com.baastiklabs.firewatch.core.engine.Relapse
+    private fun modeOn(at: Long) = com.baastiklabs.firewatch.core.model.ModeChange("m$at", at, true)
+
+    @Test
+    fun `relapse gap follows the tier and falls back to two hours`() {
+        val noTier = FirewatchData(products = DefaultProducts.all(), modeChanges = listOf(modeOn(at(10, 8))))
+        assertEquals(120.0, R.gapMinutes(noTier, at(10, 9)), 0.01)
+        val bonfire = withTarget(emptyList(), 5.0).copy(modeChanges = listOf(modeOn(at(10, 8))))
+        assertEquals(192.0, R.gapMinutes(bonfire, at(10, 9)), 0.01)
+        // The tier changes, the gap follows.
+        val stepped = bonfire.copy(rungChanges = bonfire.rungChanges + RungChange("r2", at(10, 12), 4.0, "down"))
+        assertEquals(240.0, R.gapMinutes(stepped, at(10, 13)), 0.01)
+    }
+
+    @Test
+    fun `relapse reminders restart after a piece and sleep at night`() {
+        val base = FirewatchData(products = DefaultProducts.all(), settings = com.baastiklabs.firewatch.core.model.Settings(onboardingDone = true), modeChanges = listOf(modeOn(at(10, 6))))
+        // Wake 7:00, no tier: first reminder 9:00.
+        assertEquals(at(10, 9), R.nextAt(base, at(10, 8), tz))
+        assertTrue(!R.shouldRemind(base, at(10, 8), tz, 0L))
+        assertTrue(R.shouldRemind(base, at(10, 9), tz, 0L))
+        // A piece at 9:30 restarts the timer: next 11:30.
+        val logged = base.copy(doses = listOf(gum4.toDose("a", at(10, 9, 30), 0)))
+        assertEquals(at(10, 11, 30), R.nextAt(logged, at(10, 10), tz))
+        // Late piece: next reminder moves to the morning, nothing while asleep.
+        val late = base.copy(doses = listOf(gum4.toDose("a", at(10, 22), 0)))
+        assertEquals(at(11, 9), R.nextAt(late, at(10, 22, 30), tz))
+        assertTrue(!R.shouldRemind(late, at(11, 1), tz, 0L))
+        // Ignored reminder: no repeat within one gap.
+        assertTrue(!R.shouldRemind(base, at(10, 10), tz, at(10, 9)))
+        assertEquals(at(10, 11), R.nextCheckAt(base, at(10, 9, 1), tz, at(10, 9)))
+        // Off: nothing.
+        assertNull(R.nextAt(base.copy(modeChanges = base.modeChanges + com.baastiklabs.firewatch.core.model.ModeChange("off", at(10, 7), false)), at(10, 9), tz))
+    }
+
+    @Test
+    fun `relapse recommendation and moving on`() {
+        val s = com.baastiklabs.firewatch.core.model.Settings(onboardingDone = true)
+        val cig = DefaultProducts.all().first { it.id == DefaultProducts.CIGARETTE }
+        val smoked = FirewatchData(products = DefaultProducts.all(), settings = s, doses = listOf(cig.toDose("c", at(10, 9), 0)))
+        assertEquals(com.baastiklabs.firewatch.core.engine.RelapseReason.SMOKED_OR_VAPED, R.recommendation(smoked, at(11, 9), tz))
+        // Dismissed: hidden for 2 weeks.
+        val dismissed = smoked.copy(settings = s.copy(relapseCardDismissedAt = at(11, 9)))
+        assertNull(R.recommendation(dismissed, at(20, 9), tz))
+        // Never while on.
+        assertNull(R.recommendation(smoked.copy(modeChanges = listOf(modeOn(at(10, 10)))), at(11, 9), tz))
+        // Early heavy gum: 7 a day in the first week.
+        val gum = (4..10).flatMap { d -> (0 until 7).map { i -> gum4.toDose("g$d-$i", at(d, 8 + i * 2), 0) } }
+        assertEquals(com.baastiklabs.firewatch.core.engine.RelapseReason.EARLY_HEAVY_GUM, R.recommendation(FirewatchData(products = DefaultProducts.all(), settings = s, doses = gum), at(10, 23), tz))
+        // Strong cravings.
+        val cr = (1..3).map { Craving("k$it", at(9, 8 + it), 8) }
+        assertEquals(com.baastiklabs.firewatch.core.engine.RelapseReason.STRONG_CRAVINGS, R.recommendation(FirewatchData(products = DefaultProducts.all(), settings = s, cravings = cr), at(10, 9), tz))
+        assertNull(R.recommendation(FirewatchData(products = DefaultProducts.all(), settings = s), at(10, 9), tz))
+        // Moving on after 4 steady weeks.
+        val on = FirewatchData(products = DefaultProducts.all(), settings = s, modeChanges = listOf(modeOn(at(1, 8))))
+        assertTrue(!R.movingOn(on, at(20, 8)))
+        assertTrue(R.movingOn(on, at(1, 8) + 29L * 24 * 3_600_000))
+    }
+
+    @Test
+    fun `stretch and pull pause on relapse days, tiers unchanged`() {
+        val doses = listOf(gum4.toDose("a", at(10, 9), 0), gum4.toDose("b", at(10, 10), 0))
+        val plain = withTarget(doses)
+        val mode = plain.copy(modeChanges = listOf(modeOn(at(10, 8))))
+        val d = kotlinx.datetime.LocalDate(2026, 9, 10)
+        assertTrue(com.baastiklabs.firewatch.core.engine.BatteryEngine.day(plain, d, tz, at(10, 12))!!.pullMin > 0)
+        val paused = com.baastiklabs.firewatch.core.engine.BatteryEngine.day(mode, d, tz, at(10, 12))!!
+        assertTrue(paused.paused && paused.pullMin == 0.0 && paused.stretchMin == 0.0)
+        assertEquals(0.0, Progress.battery(mode, 4.0, at(10, 12), tz).pullMinutesToday)
+        assertEquals(Progress.rollingAverage(plain, d, tz), Progress.rollingAverage(mode, d, tz))
+        assertTrue(!R.isModeDay(mode, kotlinx.datetime.LocalDate(2026, 9, 9), tz))
+        assertTrue(R.isModeDay(mode, kotlinx.datetime.LocalDate(2026, 9, 12), tz))
+    }
+
+    @Test
+    fun `mode changes round-trip through records`() {
+        val env = com.baastiklabs.firewatch.core.records.RecordCodec.mode(modeOn(at(10, 8)), null, 1L)
+        val data = FirewatchData.fromRecords(listOf(env))
+        assertTrue(data.relapseOn)
+        assertTrue(com.baastiklabs.firewatch.core.Help.search("relapse").isNotEmpty())
+    }
 }

@@ -51,4 +51,8 @@ builds, releases and maintains everything.
 
 ## Product principles (from the spec)
 - Logging takes ~2 seconds, one-handed. Every figure is labelled as an estimate.
-- No nagging: no "time for your next piece" notifications, no red screens, no streaks that reset.
+- No nagging: no "time for your next piece" notifications, except in the opt-in Relapse prevention mode
+  (`core/.../engine/Relapse.kt`, `app/.../reminders/RelapseReminders.kt`). Keep that exception. No red screens,
+  no streaks that reset.
+- Help, the welcome tour and "Why Firewatch works this way" are written once in `core/.../Help.kt` and shown by
+  both apps. Update them when a feature changes.

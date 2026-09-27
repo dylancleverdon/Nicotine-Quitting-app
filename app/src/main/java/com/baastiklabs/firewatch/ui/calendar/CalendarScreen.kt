@@ -127,6 +127,7 @@ fun CalendarScreen(data: FirewatchData, now: Long, onOpenDay: (LocalDate) -> Uni
                             isToday = date == today,
                             isFuture = date.isAfter(today),
                             beforeFirstLog = firstLog == null || date.isBefore(firstLog),
+                            isModeDay = !date.isAfter(today) && com.baastiklabs.firewatch.core.engine.Relapse.isModeDay(data, kotlinx.datetime.LocalDate(date.year, date.monthValue, date.dayOfMonth), kotlinx.datetime.TimeZone.currentSystemDefault()),
                             isBaseline = firstLog != null && !date.isBefore(firstLog) && date.isBefore(firstLog.plusDays(Baseline.DAYS.toLong())),
                             pieces = summaries[date]?.pieces ?: 0.0,
                             dark = dark,
@@ -153,6 +154,7 @@ private fun DayCell(
     beforeFirstLog: Boolean,
     isBaseline: Boolean,
     pieces: Double,
+    isModeDay: Boolean = false,
     dark: Boolean,
     modifier: Modifier,
     onClick: () -> Unit,
@@ -167,6 +169,7 @@ private fun DayCell(
     }
     var cell = modifier.aspectRatio(1f).clip(shape).background(background)
     if (isToday) cell = cell.border(2.dp, MaterialTheme.colorScheme.primary, shape)
+    else if (isModeDay && inMonth) cell = cell.border(2.dp, MaterialTheme.colorScheme.tertiary, shape)
     if (inMonth && !isFuture) cell = cell.clickable(onClick = onClick)
     Box(cell, contentAlignment = Alignment.Center) {
         if (inMonth) {
@@ -204,7 +207,7 @@ private fun Legend(dark: Boolean) {
             Text("Heavy", style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(start = 4.dp))
         }
         Text(
-            "Colour = pieces that day: none, up to 1, 3, 5, 8, 12, more. A dot marks your baseline week.",
+            "Colour = pieces that day: none, up to 1, 3, 5, 8, 12, more. A dot marks your baseline week; a ring marks Relapse prevention mode days.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

@@ -13,6 +13,8 @@ export function Home({ toast, go }: { toast: (msg: string, undo?: () => void) =>
   const [vape, setVape] = useState<any>(false)
   const [checkIn, setCheckIn] = useState(false)
   const [celebrate, setCelebrate] = useState<any>(null)
+  const [relapseSheet, setRelapseSheet] = useState(false)
+  const rp = snap.relapse
   const press = useRef<number | null>(null)
   const longFired = useRef(false)
 
@@ -44,7 +46,10 @@ export function Home({ toast, go }: { toast: (msg: string, undo?: () => void) =>
 
   return (
     <main>
-      <h1 class="brand">Firewatch<small>by Baastik Labs</small></h1>
+      <div class="row between"><h1 class="brand">Firewatch<small>by Baastik Labs</small></h1><button class="btn text help-btn" aria-label="Help" onClick={() => go('help')}>?</button></div>
+      {rp.on && <div class="card soft relapse-on"><b>Relapse prevention mode is on</b>
+        <div class="small">{rp.nextAt ? `Next scheduled piece at ${time(rp.nextAt)}` : ''}{rp.productName ? ` · ${rp.productName}` : ''}</div>
+        <div class="muted">Reminders are Android-only for now.</div></div>}
       <div class="card">
         {snap.revealed ? <>
           {(snap.target ?? snap.measured) && <>
@@ -54,13 +59,13 @@ export function Home({ toast, go }: { toast: (msg: string, undo?: () => void) =>
               <div class="muted">Working at {snap.target.label}. Your last 7 days measure {snap.measured.label}.</div>}
           </>}
           {battery && <div>
-            <b>{battery.state === 'CLEAR' ? 'Clear for one if you want it' : battery.state === 'CHARGING' ? `Next piece around ${battery.readyAt ? time(battery.readyAt) : 'later'}` :
+            <b>{rp.on && rp.nextAt ? `Next scheduled piece at ${time(rp.nextAt)}` : battery.state === 'CLEAR' ? 'Clear for one if you want it' : battery.state === 'CHARGING' ? `Next piece around ${battery.readyAt ? time(battery.readyAt) : 'later'}` :
               battery.state === 'FULL_AT_WAKE' ? 'Full when you wake up' : battery.state === 'MORNING_DELAY' ? `First piece goal: ${battery.readyAt ? time(battery.readyAt) : ''}` :
               battery.state === 'WIND_DOWN' ? 'Winding down for bed' : 'Sleeping hours · Fresh start when you wake up'}</b>
             <Meter value={battery.charge} />
             {battery.fitsNow && <div class="small muted">A {battery.fitsNow} fits now</div>}
-            <div class="small stretch" style={{ color: battery.stretchMin - battery.pullMin >= 0 ? 'var(--tertiary)' : 'var(--muted)' }}>
-              Stretch {duration(battery.stretchMin * 60000)} · Pull {duration(battery.pullMin * 60000)} · Net {signedDuration(battery.stretchMin - battery.pullMin)}</div>
+            {!rp.on && <div class="small stretch" style={{ color: battery.stretchMin - battery.pullMin >= 0 ? 'var(--tertiary)' : 'var(--muted)' }}>
+              Stretch {duration(battery.stretchMin * 60000)} · Pull {duration(battery.pullMin * 60000)} · Net {signedDuration(battery.stretchMin - battery.pullMin)}</div>}
           </div>}
         </> : <>
           <div class="label">{snap.baselineState === 'progress' ? `Baseline week · day ${snap.baselineDay} of 7` : 'Baseline week'}</div>
@@ -79,6 +84,7 @@ export function Home({ toast, go }: { toast: (msg: string, undo?: () => void) =>
           {snap.qualityLabel && <div class="stat small"><b>{snap.qualityLabel.split(' · ')[0].split(' ')[0]} {Math.round(snap.qualityScore!)}</b><span>quality</span></div>}
         </div>
         {snap.revealed && snap.wave.length > 2 && <Wave points={snap.wave} height={64} now={Date.now()} shade={[[snap.wave[0][0], snap.wakeAt], [snap.sleepAt, snap.wave[snap.wave.length - 1][0]]]} />}
+        {snap.revealed && snap.wave.length > 2 && <div class="now-mg"><b>≈ {snap.nowMg.toFixed(1)} mg</b> in your system now</div>}
       </div>
 
       {snap.revealed && !snap.target && snap.measured && <div class="card accent">
@@ -97,6 +103,18 @@ export function Home({ toast, go }: { toast: (msg: string, undo?: () => void) =>
         <div class="small">Stepping up to {snap.stepUp.label} for a while is normal and keeps you on gum rather than something worse.</div>
         <div class="row"><button class="btn" onClick={() => moveTarget(snap.stepUp!.pieces, 'up')}>Step up</button>
           <button class="btn outline" onClick={() => S.updateSettings({ stepUpSnoozedAt: Date.now() })}>I'm OK</button></div>
+      </div>}
+      {rp.recommend && <div class="card accent">
+        <h2>Try Relapse prevention mode?</h2>
+        <div class="small">{rp.recommend} Chewing on a steady schedule early on keeps you ahead of cravings.</div>
+        <div class="row"><button class="btn" onClick={() => setRelapseSheet(true)}>Tell me more</button>
+          <button class="btn outline" onClick={() => S.updateSettings({ relapseCardDismissedAt: Date.now() })}>Not now</button></div>
+      </div>}
+      {rp.movingOn && <div class="card accent">
+        <h2>You've been steady for 4 weeks</h2>
+        <div class="small">Ready to switch to tapering? Relapse prevention mode turns off, and Firewatch helps you step down at your own pace.</div>
+        <div class="row"><button class="btn" onClick={async () => { await S.setRelapse(false); toast('Relapse prevention mode is off. On to tapering.') }}>Switch to tapering</button>
+          <button class="btn outline" onClick={() => S.updateSettings({ movingOnDismissedAt: Date.now() })}>Not yet</button></div>
       </div>}
       {snap.headsUps.length > 0 && <div class="card soft"><b>Heads-up</b>{snap.headsUps.map((h) => <div class="small">{h}</div>)}</div>}
       {snap.swapTip && <div class="muted">{snap.swapTip}</div>}
@@ -140,6 +158,7 @@ export function Home({ toast, go }: { toast: (msg: string, undo?: () => void) =>
           <div>{d.name}<br /><span>{doseLine(d)}</span></div><b>{piecesLabel(d.pieces)}</b>
         </div>
       ))}</div>
+      <button class="btn outline" onClick={() => setRelapseSheet(true)}>{rp.on ? 'Relapse prevention mode: on' : 'Relapse prevention mode'}</button>
       <div class="muted">≈ All nicotine figures are estimates. Their real value is comparing your own numbers over time.</div>
 
       {options && <DoseSheet product={options} onClose={() => setOptions(null)} onLog={(at, opts) => { setOptions(null); logProduct(options, at, opts) }} />}
@@ -154,6 +173,17 @@ export function Home({ toast, go }: { toast: (msg: string, undo?: () => void) =>
         } else if (vape !== true) dose.productId = vape.id
         await S.save('dose', dose); toast('Logged as a range', () => S.remove(dose.id))
       }} />}
+      {relapseSheet && <div class="sheet-bg" onClick={() => setRelapseSheet(false)}><div class="sheet" onClick={(e) => e.stopPropagation()}>
+        <h2>Relapse prevention mode</h2>
+        <div class="small"><b>What it is:</b> a reminder to chew a piece at a steady gap: your tier's gap, or every 2 hours before you have a tier.</div>
+        <div class="small"><b>Why:</b> early on, staying ahead of cravings makes going back to smoking or vaping much less likely. It sounds backwards for an app about cutting down, and that's intentional for now. Your tiers and figures stay just as honest.</div>
+        <div class="small"><b>Turning it off:</b> this same button, any time.</div>
+        <div class="muted">On the web app, reminders are Android-only for now; the "Next scheduled piece" time still shows here.</div>
+        {rp.on ? <div class="row"><button class="btn" onClick={async () => { setRelapseSheet(false); await S.setRelapse(false); toast('Relapse prevention mode turned off') }}>Turn off</button>
+          <button class="btn outline" onClick={() => setRelapseSheet(false)}>Keep it on</button></div>
+          : <div class="row"><button class="btn" onClick={async () => { setRelapseSheet(false); await S.setRelapse(true); toast('Relapse prevention mode turned on') }}>Turn on</button>
+          <button class="btn outline" onClick={() => { setRelapseSheet(false); if (rp.recommend) S.updateSettings({ relapseCardDismissedAt: Date.now() }) }}>Not now</button></div>}
+      </div></div>}
       {checkIn && <CheckInSheet onClose={() => setCheckIn(false)} onSave={(c, m, s) => { setCheckIn(false); S.save('checkin', { id: Core.newId(), at: Date.now(), craving: c, mood: m, sleep: s }) }} />}
       {celebrate && <div class="sheet-bg" onClick={() => setCelebrate(null)}><div class="sheet" style={{ textAlign: 'center' }}>
         <div style={{ fontSize: 48 }}>🔥</div><h2>New rung: {celebrate.tier}</h2>

@@ -164,7 +164,7 @@ private fun StretchSection(ins: Insights) = Col {
     }
     ChartCard(
         "Stretch & pull",
-        "Stretch: time you held off after the battery was full. Pull: how early a piece came before it was full. " +
+        "Stretch: time you held off after the battery was full. Pull: nicotine that came before the battery had room for it. " +
             "Net = stretch − pull; positive means you're living below your target pace. Every day starts clean.",
     ) {
         Text("Stretch (teal) and pull (grey), hours a day", style = MaterialTheme.typography.labelMedium)
@@ -173,7 +173,7 @@ private fun StretchSection(ins: Insights) = Col {
         Text("Net, hours a day", style = MaterialTheme.typography.labelMedium)
         BarChart(days.map { Bar(kotlin.math.max(0.0, it.netMin / 60), color = if (it.netMin >= 0) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.outline) },
             height = 90.dp)
-        val week = days.filter { it.date < ins.today }.takeLast(7)
+        val week = days.filter { it.date < ins.today }.takeLast(7).filter { !it.paused }
         if (week.isNotEmpty()) {
             fun hm(m: Double) = Fmt.duration((kotlin.math.abs(m) * 60_000).toLong())
             val net = week.map { it.netMin }.average()
@@ -184,6 +184,12 @@ private fun StretchSection(ins: Insights) = Col {
             }
         }
         ins.stretchSummary()?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
+        val paused = days.count { it.paused }
+        if (paused > 0) Text(
+            "$paused ${if (paused == 1) "day" else "days"} in Relapse prevention mode: stretch and pull paused.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 

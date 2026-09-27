@@ -3,6 +3,9 @@ import { expect, test } from '@playwright/test'
 // Onboarding with a back-dated week -> starting tier offered -> log a dose -> reload keeps it -> export.
 test('back-dated start, logging and persistence', async ({ page }) => {
   await page.goto('./')
+  // Welcome tour first (skippable).
+  await expect(page.getByText('What Firewatch does')).toBeVisible()
+  await page.getByRole('button', { name: 'Skip' }).click()
   await expect(page.getByText('by Baastik Labs').first()).toBeVisible()
   for (let i = 0; i < 3; i++) await page.getByRole('button', { name: 'Next' }).click()
   await page.getByText('Estimate my last week').click()
@@ -27,6 +30,19 @@ test('back-dated start, logging and persistence', async ({ page }) => {
   await page.locator('.product', { hasText: 'Nicotine gum 4 mg' }).click()
   await expect(page.getByText('Logged Nicotine gum 4 mg')).toBeVisible()
   await expect(page.locator('.list .item')).toHaveCount(1)
+  await expect(page.getByText('in your system now')).toBeVisible()
+
+  // Relapse prevention mode: on, indicator, next scheduled piece, off.
+  await page.getByRole('button', { name: 'Relapse prevention mode', exact: true }).click()
+  await page.getByRole('button', { name: 'Turn on' }).click()
+  await expect(page.getByText('Relapse prevention mode is on')).toBeVisible()
+  await expect(page.getByText(/Next scheduled piece at/).first()).toBeVisible()
+
+  // Help is searchable.
+  await page.getByRole('button', { name: 'Help' }).click()
+  await page.getByPlaceholder('Search help').fill('friend')
+  await expect(page.getByText("Log a friend's vape")).toBeVisible()
+  await page.getByRole('button', { name: 'Log' }).click()
 
   // Survives a reload (IndexedDB).
   await page.reload()

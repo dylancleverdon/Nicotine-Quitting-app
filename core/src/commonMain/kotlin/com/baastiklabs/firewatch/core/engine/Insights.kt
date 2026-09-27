@@ -343,8 +343,10 @@ class Insights(private val data: FirewatchData, private val tz: TimeZone, privat
 
     /** Plain-language summary of the last 7 days (full days only). */
     fun stretchSummary(): String? {
-        val week = stretchPull.filter { it.date < today }.takeLast(7)
-        if (week.isEmpty()) return null
+        val all = stretchPull.filter { it.date < today }.takeLast(7)
+        if (all.isEmpty()) return null
+        val week = all.filter { !it.paused }
+        if (week.isEmpty()) return "Stretch and pull are paused on Relapse prevention mode days: waiting longer isn't the goal right now."
         val s = week.map { it.stretchMin }.average()
         val n = week.map { it.netMin }.average()
         fun hm(m: Double): String { val t = kotlin.math.abs(m).toInt(); return if (t >= 60) "${t / 60}h ${t % 60}m" else "${t}m" }

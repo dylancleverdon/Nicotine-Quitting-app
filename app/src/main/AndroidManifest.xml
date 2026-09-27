@@ -8,6 +8,8 @@
     <uses-permission android:name="android.permission.UPDATE_PACKAGES_WITHOUT_USER_ACTION" />
     <!-- Only used when an update needs a tap (older Android, or permission missing). -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Relapse prevention mode: re-arm its reminder after a restart. -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <!-- Optional watch overlay (Health Connect). Only asked for if D turns it on. -->
     <uses-permission android:name="android.permission.health.READ_RESTING_HEART_RATE" />
     <uses-permission android:name="android.permission.health.READ_SLEEP" />
@@ -87,6 +89,14 @@
             android:exported="false">
             <intent-filter>
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+
+        <receiver
+            android:name=".reminders.RelapseReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
             </intent-filter>
         </receiver>
     </application>

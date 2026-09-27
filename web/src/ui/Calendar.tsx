@@ -20,6 +20,7 @@ export function Calendar() {
   const shift = (n: number) => { const d = new Date(y, m - 1 + n, 1); setMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`) }
 
   if (open) return <DayView iso={open} back={() => setOpen(null)} />
+  const modeDays = new Set(S.snapshot.value!.relapse.modeDays)
   return (
     <main>
       <div class="row"><button class="btn text" onClick={() => shift(-1)}>‹</button>
@@ -31,11 +32,11 @@ export function Calendar() {
         const key = iso(d), day = byDate.get(key)
         const tracked = first && key >= first && key <= today
         const base = first && key >= first && (new Date(key).getTime() - new Date(first).getTime()) / 864e5 < 7
-        return <div class={`${key === today ? 'today' : ''} ${base ? 'base' : ''}`} style={{ background: tracked ? heat[day?.level ?? 0] : 'var(--surface)', opacity: day?.estimated ? 0.7 : 1, color: key > today ? 'var(--line)' : undefined }}
+        return <div class={`${key === today ? 'today' : ''} ${base ? 'base' : ''} ${modeDays.has(key) ? 'mode' : ''}`} style={{ background: tracked ? heat[day?.level ?? 0] : 'var(--surface)', opacity: day?.estimated ? 0.7 : 1, color: key > today ? 'var(--line)' : undefined }}
           onClick={() => key <= today && setOpen(key)}>{d}</div>
       })}</div>
       <div class="row small">Clear {heat.map((c) => <span style={{ width: 16, height: 16, background: c, borderRadius: 4, display: 'inline-block' }} />)} Heavy</div>
-      <div class="muted">Colour = pieces that day: none, up to 1, 3, 5, 8, 12, more. A dot marks your baseline week; faded days are estimates.</div>
+      <div class="muted">Colour = pieces that day: none, up to 1, 3, 5, 8, 12, more. A dot marks your baseline week; faded days are estimates; a ring marks Relapse prevention mode days.</div>
     </main>
   )
 }

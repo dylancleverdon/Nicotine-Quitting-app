@@ -5,6 +5,7 @@ import com.baastiklabs.firewatch.core.model.CheckIn
 import com.baastiklabs.firewatch.core.model.Craving
 import com.baastiklabs.firewatch.core.model.DefaultProducts
 import com.baastiklabs.firewatch.core.model.Dose
+import com.baastiklabs.firewatch.core.model.ModeChange
 import com.baastiklabs.firewatch.core.model.Product
 import com.baastiklabs.firewatch.core.model.RungChange
 import com.baastiklabs.firewatch.core.model.Settings
@@ -39,6 +40,7 @@ object RecordTypes {
     const val SETTINGS = "settings"
     const val RUNG = "rung"
     const val CHECKIN = "checkin"
+    const val MODE = "mode"
 
     const val SETTINGS_ID = "settings"
 }
@@ -92,6 +94,9 @@ object RecordCodec {
     fun checkIn(c: CheckIn, previousJson: String?, now: Long, deleted: Boolean = false) =
         encode(RecordTypes.CHECKIN, c.id, c.at, c, CheckIn.serializer(), previousJson, now, deleted)
 
+    fun mode(m: ModeChange, previousJson: String?, now: Long, deleted: Boolean = false) =
+        encode(RecordTypes.MODE, m.id, m.at, m, ModeChange.serializer(), previousJson, now, deleted)
+
     fun settings(s: Settings, previousJson: String?, now: Long) =
         encode(RecordTypes.SETTINGS, RecordTypes.SETTINGS_ID, null, s, Settings.serializer(), previousJson, now)
 }
@@ -105,7 +110,11 @@ data class FirewatchData(
     val settings: Settings = Settings(),
     val rungChanges: List<RungChange> = emptyList(),
     val checkIns: List<CheckIn> = emptyList(),
+    val modeChanges: List<ModeChange> = emptyList(),
 ) {
+    /** Relapse prevention mode is on right now. */
+    val relapseOn: Boolean get() = modeChanges.lastOrNull { it.mode == "relapse" }?.on == true
+
     /** The rung D is working at (pieces a day), or null before one is chosen. */
     val targetPieces: Double? get() = rungChanges.lastOrNull()?.pieces
 
@@ -138,6 +147,7 @@ data class FirewatchData(
                 settings = settings,
                 rungChanges = decodeAll(RecordTypes.RUNG, RungChange.serializer()).sortedBy { it.at },
                 checkIns = decodeAll(RecordTypes.CHECKIN, CheckIn.serializer()).sortedBy { it.at },
+                modeChanges = decodeAll(RecordTypes.MODE, ModeChange.serializer()).sortedBy { it.at },
             )
         }
     }

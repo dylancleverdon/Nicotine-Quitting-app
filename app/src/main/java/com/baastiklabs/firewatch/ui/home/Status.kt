@@ -47,6 +47,8 @@ fun TierStatusCard(
     sleepShade: List<Pair<Long, Long>>,
     quality: Double?,
     fitsNow: String? = null,
+    nowDoses: List<com.baastiklabs.firewatch.core.model.Dose> = emptyList(),
+    relapseNext: Long? = null,
 ) {
     Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
@@ -73,7 +75,7 @@ fun TierStatusCard(
                     Text("Next rung down: ${next.label}", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
-            battery?.let { BatteryRow(it, now, fitsNow) }
+            battery?.let { BatteryRow(it, now, fitsNow, relapseNext) }
             Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
                 Stat("≈ ${Fmt.pieces(today.pieces)}", "pieces today", big = true)
                 Stat("≈ ${Fmt.mg(today.absorbedMg)}", "absorbed today", big = true)
@@ -90,14 +92,20 @@ fun TierStatusCard(
             if (wave.size > 2) {
                 WaveChart(wave, shaded = sleepShade, now = now, height = 64.dp, compact = true)
                 Text("Estimated nicotine in your system today", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                val inBody = remember(wave, now) { com.baastiklabs.firewatch.core.engine.Kinetics.level(nowDoses, now) }
+                Text(
+                    "≈ ${Fmt.mg(inBody)} in your system now",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                )
             }
         }
     }
 }
 
 @Composable
-private fun BatteryRow(b: Battery, now: Long, fitsNow: String?) {
-    val (title, detail) = when (b.state) {
+private fun BatteryRow(b: Battery, now: Long, fitsNow: String?, relapseNext: Long?) {
+    val (title, detail) = if (relapseNext != null) "Next scheduled piece at ${Fmt.time(relapseNext)}" to "Relapse prevention mode: staying ahead of cravings" else when (b.state) {
         BatteryState.CLEAR -> "Clear for one if you want it" to "No rush. Every minute you wait counts as stretch."
         BatteryState.CHARGING -> "Next piece around ${b.readyAt?.let { Fmt.time(it) } ?: "later"}" to
             "${b.readyAt?.let { Fmt.duration(it - now) } ?: ""} to go at your target pace"
@@ -111,7 +119,7 @@ private fun BatteryRow(b: Battery, now: Long, fitsNow: String?) {
         LinearProgressIndicator(progress = { b.charge.coerceIn(0.0, 1.0).toFloat() }, modifier = Modifier.fillMaxWidth())
         Text(detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         fitsNow?.let { Text("A $it fits now", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-        StretchLine(b.stretchMinutesToday, b.pullMinutesToday)
+        if (relapseNext == null) StretchLine(b.stretchMinutesToday, b.pullMinutesToday)
     }
 }
 

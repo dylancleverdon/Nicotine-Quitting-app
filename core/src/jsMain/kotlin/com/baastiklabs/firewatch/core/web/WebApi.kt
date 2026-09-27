@@ -45,7 +45,13 @@ external object JsJodaTimeZoneModule
 
 @Serializable data class RungDto(val pieces: Double, val tier: String, val label: String, val plain: String)
 @Serializable data class BatteryDto(val charge: Double, val state: String, val readyAt: Double?, val stretchMin: Double, val pullMin: Double, val fitsNow: String? = null)
-@Serializable data class StretchDay(val date: String, val stretchMin: Double, val pullMin: Double)
+@Serializable data class StretchDay(val date: String, val stretchMin: Double, val pullMin: Double, val paused: Boolean = false)
+@Serializable data class RelapseDto(
+    val on: Boolean, val nextAt: Double?, val gapMin: Double, val productId: String?, val productName: String?,
+    /** Why the "try Relapse prevention mode" card shows (null = hidden). */
+    val recommend: String?, val movingOn: Boolean, val modeDays: List<String>,
+)
+@Serializable data class HelpDto(val tour: List<com.baastiklabs.firewatch.core.Help.Page>, val why: List<com.baastiklabs.firewatch.core.Help.Page>, val articles: List<com.baastiklabs.firewatch.core.Help.Article>)
 @Serializable data class DoseView(val id: String, val at: Double, val name: String, val pieces: Double, val mg: Double, val estimated: Boolean, val tags: List<String>, val kind: String)
 @Serializable data class CravingView(val id: String, val at: Double, val intensity: Int, val name: String, val outcome: String, val endedAt: Double?, val tags: List<String>)
 @Serializable data class DayView(
@@ -90,6 +96,9 @@ external object JsJodaTimeZoneModule
     val tiers: List<NamedValue>,
     val stretchDays: List<StretchDay>,
     val stretchSummary: String?,
+    val relapse: RelapseDto,
+    /** Estimated nicotine in the body right now, mg (the home graph's value at "now"). */
+    val nowMg: Double,
 )
 @Serializable data class InsightsDto(
     val avoidedPieces: Double, val avoidedMg: Double, val money: Double, val winRate: Double?, val cravingMinutes: Double?,
@@ -267,8 +276,18 @@ object FirewatchCore {
             insights = insights,
             ladder = (Ladder.rungs + Ladder.clearAir).map { it.dto() },
             tiers = Tier.entries.map { NamedValue(it.title, 0.0, it.pace) },
-            stretchDays = ins.stretchPull.map { StretchDay(it.date.toString(), it.stretchMin, it.pullMin) },
+            stretchDays = ins.stretchPull.map { StretchDay(it.date.toString(), it.stretchMin, it.pullMin, it.paused) },
             stretchSummary = ins.stretchSummary(),
+            relapse = com.baastiklabs.firewatch.core.engine.Relapse.let { r ->
+                val p = r.product(d)
+                RelapseDto(
+                    on = d.relapseOn, nextAt = r.nextAt(d, now, tz)?.toDouble(), gapMin = r.gapMinutes(d, now),
+                    productId = p?.id, productName = p?.name,
+                    recommend = r.recommendation(d, now, tz)?.let { r.reasonText(it) }, movingOn = r.movingOn(d, now),
+                    modeDays = ins.days.filter { r.isModeDay(d, it.date, tz) }.map { it.date.toString() },
+                )
+            },
+            nowMg = com.baastiklabs.firewatch.core.engine.Kinetics.level(d.doses, now),
         )
         return FirewatchJson.encodeToString(Snapshot.serializer(), snapshot)
     }
@@ -295,6 +314,12 @@ object FirewatchCore {
         val dose = d.doses.firstOrNull { it.id == doseId } ?: return false
         return com.baastiklabs.firewatch.core.engine.BatteryEngine.waitedForFull(d, dose, TimeZone.currentSystemDefault())
     }
+
+    /** Help articles, the welcome tour and "Why Firewatch works this way" (shared with Android). */
+    fun help(): String = FirewatchJson.encodeToString(
+        HelpDto.serializer(),
+        HelpDto(com.baastiklabs.firewatch.core.Help.tour, com.baastiklabs.firewatch.core.Help.why, com.baastiklabs.firewatch.core.Help.articles),
+    )
 
     fun encodeElement(json: String): String = FirewatchJson.parseToJsonElement(json).toString()
 

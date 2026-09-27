@@ -5,7 +5,8 @@ import { dayTitle, isoToday } from './format'
 
 export function Onboarding() {
   const [step, setStep] = useState(0)
-  const [backfill, setBackfill] = useState(false)
+  const [choice, setChoice] = useState<'baseline' | 'backfill' | 'gum'>('baseline')
+  const backfill = choice === 'backfill'
   const [filling, setFilling] = useState(false)
   const s = S.settings.value
   const finish = () => S.updateSettings({ onboardingDone: true })
@@ -32,13 +33,14 @@ export function Onboarding() {
       </>}
       {step === 3 && <>
         <h2>How do you want to start?</h2>
-        {[[false, 'Establish a baseline', 'Just log as usual for 7 days. Your tier appears on day 8.'], [true, 'Estimate my last week', 'Go through the last 7 days and tap roughly what you used each day. No times needed. Your tier shows up straight away.']].map(([v, t, b]) =>
-          <div class={`card ${backfill === v ? 'accent' : 'soft'}`} onClick={() => setBackfill(v as boolean)} style={{ cursor: 'pointer' }}><b>{t}</b><div class="small">{b}</div></div>)}
+        {[['baseline', 'Establish a baseline', 'Just log as usual for 7 days. Your tier appears on day 8.'], ['backfill', 'Estimate my last week', 'Go through the last 7 days and tap roughly what you used each day. No times needed. Your tier shows up straight away.'],
+          ['gum', "I'm just starting gum and want help sticking to it", 'Turns on Relapse prevention mode: a reminder to chew every 2 hours, to stay ahead of cravings (reminders are Android-only for now). Firewatch still measures your use, so tiers are ready when you are.']].map(([v, t, b]) =>
+          <div class={`card ${choice === v ? 'accent' : 'soft'}`} onClick={() => setChoice(v as any)} style={{ cursor: 'pointer' }}><b>{t}</b><div class="small">{b}</div></div>)}
       </>}
       <div class="row" style={{ marginTop: 'auto' }}>
         {step > 0 && <button class="btn text" onClick={() => setStep(step - 1)}>Back</button>}
         <span class="grow" />
-        <button class="btn" onClick={() => (step < 3 ? setStep(step + 1) : backfill ? setFilling(true) : finish())}>{step < 3 ? 'Next' : backfill ? 'Estimate my week' : 'Start'}</button>
+        <button class="btn" onClick={async () => { if (step < 3) setStep(step + 1); else if (backfill) setFilling(true); else { if (choice === 'gum') await S.startGum(); finish() } }}>{step < 3 ? 'Next' : backfill ? 'Estimate my week' : 'Start'}</button>
       </div>
     </main>
   )

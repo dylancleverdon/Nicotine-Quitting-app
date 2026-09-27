@@ -40,6 +40,7 @@ import com.baastiklabs.firewatch.ui.products.ProductsScreen
 import com.baastiklabs.firewatch.ui.settings.AboutScreen
 import com.baastiklabs.firewatch.ui.settings.SettingsScreen
 import java.time.LocalDate
+import kotlinx.coroutines.launch
 
 private data class Tab(val route: String, val label: String, val icon: ImageVector)
 
@@ -61,6 +62,20 @@ fun FirewatchRoot(vm: FirewatchViewModel) {
         Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background))
         return
     }
+    var preRoute by rememberSaveable { mutableStateOf<String?>(null) }
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    if (!data.settings.tourSeen || preRoute != null) {
+        if (preRoute == "why") {
+            BackHandler { preRoute = null }
+            com.baastiklabs.firewatch.ui.help.WhyScreen(onBack = { preRoute = null })
+        } else {
+            com.baastiklabs.firewatch.ui.help.TourScreen(
+                onDone = { scope.launch { vm.repository.updateSettings { it.copy(tourSeen = true) } } },
+                onWhy = { preRoute = "why" },
+            )
+        }
+        return
+    }
     if (!data.settings.onboardingDone) {
         OnboardingScreen(vm, data)
         return
@@ -76,6 +91,8 @@ fun FirewatchRoot(vm: FirewatchViewModel) {
         route = when {
             route.startsWith("day/") -> "calendar"
             route == "backfill" -> "home"
+            route == "why" || route == "tour" -> "help"
+            route == "help" -> "home"
             else -> "settings"
         }
     }
@@ -102,7 +119,10 @@ fun FirewatchRoot(vm: FirewatchViewModel) {
     ) { padding ->
         Box(Modifier.padding(padding).fillMaxSize()) {
             when {
-                route == "home" -> HomeScreen(vm, data, now, snackbar, onBackfill = { route = "backfill" })
+                route == "home" -> HomeScreen(vm, data, now, snackbar, onBackfill = { route = "backfill" }, onHelp = { route = "help" })
+                route == "help" -> com.baastiklabs.firewatch.ui.help.HelpScreen(onBack = { route = "home" }, onTour = { route = "tour" }, onWhy = { route = "why" })
+                route == "why" -> com.baastiklabs.firewatch.ui.help.WhyScreen(onBack = { route = "help" })
+                route == "tour" -> com.baastiklabs.firewatch.ui.help.TourScreen(onDone = { route = "help" }, onWhy = { route = "why" })
                 route == "backfill" -> com.baastiklabs.firewatch.ui.onboarding.BackfillScreen(
                     vm, data, onDone = { route = "home" }, onCancel = { route = "home" },
                 )
@@ -119,6 +139,7 @@ fun FirewatchRoot(vm: FirewatchViewModel) {
                     onOpenProducts = { route = "products" },
                     onOpenAbout = { route = "about" },
                     onBackfill = { route = "backfill" },
+                    onOpenHelp = { route = "help" },
                 )
                 route.startsWith("day/") -> DayScreen(
                     vm = vm,

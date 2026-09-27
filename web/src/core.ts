@@ -5,7 +5,10 @@ const core = FirewatchCore.getInstance()
 
 export interface Rung { pieces: number; tier: string; label: string; plain: string }
 export interface Battery { charge: number; state: 'CLEAR' | 'CHARGING' | 'FULL_AT_WAKE' | 'MORNING_DELAY' | 'WIND_DOWN' | 'ASLEEP'; readyAt: number | null; stretchMin: number; pullMin: number; fitsNow?: string | null }
-export interface StretchDay { date: string; stretchMin: number; pullMin: number }
+export interface StretchDay { date: string; stretchMin: number; pullMin: number; paused?: boolean }
+export interface Relapse { on: boolean; nextAt: number | null; gapMin: number; productId: string | null; productName: string | null; recommend: string | null; movingOn: boolean; modeDays: string[] }
+export interface HelpPage { title: string; body: string }
+export interface HelpArticle { id: string; section: string; title: string; body: string }
 export interface DoseView { id: string; at: number; name: string; pieces: number; mg: number; estimated: boolean; tags: string[]; kind: string }
 export interface CravingView { id: string; at: number; intensity: number; name: string; outcome: string; endedAt: number | null; tags: string[] }
 export interface DayView {
@@ -34,9 +37,11 @@ export interface Snapshot {
   todayDoses: DoseView[]; todayCravingList: CravingView[]; wave: number[][]; wakeAt: number; sleepAt: number; typical: number[]
   days: DayView[]; sevenDayAverage: number[]; insights: InsightsData; ladder: Rung[]; tiers: NamedValue[]
   stretchDays: StretchDay[]; stretchSummary: string | null
+  relapse: Relapse; nowMg: number
 }
 
 export const Core = {
+  help: (): { tour: HelpPage[]; why: HelpPage[]; articles: HelpArticle[] } => JSON.parse(core.help()),
   defaultProducts: (): any[] => JSON.parse(core.defaultProducts()),
   cravingScale: (): NamedValue[] => JSON.parse(core.cravingScale()),
   newId: (): string => core.newId(Date.now()),

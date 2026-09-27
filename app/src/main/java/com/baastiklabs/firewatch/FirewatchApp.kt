@@ -36,6 +36,7 @@ class FirewatchApp : Application() {
             pending = graph.appScope.launch {
                 kotlinx.coroutines.delay(400)
                 com.baastiklabs.firewatch.widget.refreshWidgets(this@FirewatchApp)
+                runCatching { com.baastiklabs.firewatch.reminders.RelapseReminders.sync(this@FirewatchApp, graph.repository.data.value) }
             }
         }
         registerActivityLifecycleCallbacks(ForegroundTracker())
@@ -47,6 +48,7 @@ class FirewatchApp : Application() {
             runCatching {
                 graph.repository.ensureLoaded()
                 com.baastiklabs.firewatch.reminders.Reminders.sync(this@FirewatchApp, graph.repository.data.value.settings)
+                com.baastiklabs.firewatch.reminders.RelapseReminders.sync(this@FirewatchApp, graph.repository.data.value)
                 BackupStore.dailyIfDue(this@FirewatchApp, graph.repository)
             }
         }

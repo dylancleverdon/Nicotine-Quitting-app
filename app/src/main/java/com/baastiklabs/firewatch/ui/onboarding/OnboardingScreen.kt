@@ -64,7 +64,19 @@ private const val STEPS = 5
 fun OnboardingScreen(vm: FirewatchViewModel, data: FirewatchData) {
     val scope = rememberCoroutineScope()
     var step by rememberSaveable { mutableIntStateOf(0) }
-    var backfill by rememberSaveable { mutableStateOf(false) }
+    var choice by rememberSaveable { mutableStateOf("baseline") }
+    val backfill = choice == "backfill"
+    val startGum = {
+        scope.launch {
+            vm.repository.startGum()
+            vm.updateState.lastSeenVersion = BuildConfig.VERSION_NAME
+            vm.repository.updateSettings { it.copy(onboardingDone = true) }
+        }
+        Unit
+    }
+    val notifyPermission = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestPermission(),
+    ) { startGum() }
     var backfilling by rememberSaveable { mutableStateOf(false) }
 
     fun finish() {
@@ -93,7 +105,7 @@ fun OnboardingScreen(vm: FirewatchViewModel, data: FirewatchData) {
                     1 -> UpdatesStep()
                     2 -> ScheduleStep(vm, data)
                     3 -> ProductsStep(vm, data)
-                    else -> StartStep(backfill) { backfill = it }
+                    else -> StartStep(choice) { choice = it }
                 }
             }
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -106,6 +118,8 @@ fun OnboardingScreen(vm: FirewatchViewModel, data: FirewatchData) {
                         step++
                     } else if (backfill) {
                         backfilling = true
+                    } else if (choice == "gum") {
+                        if (android.os.Build.VERSION.SDK_INT >= 33) notifyPermission.launch(android.Manifest.permission.POST_NOTIFICATIONS) else startGum()
                     } else {
                         finish()
                     }
@@ -116,23 +130,29 @@ fun OnboardingScreen(vm: FirewatchViewModel, data: FirewatchData) {
 }
 
 @Composable
-private fun StartStep(backfill: Boolean, onChoose: (Boolean) -> Unit) {
+private fun StartStep(choice: String, onChoose: (String) -> Unit) {
     Text("How do you want to start?", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
     Text(
         "Firewatch needs about a week of history to work out your starting tier.",
         style = MaterialTheme.typography.bodyLarge,
     )
     ChoiceCard(
-        selected = !backfill,
+        selected = choice == "baseline",
         title = "Establish a baseline",
         body = "Just log as usual for 7 days. Most accurate; your tier appears on day 8.",
-        onClick = { onChoose(false) },
+        onClick = { onChoose("baseline") },
     )
     ChoiceCard(
-        selected = backfill,
+        selected = choice == "backfill",
         title = "Estimate my last week",
         body = "Go through the last 7 days one at a time and tap roughly what you used each day. No times needed. Your starting tier shows up straight away.",
-        onClick = { onChoose(true) },
+        onClick = { onChoose("backfill") },
+    )
+    ChoiceCard(
+        selected = choice == "gum",
+        title = "I'm just starting gum and want help sticking to it",
+        body = "Turns on Relapse prevention mode: a reminder to chew every 2 hours, to stay ahead of cravings. Firewatch still measures your use, so tiers are ready when you are.",
+        onClick = { onChoose("gum") },
     )
 }
 

@@ -107,7 +107,7 @@ The app tells D when the next piece is recommended, using a battery that recharg
 
 ### Ground rules
 
-1. The app answers when asked; it doesn't invite. No "time for your next piece!" notifications by default, because a ping saying nicotine is allowed is itself a craving trigger. Any notifications are opt-in and neutral.
+1. The app answers when asked; it doesn't invite. No "time for your next piece!" notifications by default, because a ping saying nicotine is allowed is itself a craving trigger. Any notifications are opt-in and neutral. The one exception is the opt-in Relapse prevention mode (see `docs/proposals/relapse-prevention-and-help.md`): reminders to chew at the tier's gap, for people new to gum who most need to stay ahead of cravings.
 2. It never recommends a pace faster than D is actually using.
 3. Using early just moves the next window. No red screens, no scolding and no streaks that reset. Progress shows as counts and personal bests.
 
