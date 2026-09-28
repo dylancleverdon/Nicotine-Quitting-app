@@ -1,5 +1,8 @@
 # Firewatch web changelog
 
+## 0.8.1 · 2026-09-28
+- Each product button now shows how much logging it now adds to stretch or pull, right under its name. It shows even when the next-piece timer is hidden.
+
 ## 0.8.0 · 2026-09-28
 - The next-piece timer is now simply "one gap after your last piece", whatever you took. Dose size now shows up where it belongs, in stretch and pull: smaller doses add stretch, bigger ones add pull. Past days are recalculated this way, so their net may shift a little. Your logs don't change.
 - Each product now shows what it would do to your net before you log it (e.g. "+38m pull").

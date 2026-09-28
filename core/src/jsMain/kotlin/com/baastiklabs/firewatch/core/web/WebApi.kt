@@ -302,7 +302,7 @@ object FirewatchCore {
             stepUpSameDay = stepUpFull?.sameDay ?: false,
             cravingEndings = ins.cravingEndings().entries.sortedBy { it.key.ordinal }.map { NamedValue(it.key.title, it.value.toDouble(), if (it.key.win) "win" else "") },
             checks = com.baastiklabs.firewatch.core.engine.Checks.history(d, today, tz, 42).map { NamedValue(it.date.toString(), it.total.toDouble(), it.charging.toString()) },
-            previews = if (target != null && !d.settings.hideTimer) d.homeProducts.mapNotNull { p ->
+            previews = if (target != null) d.homeProducts.mapNotNull { p ->
                 com.baastiklabs.firewatch.core.engine.BatteryEngine.preview(d, p, if (target.pieces > 0) target.pieces else 1.0 / 3.0, now, tz, lastActivityMs.toLong())?.let { p.id to it }
             }.toMap() else emptyMap(),
             steadyDays = steady,

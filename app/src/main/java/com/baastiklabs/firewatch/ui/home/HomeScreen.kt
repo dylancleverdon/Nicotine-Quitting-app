@@ -139,7 +139,7 @@ fun HomeScreen(
     val practiceFollowUp = remember(data, minute) { com.baastiklabs.firewatch.core.engine.Control.practiceFollowUp(data, now, tz) }
     val previews = remember(data, minute) {
         val t = target?.pieces
-        if (t == null || data.settings.hideTimer) emptyMap()
+        if (t == null) emptyMap()
         else data.homeProducts.mapNotNull { p ->
             com.baastiklabs.firewatch.core.engine.BatteryEngine.preview(data, p, if (t > 0) t else 1.0 / 3.0, now, tz, com.baastiklabs.firewatch.data.AppActivity.last(context))?.let { p.id to it }
         }.toMap()
@@ -458,7 +458,7 @@ fun HomeScreen(
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 row.forEach { product ->
                     ProductButton(
-                        preview = if (timerHidden) null else previews[product.id],
+                        preview = previews[product.id],
                         product = product,
                         referenceMg = data.referenceMg,
                         modifier = Modifier.weight(1f),
@@ -807,7 +807,7 @@ private fun ProductButton(
         contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
         shape = shape,
         modifier = modifier
-            .height(if (preview != null) 108.dp else 96.dp)
+            .height(if (preview != null) 112.dp else 96.dp)
             .clip(shape)
             .combinedClickable(onClick = onTap, onLongClick = onLongPress),
     ) {
@@ -819,17 +819,15 @@ private fun ProductButton(
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
-            Column {
-                Text(Fmt.piecesLabel(pieces), style = MaterialTheme.typography.bodySmall)
-                // What logging it now would do to net (timing and size): neutral, never "earn it".
-                preview?.takeIf { kotlin.math.abs(it) >= 1 }?.let {
-                    Text(
-                        if (it > 0) "+${Fmt.duration((it * 60_000).toLong())} stretch" else "+${Fmt.duration((-it * 60_000).toLong())} pull",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.75f),
-                    )
-                }
+            // What logging it now would do to net (timing and size): neutral, never "earn it".
+            preview?.takeIf { kotlin.math.abs(it) >= 1 }?.let {
+                Text(
+                    if (it > 0) "+${Fmt.duration((it * 60_000).toLong())} stretch" else "+${Fmt.duration((-it * 60_000).toLong())} pull",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
+                )
             }
+            Text(Fmt.piecesLabel(pieces), style = MaterialTheme.typography.bodySmall)
         }
     }
 }

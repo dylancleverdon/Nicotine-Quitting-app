@@ -78,7 +78,7 @@ as an estimate.
   ahead of or behind the rung's pace whatever the product (a Zyn 6 mg every 3h 50m nets 0 at
   Bonfire; two gum 2 mg = one gum 4 mg). Negative net is grey, never red. Paused in Relapse
   prevention mode. The full-battery cheer stays.
-- **Dose preview** under each product (hidden with "Hide next piece timer"). Neutral wording only.
+- **Dose preview** under each product between the name and the pieces (shown even with "Hide next piece timer"). Neutral wording only.
 - **Hide next piece timer** (opt-in): "Tap to see your next piece time"; each tap is a counted
   check, a "wanting it" signal used in Insights and the offers.
 - The maths jumps from dose to dose (fast); tests check it matches a minute-by-minute version.
