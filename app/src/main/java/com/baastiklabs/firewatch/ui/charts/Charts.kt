@@ -1,6 +1,12 @@
 package com.baastiklabs.firewatch.ui.charts
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -94,6 +100,7 @@ fun ChartFrame(
     height: Dp,
     x: List<Pair<Float, String>>,
     modifier: Modifier = Modifier,
+    readout: ((Float) -> String?)? = null,
     content: @Composable () -> Unit,
 ) {
     val showY = ticks != null && fmt != null && ticks.isNotEmpty()
@@ -117,9 +124,60 @@ fun ChartFrame(
                 }
                 Spacer(Modifier.width(6.dp))
             }
-            Box(Modifier.weight(1f)) { content() }
+            if (readout == null) Box(Modifier.weight(1f)) { content() }
+            else Box(Modifier.weight(1f)) { Scrubbable(readout, content) }
         }
         if (x.isNotEmpty()) XAxis(x, Modifier.padding(start = if (showY) (Y_AXIS_DP + 6).dp else 0.dp))
+    }
+}
+
+/** Touch and drag to read the value at that point; let go and it disappears. */
+@Composable
+private fun Scrubbable(readout: (Float) -> String?, content: @Composable () -> Unit) {
+    var pos by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<Float?>(null) }
+    val lineColor = MaterialTheme.colorScheme.onSurface
+    Box(
+        Modifier.fillMaxWidth().pointerInput(Unit) {
+            awaitEachGesture {
+                val down = awaitFirstDown(requireUnconsumed = false)
+                pos = (down.position.x / size.width).coerceIn(0f, 1f)
+                while (true) {
+                    val e = awaitPointerEvent()
+                    val c = e.changes.firstOrNull() ?: break
+                    if (!c.pressed) break
+                    pos = (c.position.x / size.width).coerceIn(0f, 1f)
+                }
+                pos = null
+            }
+        },
+    ) {
+        content()
+        val p = pos
+        val label = p?.let(readout)
+        if (p != null && label != null) {
+            Canvas(Modifier.matchParentSize()) {
+                drawLine(lineColor.copy(alpha = 0.6f), Offset(p * size.width, 0f), Offset(p * size.width, size.height), strokeWidth = 1.dp.toPx())
+            }
+            Layout(
+                content = {
+                    Text(
+                        label,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier
+                            .background(MaterialTheme.colorScheme.surfaceContainerHighest, androidx.compose.foundation.shape.RoundedCornerShape(6.dp))
+                            .padding(horizontal = 6.dp, vertical = 2.dp),
+                    )
+                },
+                modifier = Modifier.fillMaxWidth(),
+            ) { ms, c ->
+                val t = ms.first().measure(Constraints())
+                layout(c.maxWidth, t.height) {
+                    val xc = (c.maxWidth * p).toInt()
+                    t.place((xc - t.width / 2).coerceIn(0, (c.maxWidth - t.width).coerceAtLeast(0)), 0)
+                }
+            }
+        }
     }
 }
 
@@ -173,7 +231,11 @@ fun WaveChart(
     val t1 = points.last().first
     val ticks = if (compact) null else niceTicks(max(points.maxOf { it.second }, typical.maxOfOrNull { it.second } ?: 0.0).coerceAtLeast(0.5))
     val yMax = ticks?.last() ?: (max(points.maxOf { it.second }, typical.maxOfOrNull { it.second } ?: 0.0).coerceAtLeast(1.0) * 1.1)
-    ChartFrame(ticks, { "${fmtNum(it)} mg" }, height, timeTicks(t0, t1, if (compact) 4 else 5), modifier) {
+    ChartFrame(ticks, { "${fmtNum(it)} mg" }, height, timeTicks(t0, t1, if (compact) 4 else 5), modifier, readout = { p ->
+        val t = t0 + (p * (t1 - t0)).toLong()
+        val pt = points.minByOrNull { kotlin.math.abs(it.first - t) }!!
+        "${com.baastiklabs.firewatch.ui.Fmt.time(pt.first)} · ≈ ${fmtNum(Math.round(pt.second * 10) / 10.0)} mg"
+    }) {
     Canvas(Modifier.fillMaxWidth().height(height)) {
         fun x(t: Long) = ((t - t0).toFloat() / (t1 - t0).coerceAtLeast(1)) * size.width
         fun y(v: Double) = size.height - (v / yMax).toFloat() * size.height
@@ -229,7 +291,11 @@ fun BarChart(
     val dataMax = bars.maxOf { max(it.value, it.high ?: 0.0) }.coerceAtLeast(line?.maxOrNull() ?: 0.0)
     val ticks = yFmt?.let { niceTicks(dataMax.coerceAtLeast(0.001)) }
     val yMax = ticks?.last() ?: (dataMax.coerceAtLeast(1.0) * 1.1)
-    ChartFrame(ticks, yFmt, height, xLabels?.let { indexTicks(it, centred = true) } ?: emptyList(), modifier) {
+    ChartFrame(ticks, yFmt, height, xLabels?.let { indexTicks(it, centred = true) } ?: emptyList(), modifier, readout = { p ->
+        val i = (p * bars.size).toInt().coerceIn(0, bars.lastIndex)
+        val v = Math.round(bars[i].value * 10) / 10.0
+        listOfNotNull(xLabels?.getOrNull(i), yFmt?.invoke(v) ?: fmtNum(v), line?.getOrNull(i)?.let { "line ${fmtNum(Math.round(it * 10) / 10.0)}" }).joinToString(" · ")
+    }) {
     Canvas(Modifier.fillMaxWidth().height(height)) {
         gridLines(ticks, yMax, grid)
         fun y(v: Double) = size.height - (v / yMax).toFloat() * size.height
@@ -292,7 +358,12 @@ fun TrendLine(
     val all = values + (second ?: emptyList())
     val ticks = if (yFmt != null && !invert) niceTicks(top ?: (all.maxOrNull()?.coerceAtLeast(0.001) ?: 1.0)) else null
     val yTop = ticks?.last() ?: ((all.maxOrNull()?.coerceAtLeast(0.001) ?: 1.0) * 1.1)
-    ChartFrame(ticks, yFmt, height, xLabels?.let { indexTicks(it) } ?: emptyList(), modifier) {
+    ChartFrame(ticks, yFmt, height, xLabels?.let { indexTicks(it) } ?: emptyList(), modifier, readout = { p ->
+        val n = maxOf(values.size, second?.size ?: 0)
+        val i = Math.round(p * (n - 1)).coerceIn(0, (n - 1).coerceAtLeast(0))
+        fun f(v: Double?) = v?.let { yFmt?.invoke(Math.round(it * 10) / 10.0) ?: fmtNum(Math.round(it * 10) / 10.0) } ?: "–"
+        listOfNotNull(xLabels?.getOrNull(i), f(values.getOrNull(i)) + (second?.let { " / " + f(it.getOrNull(i)) } ?: "")).joinToString(" · ")
+    }) {
     Canvas(Modifier.fillMaxWidth().height(height)) {
         gridLines(ticks, yTop, grid)
         fun y(v: Double): Float {
@@ -416,7 +487,12 @@ fun CravingForecastChart(
     val t1 = points.last().at
     val ticks = niceTicks(points.maxOf { it.likelihood }.coerceAtLeast(0.1))
     val yMax = ticks.last()
-    ChartFrame(ticks, { "${Math.round(it * 100)}%" }, height, timeTicks(t0, t1), modifier) {
+    ChartFrame(ticks, { "${Math.round(it * 100)}%" }, height, timeTicks(t0, t1), modifier, readout = { p ->
+        val t = t0 + (p * (t1 - t0)).toLong()
+        val pt = points.minByOrNull { kotlin.math.abs(it.at - t) }!!
+        if (pt.asleep) "${com.baastiklabs.firewatch.ui.Fmt.time(pt.at)} · asleep"
+        else "${com.baastiklabs.firewatch.ui.Fmt.time(pt.at)} · ${Math.round(pt.likelihood * 100)}% · strength ≈ ${Math.round(pt.strength)}"
+    }) {
     Canvas(Modifier.fillMaxWidth().height(height)) {
         gridLines(ticks, yMax, grid)
         fun x(t: Long) = ((t - t0).toFloat() / (t1 - t0).coerceAtLeast(1)) * size.width
@@ -463,7 +539,12 @@ fun ReceptorChart(
     val total = history.size + maxOf(plan.size, stay.size)
     if (total < 2) return
     val ticks = listOf(0.0, 0.25, 0.5, 0.75, 1.0)
-    ChartFrame(ticks, { "${Math.round(it * 100)}%" }, height, indexTicks(dates), modifier) {
+    ChartFrame(ticks, { "${Math.round(it * 100)}%" }, height, indexTicks(dates), modifier, readout = { p ->
+        val i = Math.round(p * (total - 1))
+        val today = (history.size - 1).coerceAtLeast(0)
+        val v = if (i < history.size) history[i] else plan.getOrNull(i - today) ?: stay.getOrNull(i - today)
+        listOfNotNull(dates.getOrNull(i), v?.let { "≈ ${Math.round(it * 100)}%" + if (i >= history.size) " (plan)" else "" }).joinToString(" · ")
+    }) {
     Canvas(Modifier.fillMaxWidth().height(height)) {
         fun x(i: Int) = i.toFloat() / (total - 1).coerceAtLeast(1) * size.width
         fun y(v: Double) = size.height - (v.coerceIn(0.0, 1.0)).toFloat() * size.height

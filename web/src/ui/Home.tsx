@@ -67,6 +67,7 @@ export function Home({ toast, go, backfill }: { toast: (msg: string, undo?: () =
           {(snap.target ?? snap.measured) && <>
             <p class="tier">{(snap.target ?? snap.measured)!.tier}</p>
             <div class="small">{(snap.target ?? snap.measured)!.plain}</div>
+            {snap.practicing && <div class="muted">Practice day: {snap.ladder.find((r) => Math.abs(r.pieces - (settings.practicePieces ?? 0)) < 1e-6)?.label ?? ''} pace</div>}
             {snap.early && <div class="muted">Early estimate · firming up as you log your first week{snap.baselineState === 'progress' ? ` (day ${snap.baselineDay} of 7)` : ''}.</div>}
             {snap.target && snap.measured && snap.measured.pieces !== snap.target.pieces &&
               <div class="muted">Working at {snap.target.label}. Your last 7 days measure {snap.measured.label}.</div>}
@@ -81,7 +82,6 @@ export function Home({ toast, go, backfill }: { toast: (msg: string, undo?: () =
               battery.state === 'WIND_DOWN' ? 'Winding down for bed' : 'Sleeping hours · Fresh start when you wake up'}</b>
             <Meter value={battery.charge} />
             {battery.closeToBed && <div class="small muted">Close to bedtime: nicotine can make it harder to fall asleep.</div>}
-            {battery.fitsNow && <div class="small muted">A {battery.fitsNow} fits now</div>}
             {!rp.on && <div class="small stretch" style={{ color: battery.stretchMin - battery.pullMin >= 0 ? 'var(--tertiary)' : 'var(--muted)' }}>
               Stretch {duration(battery.stretchMin * 60000)} · Pull {duration(battery.pullMin * 60000)} · Net {signedDuration(battery.stretchMin - battery.pullMin)}</div>}
           </div>}
@@ -101,7 +101,8 @@ export function Home({ toast, go, backfill }: { toast: (msg: string, undo?: () =
           <div class="stat small"><b>{snap.todayRodeOut}/{snap.todayCravings}</b><span>urges beaten</span></div>
           {snap.qualityLabel && <div class="stat small"><b>{snap.qualityLabel.split(' · ')[0].split(' ')[0]} {Math.round(snap.qualityScore!)}</b><span>quality</span></div>}
         </div>
-        {(snap.heldDays > 0 || snap.lighterThanStart != null || (snap.daysOffSmokeAndVape ?? 0) > 0 || snap.insights.journey != null) && <div class="wins small">
+        {(((settings.showSteadyDays ?? true) && snap.steadyDays > 0) || snap.heldDays > 0 || snap.lighterThanStart != null || (snap.daysOffSmokeAndVape ?? 0) > 0 || snap.insights.journey != null) && <div class="wins small">
+          {(settings.showSteadyDays ?? true) && snap.steadyDays > 0 && <div>✓ {snap.steadyDays} steady {snap.steadyDays === 1 ? 'day' : 'days'}</div>}
           {snap.heldDays > 0 && snap.target && <div>✓ Held {snap.target.label} for {snap.heldDays} {snap.heldDays === 1 ? 'day' : 'days'}</div>}
           {snap.lighterThanStart != null && <div>✓ About {Math.round(snap.lighterThanStart * 100)}% lighter than when you started</div>}
           {(snap.daysOffSmokeAndVape ?? 0) > 0 && <div>✓ {snap.daysOffSmokeAndVape} days off cigarettes and vapes</div>}
@@ -111,6 +112,17 @@ export function Home({ toast, go, backfill }: { toast: (msg: string, undo?: () =
         {showTier && snap.wave.length > 2 && <div class="now-mg"><b>≈ {snap.nowMg.toFixed(1)} mg</b> in your system now</div>}
       </div>
 
+      {snap.steadyMilestone && (settings.showSteadyDays ?? true) && <div class="card accent">
+        <h2>{snap.steadyMilestone} steady days</h2>
+        <div class="small">{snap.steadyMilestone} days at or under your pace with no cigarettes or vapes. That's real control.</div>
+        <div><button class="btn" onClick={() => S.updateSettings({ steadyMilestoneSeen: snap.steadyMilestone })}>Nice</button></div>
+      </div>}
+      {snap.practiceFollowUp && <div class="card accent">
+        <h2>How was {snap.practiceFollowUp.label} pace?</h2>
+        <div class="small">Step down to it, or stay where you are. Either is fine.</div>
+        <div class="row"><button class="btn" onClick={async () => { await S.updateSettings({ practiceDate: '', practicePieces: 0 }); moveTarget(snap.practiceFollowUp!.pieces, 'down') }}>Step down</button>
+          <button class="btn outline" onClick={() => S.updateSettings({ practiceDate: '', practicePieces: 0, stepDownSnoozedAt: Date.now() })}>Stay here</button></div>
+      </div>}
       {snap.welcomeBack && <div class="card accent">
         <h2>Welcome back</h2>
         <div class="small">Want to add what you had while you were away? Rough counts per day, no times needed.</div>
@@ -125,7 +137,8 @@ export function Home({ toast, go, backfill }: { toast: (msg: string, undo?: () =
       {snap.stepDown && snap.target && <div class="card accent">
         <h2>Ready for {snap.stepDown.label}?</h2>
         <div class="small">You've held {snap.target.label} for {settings.holdDays} days. {snap.stepDownNote} Or stay here, that's fine too.</div>
-        <div class="row"><button class="btn" onClick={() => moveTarget(snap.stepDown!.pieces, 'down')}>Step down</button>
+        <div class="row wrap"><button class="btn" onClick={() => moveTarget(snap.stepDown!.pieces, 'down')}>Step down</button>
+          <button class="btn outline" onClick={() => { S.updateSettings({ practiceDate: snap.wakingToday, practicePieces: snap.stepDown!.pieces }); toast(`Practice day: ${snap.stepDown!.label} pace for today`) }}>Try it for a day</button>
           <button class="btn outline" onClick={() => S.updateSettings({ stepDownSnoozedAt: Date.now() })}>Stay here</button></div>
       </div>}
       {snap.stepUp && snap.target && <div class="card accent">
@@ -161,6 +174,7 @@ export function Home({ toast, go, backfill }: { toast: (msg: string, undo?: () =
         {S.homeProducts.value.map((p) => (
           <button class="product" onPointerDown={() => down(p)} onPointerUp={() => up(p)} onPointerLeave={() => press.current && clearTimeout(press.current)} onContextMenu={(e) => e.preventDefault()}>
             <b>{p.name}</b><span>{piecesLabel(Core.piecesOf(p, S.json()))}</span>
+            {!hidden && snap.previews[p.id] != null && Math.abs(snap.previews[p.id]) >= 1 && <span class="preview">{snap.previews[p.id] > 0 ? `+${duration(snap.previews[p.id] * 60000)} stretch` : `+${duration(-snap.previews[p.id] * 60000)} pull`}</span>}
           </button>
         ))}
       </div>

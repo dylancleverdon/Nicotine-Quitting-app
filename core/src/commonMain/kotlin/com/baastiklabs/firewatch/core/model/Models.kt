@@ -149,6 +149,29 @@ data class Settings(
     val hideTimer: Boolean = false,
     /** "Welcome back" was answered (back-dated or "Not now") at this time. */
     val welcomeBackDismissedAt: Long = 0,
+    /** Show the "✓ N steady days" line on the home card. */
+    val showSteadyDays: Boolean = true,
+    /** The highest steady-days milestone already celebrated (7, 30, 60, 90, 180, 365). */
+    val steadyMilestoneSeen: Int = 0,
+    /** Opt-in: range choices and a date stepper on multi-day charts. */
+    val detailedCharts: Boolean = false,
+    /** Practice day: this waking day (ISO date) uses [practicePieces] for the battery. "" = none. */
+    val practiceDate: String = "",
+    val practicePieces: Double = 0.0,
+)
+
+/**
+ * The product that counts as one piece changed. Doses from [from] on use [productId]; earlier ones
+ * keep [previousProductId]. "From today on" sets [from] to the change time; back-dating sets it to
+ * the start of the chosen day.
+ */
+@Serializable
+data class RefChange(
+    val id: String,
+    val at: Long,
+    val from: Long,
+    val productId: String,
+    val previousProductId: String,
 )
 
 /** A tap to see the hidden next-piece time. [charging]: the battery wasn't full yet. */

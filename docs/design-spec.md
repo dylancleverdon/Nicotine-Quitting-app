@@ -1,6 +1,6 @@
 # Firewatch by Baastik Labs: design spec
 
-Baastik Labs · living spec, updated 28 Sep 2026 (Android 0.9 / web 0.7)
+Baastik Labs · living spec, updated 28 Sep 2026 (Android 0.10 / web 0.8)
 
 This describes what Firewatch does today and how it should feel. Read `docs/vision.md` first: the
 vision and principles there decide every trade-off here. The original 1.0 spec is kept in
@@ -56,27 +56,32 @@ as an estimate.
 
 - **Status card:** tier and pieces a day; the battery (see 7); pieces and mg today; doses, time
   since last, cravings ridden out, quality; today's nicotine curve with "≈ X mg in your system now".
-- **Wins, only ever positive:** "✓ Held Bonfire for 12 days", "✓ About 20% lighter than when you
+- **Wins, only ever positive:** "✓ 23 steady days" (hideable), "✓ Held Bonfire for 12 days", "✓ About 20% lighter than when you
   started" (only when true), "✓ 30 days off cigarettes and vapes", "Journey to Clear Air: 40%".
-- **Offers:** starting point; step down ("…or stay here, that's fine too" with **Stay here**);
+- **Offers:** starting point; step down ("…or stay here, that's fine too", with **Try it for a day**
+  and **Stay here**); "How was Campfire pace?" after a practice day; steady-days milestones;
   step up (with the reason); Relapse prevention mode suggestion; "Welcome back".
-- **Quick logging:** one tap per product (hold for time, amount and more); "Craving? Log it";
+- **Quick logging:** one tap per product (hold for time, amount and more), each with a quiet
+  dose preview ("+38m pull", "+1h 36m stretch": what logging it now does to net); "Craving? Log it";
   "Friend's vape"; Good morning / Good night; today's list; Relapse prevention mode button;
   "Suggest something / report a bug"; "?" for Help.
 
 ## 7. The battery (next-piece guidance)
 
-- Refills one piece per gap (16 waking hours ÷ the rung's pieces a day). Full at wake-up, fresh
-  every morning, never in debt; each dose drains it by its size (one gap at most).
-- States: clear for one; next piece around …; full when you wake up; first-piece goal; sleeping
-  hours (late-night activity catches up). **Wind-down** is a note only ("Close to bedtime: nicotine
-  can make it harder to fall asleep"); it never hides the guidance. "A gum 2 mg fits now" when a
-  smaller product fits.
-- **Stretch** (held off with a full battery), **pull** (nicotine that came before there was room,
-  including oversized doses) and **net**; negative net is grey, never red. The cheer: "You waited
-  for a full battery. Nice work!"
+- **A plain timer:** every dose empties it, whatever its size; it refills over one gap (16 waking
+  hours ÷ the rung's pieces a day). "Next piece around …" is always one gap after the last piece.
+  Full at wake-up, fresh every morning, no waiting overnight; sleeping hours (late-night activity
+  catches up). **Wind-down** is a note only. A practice day uses the next rung's gap.
+- **Stretch and pull carry timing and size.** Timing: a piece before the battery is full adds pull
+  (the time it still needed); holding off with a full battery adds stretch. Size: p pieces above one
+  add (p − 1) × gap of pull; below one add (1 − p) × gap of stretch. **Net** = stretch − pull = time
+  ahead of or behind the rung's pace whatever the product (a Zyn 6 mg every 3h 50m nets 0 at
+  Bonfire; two gum 2 mg = one gum 4 mg). Negative net is grey, never red. Paused in Relapse
+  prevention mode. The full-battery cheer stays.
+- **Dose preview** under each product (hidden with "Hide next piece timer"). Neutral wording only.
 - **Hide next piece timer** (opt-in): "Tap to see your next piece time"; each tap is a counted
   check, a "wanting it" signal used in Insights and the offers.
+- The maths jumps from dose to dose (fast); tests check it matches a minute-by-minute version.
 
 ## 8. The ladder: find, control, taper
 
@@ -87,9 +92,13 @@ as an estimate.
   7 days measure a heavier rung (creeping up), or when two multi-day signals line up. "I'm OK"
   hides it until tomorrow. No "just for today" option: the point is finding the real level.
 - **Hold (control):** holding a rung is a win: held-days counts, a Holding steady chart, badges at
-  7/30/90/180 days held.
+  7/30/90/180 days held. **Steady days:** net ≥ 0 and no cigarette or vape (back-dated days: pieces
+  at or under the rung; Relapse prevention mode: no cigarette or vape; empty days count only at
+  Clear Air or when the app was in use). The total only ever goes up; milestones at 7/30/60/90/180/365.
+  A celebration, never a gate.
 - **Step down (taper, optional):** offered after the hold period (Settings) at or under the rung;
-  never a button; always with "Stay here".
+  never a button; always with "Stay here". **Try it for a day:** that waking day runs at the next
+  rung's pace (battery, gap, preview); nothing else changes; next morning "Step down / Stay here".
 
 ## 9. Cravings
 
@@ -113,9 +122,18 @@ Today (wave, dose strip), Cravings ahead, Receptors (estimated healing, followin
 staying), Stretch & pull, Trends, Patterns (heatmap, how cravings ended, checking, triggers),
 Going up (holding steady, clear hours, wins, money), Going down (quality, dose size, spike share,
 background level), Mix, Forecasts (Journey to Clear Air, arrival dates), Milestones (records,
-badges, recaps, day barcode), Ladder. Every chart has labelled axes. Every figure is an estimate.
+badges, recaps, day barcode), Ladder. Every chart has labelled axes; touch and drag reads any
+point. Day charts (wave, dose strip) have ‹ Today › to view any earlier day (no overlay, no
+comparison). Opt-in "Detailed charts" adds 7/30/90/all ranges and earlier/later on multi-day
+charts. Forecasts show "If you take each step" from day one (plan → plan + recent weeks → pace).
+Every figure is an estimate.
 
 ## 12. Calendar and back-dating
+
+**One day everywhere:** daily counts (pieces today, calendar, daily Insights bars, tiers, stretch and
+pull, steady days) use the waking day (wake-up to the next wake-up), so a 1 AM piece counts toward
+the night before. Continuous things (the wave, receptors, the hour heatmap, the craving forecast)
+keep clock time.
 
 Month heatmap; day view with doses, cravings (with how they ended) and sleep. **Back-dating
 without times is the default:** "Add what you had" takes rough counts for a day and spreads them
@@ -126,8 +144,8 @@ missed day.
 ## 13. Settings
 
 Plan (step back up a rung, hold period, first-piece goal, time format, Hide next piece timer, wind
-down note, daily check-in), Relapse prevention mode, optional reminders, money, data (export,
-import, automatic backups off the phone), products and the reference piece, sleep schedule,
+down note, show steady days, detailed charts, daily check-in), Relapse prevention mode, optional reminders, money, data (export,
+import, automatic backups off the phone), products and the reference piece (change "from today on", or back-dated with a warning), sleep schedule,
 unsent suggestions, Help, About, updates.
 
 ## 14. Help and feedback

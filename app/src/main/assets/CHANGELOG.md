@@ -2,6 +2,17 @@
 
 Newest first. Each release is a "## <version>" heading; the app shows these notes in "What's new".
 
+## 0.10.0 · 2026-09-28
+- The next-piece timer is now simply "one gap after your last piece", whatever you took. Dose size now shows up where it belongs, in stretch and pull: smaller doses add stretch, bigger ones add pull. Past days are recalculated this way, so their net may shift a little. Your logs don't change.
+- Each product now shows what it would do to your net before you log it (e.g. "+38m pull").
+- New: your total **steady days**, which only ever go up, with milestones along the way. You can hide it in Settings → Your plan.
+- New: when a step down is offered, you can **try it for a day** first.
+- Charts: touch and drag to read any point. Day charts can step back to yesterday or any earlier day. Want more? "Detailed charts" in Settings adds ranges.
+- Forecasts show an "If you take each step" plan from day one, and adjust as you go.
+- Pieces after midnight now count toward the night before everywhere, like the rest of the app.
+- You can change what counts as one piece from today on, or back-date it (with a warning).
+- The mouth-free time statistic is gone; it wasn't accurate enough to be useful.
+
 ## 0.9.0 · 2026-09-28
 - New users get guidance from day one: an early estimate of 8 pieces a day that firms up to your real level over your first week.
 - Holding steady is a win: the Log tab shows how long you've held your level (and other wins, like time off cigarettes and vapes), plus a new Holding steady chart and badges.

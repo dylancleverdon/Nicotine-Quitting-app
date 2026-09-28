@@ -2,7 +2,7 @@ import { useMemo, useState } from 'preact/hooks'
 import { Core } from '../core'
 import * as S from '../store'
 import { Barcode, Bars, ForecastChart, Heatmap, Line, Meter, ReceptorChart, Wave, dateLabels } from './Charts'
-import { duration, pieces, shortDate, signedDuration, time } from './format'
+import { dayTitle, duration, pieces, shortDate, signedDuration, time } from './format'
 
 const SECTIONS = ['Today', 'Cravings ahead', 'Receptors', 'Stretch & pull', 'Trends', 'Patterns', 'Going up', 'Going down', 'Mix', 'Forecasts', 'Milestones', 'Ladder']
 const Card = ({ title, sub, children }: { title: string; sub?: string; children?: any }) => (
@@ -17,8 +17,16 @@ export function Insights() {
   const [recap, setRecap] = useState(0)
   const tick = Math.floor(S.tick.value / 300000)
   const out = useMemo(() => (sec === 'Cravings ahead' || sec === 'Receptors' ? Core.outlooks(S.json()) : null), [sec, S.json(), tick])
-  const days = snap.days.slice(-42)
-  const full = snap.days.slice(0, -1).slice(-42)
+  // Opt-in "Detailed charts": range choices and a stepper on multi-day charts (42 days otherwise).
+  const detailed = !!S.settings.value.detailedCharts
+  const [range, setRange] = useState(42)
+  const [endOff, setEndOff] = useState(0)
+  const R = detailed ? range : 42
+  const win = <T,>(a: T[]): T[] => (detailed ? a.slice(0, Math.max(1, a.length - endOff)) : a).slice(-R)
+  const days = win(snap.days)
+  const full = win(snap.days.slice(0, -1))
+  // Day charts: choose which day to view (no overlay, no comparison).
+  const [dayOff, setDayOff] = useState(0)
   if (!snap.days.length) return <main><h1>Insights</h1><div class="muted">Log a few doses and your graphs appear here.</div></main>
   const today = snap.days[snap.days.length - 1]
   const dl = (ds: { date: string }[]) => dateLabels(ds.map((d) => d.date))
@@ -29,14 +37,29 @@ export function Insights() {
     <main>
       <h1>Insights</h1>
       <div class="scroll-x">{SECTIONS.map((s) => <button class={`chip ${sec === s ? 'on' : ''}`} onClick={() => setSec(s)}>{s}</button>)}</div>
-      {sec === 'Today' && <>
-        <Card title="Blood-level wave" sub="Each dose is a hill or spike. Sleep is shaded; the dashed line is your typical day.">
-          <Wave points={snap.wave} now={Date.now()} typical={snap.typical.map((v, i) => [dayStart + i * 1800000, v]).filter((p) => snap.wave.length && p[0] >= snap.wave[0][0] && p[0] <= snap.wave[snap.wave.length - 1][0])}
-            shade={[[snap.wave[0]?.[0] ?? 0, snap.wakeAt], [snap.sleepAt, snap.wave[snap.wave.length - 1]?.[0] ?? 0]]} />
-        </Card>
-        <Card title="Today so far"><div class="stats"><Stat v={`≈ ${pieces(today.pieces)}`} l="pieces" /><Stat v={`${today.clearHours.toFixed(1)} h`} l="clear hours" />
-          <Stat v={duration(Math.max(0, today.awakeHours * 60 - today.mouthMin) * 60000)} l="mouth-free" /></div></Card>
-      </>}
+      {detailed && !['Today', 'Cravings ahead', 'Receptors', 'Ladder'].includes(sec) && <div class="row wrap small">
+        {[[7, '7 days'], [30, '30 days'], [90, '90 days'], [100000, 'All']].map(([v, l]) => <button class={`chip ${range === v ? 'on' : ''}`} onClick={() => { setRange(v as number); setEndOff(0) }}>{l}</button>)}
+        {range < 100000 && <><button class="btn text" onClick={() => setEndOff(endOff + range)}>‹ Earlier</button>
+          <button class="btn text" disabled={endOff === 0} onClick={() => setEndOff(Math.max(0, endOff - range))}>Later ›</button></>}
+      </div>}
+      {sec === 'Today' && (() => {
+        const iso = new Date(new Date(snap.wakingToday + 'T12:00').getTime() - dayOff * 864e5).toISOString().slice(0, 10)
+        const past = dayOff > 0 ? Core.day(S.json(), iso) : null
+        const wave = past ? past.wave : snap.wave
+        const wakeAt = past ? past.wakeAt : snap.wakeAt, sleepAt = past ? past.sleepAt : snap.sleepAt
+        const stat = snap.days.find((d) => d.date === iso) ?? today
+        const oldest = snap.days[0]?.date ?? iso
+        return <>
+          <div class="day-stepper"><button class="btn text" disabled={iso <= oldest} onClick={() => setDayOff(dayOff + 1)}>‹</button>
+            <b>{dayOff === 0 ? 'Today' : dayOff === 1 ? 'Yesterday' : dayTitle(iso)}</b>
+            <button class="btn text" disabled={dayOff === 0} onClick={() => setDayOff(dayOff - 1)}>›</button></div>
+          <Card title="Blood-level wave" sub={dayOff === 0 ? 'Each dose is a hill or spike. Sleep is shaded; the dashed line is your typical day.' : 'Each dose is a hill or spike. Sleep is shaded.'}>
+            {wave.length > 1 ? <Wave points={wave} now={dayOff === 0 ? Date.now() : undefined} typical={dayOff === 0 ? snap.typical.map((v, i) => [dayStart + i * 1800000, v]).filter((p) => wave.length && p[0] >= wave[0][0] && p[0] <= wave[wave.length - 1][0]) : []}
+              shade={[[wave[0]?.[0] ?? 0, wakeAt], [sleepAt, wave[wave.length - 1]?.[0] ?? 0]]} /> : <div class="muted">Nothing logged that day.</div>}
+          </Card>
+          <Card title={dayOff === 0 ? 'Today so far' : 'That day'}><div class="stats"><Stat v={`≈ ${pieces(stat.pieces)}`} l="pieces" /><Stat v={`${stat.clearHours.toFixed(1)} h`} l="clear hours" /><Stat v={stat.doses} l="doses" /></div></Card>
+        </>
+      })()}
       {sec === 'Cravings ahead' && out && (() => {
         const f = out.forecast
         const first = f.points[0]?.[0] ?? Date.now()
@@ -63,7 +86,7 @@ export function Insights() {
         </Card>
       })()}
       {sec === 'Stretch & pull' && (() => {
-        const sd = snap.stretchDays.slice(-42)
+        const sd = win(snap.stretchDays)
         if (!sd.length) return <Card title="Stretch & pull" sub="Starts once you're working at a target rung." />
         const week = sd.filter((d) => d.date < snap.today).slice(-7).filter((d) => !d.paused)
         const paused = sd.filter((d) => d.paused).length
@@ -133,7 +156,7 @@ export function Insights() {
           <div class="muted">🥦 90+ · 🍎 75+ · 🥪 55+ · 🍕 35+ · 🍩 11+ · 🍔 0–10</div></Card>
         <Card title="Average dose size (mg)"><Line values={full.map((d) => (d.doses ? d.mg / d.doses : 0))} fmt={(v) => `${v} mg`} x={dl(full)} /></Card>
         <Card title="Spike share (%)"><Line values={full.map((d) => (d.mg > 0 ? (d.spikeMg / d.mg) * 100 : 0))} fmt={(v) => `${v}%`} top={100} x={dl(full)} /></Card>
-        <Card title="Background level" sub="Modelled on cotinine; drifts down even through messy days."><Line values={ins.background.slice(-42)} fmt={(v) => `${v} mg`} x={dl(snap.days.slice(-42))} /></Card>
+        <Card title="Background level" sub="Modelled on cotinine; drifts down even through messy days."><Line values={win(ins.background)} fmt={(v) => `${v} mg`} x={dl(win(snap.days))} /></Card>
         <Card title="Cravings vs doses" sub="Doses orange, urges teal."><Line values={full.map((d) => d.doses)} second={full.map((d) => d.cravings)} fmt={n} x={dl(full)} /></Card>
         <Card title="What you can ride out"><div class="small">{ins.coachConfident ? `You reliably ride out cravings up to about ${ins.capacity} out of 10.` : 'Log a few more cravings (and whether they passed) to personalise this.'}</div>
           {ins.coachLevels.map((l) => <div class="row small"><span class="grow">{l.label}</span>{l.extra}</div>)}{ins.honest && <div class="muted">Honest level: {ins.honest}</div>}</Card>
@@ -144,6 +167,9 @@ export function Insights() {
         <Card title="Borrowed share"><b>{Math.round((snap.days.reduce((a, d) => a + d.borrowedPieces, 0) / Math.max(0.001, snap.days.reduce((a, d) => a + d.pieces, 0))) * 100)}%</b></Card>
       </>}
       {sec === 'Forecasts' && <>
+        {snap.taperSteps.length > 0 && <Card title="If you take each step" sub={`Stepping down each time it's offered (every ${S.settings.value.holdDays} days). Optional: staying steady is a win too. ${snap.taperBasis ?? ''}.`}>
+          {snap.taperSteps.map((t) => <div class="row small"><span class="grow">{t.label}</span>around {shortDate(t.extra)}</div>)}
+        </Card>}
         <Card title="Journey to Clear Air">{ins.journey != null ? <><h2>{Math.round(ins.journey * 100)}%</h2><Meter value={ins.journey} /></> : <div class="muted">Starts after your baseline week.</div>}</Card>
         <Card title="Taper speed"><b>{ins.taperPct != null ? `${ins.taperPct.toFixed(1)}% lighter each week` : 'Needs a week or two more data.'}</b></Card>
         <Card title="Arrival dates">{ins.arrivals.map((a) => <div class="small">{a.label}: {a.extra ? (a.extra <= snap.today ? 'reached' : shortDate(a.extra)) : 'not at this pace yet'}</div>)}</Card>

@@ -100,7 +100,9 @@ fun PlanSettings(vm: FirewatchViewModel, data: FirewatchData) {
             "The time shows only when you tap it, so Firewatch can learn how often you check",
             s.hideTimer,
         ) { v -> update { it.copy(hideTimer = v) } }
-        ToggleRow("Wind down before bed", "No \"clear for one\" in the last hour before bed", s.windDown) { v -> update { it.copy(windDown = v) } }
+        ToggleRow("Wind down before bed", "A bedtime note in the last hour before bed", s.windDown) { v -> update { it.copy(windDown = v) } }
+        ToggleRow("Show steady days", "\"✓ N steady days\" on the home card", s.showSteadyDays) { v -> update { it.copy(showSteadyDays = v) } }
+        ToggleRow("Detailed charts", "Range choices and earlier/later on Insights charts", s.detailedCharts) { v -> update { it.copy(detailedCharts = v) } }
         ToggleRow("Daily check-in", "Three quick taps: craving strength, mood and sleep", s.dailyCheckIn) { v -> update { it.copy(dailyCheckIn = v) } }
     }
 

@@ -104,6 +104,7 @@ fun SettingsScreen(
     var pendingImport by remember { mutableStateOf<BackupFile?>(null) }
     var showBackups by remember { mutableStateOf(false) }
     var pickReference by remember { mutableStateOf(false) }
+    var refChoice by remember { mutableStateOf<String?>(null) }
     var pickWake by remember { mutableStateOf(false) }
     var pickSleep by remember { mutableStateOf(false) }
 
@@ -398,11 +399,55 @@ fun SettingsScreen(
             confirmButton = {
                 TextButton(onClick = {
                     pickReference = false
-                    scope.launch { vm.repository.updateSettings { it.copy(referenceProductId = selected) } }
-                }) { Text("Save") }
+                    if (selected != data.settings.referenceProductId) refChoice = selected
+                }) { Text("Next") }
             },
             dismissButton = { TextButton(onClick = { pickReference = false }) { Text("Cancel") } },
         )
+    }
+
+    refChoice?.let { productId ->
+        val name = data.productsById[productId]?.name ?: "it"
+        var backdating by remember { mutableStateOf(false) }
+        if (!backdating) {
+            AlertDialog(
+                onDismissRequest = { refChoice = null },
+                title = { Text("From when?") },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("From today on, $name counts as one piece. Past days keep the old piece size.")
+                        Text("Or back-date the change. This changes your past totals and may change your tier.", fontWeight = FontWeight.SemiBold)
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = {
+                        refChoice = null
+                        scope.launch { vm.repository.changeReference(productId, vm.repository.now()) }
+                    }) { Text("From today on") }
+                },
+                dismissButton = { TextButton(onClick = { backdating = true }) { Text("Back-date…") } },
+            )
+        } else {
+            @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+            run {
+                val state = androidx.compose.material3.rememberDatePickerState()
+                androidx.compose.material3.DatePickerDialog(
+                    onDismissRequest = { refChoice = null },
+                    confirmButton = {
+                        TextButton(onClick = {
+                            val utc = state.selectedDateMillis
+                            refChoice = null
+                            if (utc != null) {
+                                val day = java.time.Instant.ofEpochMilli(utc).atZone(java.time.ZoneOffset.UTC).toLocalDate()
+                                val from = day.atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
+                                scope.launch { vm.repository.changeReference(productId, from) }
+                            }
+                        }) { Text("Back-date to this day") }
+                    },
+                    dismissButton = { TextButton(onClick = { refChoice = null }) { Text("Cancel") } },
+                ) { androidx.compose.material3.DatePicker(state) }
+            }
+        }
     }
 
     if (pickWake) {

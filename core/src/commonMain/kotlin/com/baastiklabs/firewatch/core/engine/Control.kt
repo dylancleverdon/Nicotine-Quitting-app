@@ -128,4 +128,117 @@ object Control {
             .filter { d -> data.doses.none { it.at.localDate(tz) == d } }
         return gap.takeIf { it.size >= 2 }?.takeLast(14)
     }
+
+    // ---- Steady days ----
+
+    val STEADY_MILESTONES = listOf(7, 30, 60, 90, 180, 365)
+
+    /**
+     * Is this full waking day a steady day? No cigarette or vape, and net ≥ 0. Back-dated days (no
+     * real times) use pieces at or under the rung instead. In Relapse prevention mode: no cigarette
+     * or vape. Null before there's a rung to judge against.
+     */
+    fun isSteady(data: FirewatchData, date: LocalDate, tz: TimeZone, now: Long): Boolean? {
+        val w = Waking.day(data, date, tz)
+        val nextWake = Waking.day(data, date.plus(1, DateTimeUnit.DAY), tz).wakeAt
+        val target = BatteryEngine.targetAt(data, nextWake - 1) ?: return null
+        val doses = data.doses.filter { it.at >= w.wakeAt && it.at < nextWake }
+        if (doses.any { Cravings.isRelapseDose(it) }) return false
+        // A day with nothing logged only counts at Clear Air, or if the app was clearly in use
+        // (a craving or Good morning / Good night): otherwise it's probably just untracked.
+        if (doses.isEmpty() && target > 0 &&
+            data.cravings.none { it.at >= w.wakeAt && it.at < nextWake } &&
+            data.sleepEvents.none { it.at >= w.wakeAt && it.at < nextWake }
+        ) return false
+        if (Relapse.isModeDay(data, date, tz)) return true
+        if (doses.isNotEmpty() && doses.all { it.estimated }) return doses.sumOf { data.piecesOf(it) } <= target + 0.25
+        val day = BatteryEngine.day(data, date, tz, now) ?: return null
+        return day.netMin >= 0
+    }
+
+    /** Steady days so far (full waking days only). It only ever goes up: bad days just don't add. */
+    fun steadyDays(data: FirewatchData, now: Long, tz: TimeZone): Int = steadyDates(data, now, tz).size
+
+    fun steadyDates(data: FirewatchData, now: Long, tz: TimeZone): List<LocalDate> {
+        val first = data.rungChanges.firstOrNull()?.at ?: return emptyList()
+        val start = BatteryEngine.currentDay(data, first, tz).first.date
+        val today = BatteryEngine.currentDay(data, now, tz).first.date
+        val out = ArrayList<LocalDate>()
+        var d = start
+        while (d < today) {
+            if (isSteady(data, d, tz, now) == true) out += d
+            d = d.plus(1, DateTimeUnit.DAY)
+        }
+        return out
+    }
+
+    /** The newest steady-days milestone reached but not yet celebrated, if any. */
+    fun newSteadyMilestone(data: FirewatchData, steady: Int): Int? =
+        STEADY_MILESTONES.lastOrNull { steady >= it }?.takeIf { it > data.settings.steadyMilestoneSeen }
+
+    // ---- Practice day ----
+
+    /** True while today (waking day) is a practice day at the next rung. */
+    fun practicingToday(data: FirewatchData, now: Long, tz: TimeZone): Boolean {
+        val s = data.settings
+        return s.practiceDate.isNotEmpty() && s.practicePieces > 0 &&
+            s.practiceDate == BatteryEngine.currentDay(data, now, tz).first.date.toString()
+    }
+
+    /** After a practice day: the rung that was practised, to ask "How was it?". Null otherwise. */
+    fun practiceFollowUp(data: FirewatchData, now: Long, tz: TimeZone): Rung? {
+        val s = data.settings
+        if (s.practiceDate.isEmpty() || s.practicePieces <= 0) return null
+        val today = BatteryEngine.currentDay(data, now, tz).first.date
+        val practised = runCatching { LocalDate.parse(s.practiceDate) }.getOrNull() ?: return null
+        return if (practised < today) Ladder.rung(s.practicePieces) else null
+    }
+
+    // ---- Taper forecast ----
+
+    data class TaperStep(val rung: Rung, val date: LocalDate)
+    data class TaperPlan(val steps: List<TaperStep>, val basis: String, val holdDays: Int)
+
+    /**
+     * "If you step down each time it's offered": from the current (or early) rung, one rung per hold
+     * period, blended toward D's real taper pace as weeks of data build up. Always worded as an
+     * option ("if you take each step"). Null before any level at all.
+     */
+    fun taperPlan(data: FirewatchData, now: Long, tz: TimeZone): TaperPlan? {
+        val today = now.localDate(tz)
+        val current = data.targetPieces ?: Progress.measuredRung(data, today, tz)?.pieces ?: return null
+        if (current <= 0) return TaperPlan(emptyList(), "You're at Clear Air", data.settings.holdDays)
+        val hold = data.settings.holdDays.coerceAtLeast(1)
+        val since = data.rungChanges.lastOrNull()?.at?.localDate(tz)
+        var daysLeft = (hold - (since?.daysUntil(today) ?: 0)).coerceIn(1, hold)
+        var rung = current
+        var date = today
+        val plan = ArrayList<TaperStep>()
+        var guard = 0
+        while (rung > 0 && guard++ < 60) {
+            date = date.plus(daysLeft, DateTimeUnit.DAY)
+            rung = Ladder.nextDown(rung).pieces
+            plan += TaperStep(Ladder.rung(rung).takeIf { rung > 0 } ?: Ladder.clearAir, date)
+            daysLeft = hold
+        }
+        // Blend toward the real pace as full weeks of data build up (4 weeks = all pace).
+        val ins = Insights(data, tz, now)
+        val weeks = (ins.fullDays.size / 7).coerceAtMost(4)
+        val pace = ins.arrivals().associateBy { it.rung.tier }
+        val w = weeks / 4.0
+        val steps = plan.map { st ->
+            val paceDate = pace[st.rung.tier]?.date
+            if (paceDate == null || w == 0.0) st
+            else {
+                val diff = st.date.daysUntil(paceDate)
+                TaperStep(st.rung, st.date.plus((diff * w).toInt(), DateTimeUnit.DAY).let { if (it < today) today else it })
+            }
+        }
+        val basis = when {
+            w == 0.0 || pace.isEmpty() -> "Based on your plan"
+            w < 1.0 -> "Based on your plan and your last $weeks ${if (weeks == 1) "week" else "weeks"}"
+            else -> "Based on your pace"
+        }
+        return TaperPlan(steps, basis, hold)
+    }
 }

@@ -1,6 +1,6 @@
 # Proposed update: dose-honest battery, steady days, chart touches and continuity
 
-Status: **proposed, not built.** Written against Android 0.9.0. The maths lives in the shared
+Status: **built in Android 0.10.0 / web 0.8.0.** §7 changed: no overlay; day charts get ‹ Today › to view any earlier day. Written against Android 0.9.0. The maths lives in the shared
 `core`, so the web app gets it too, but web-only work isn't a priority. Decisions on each idea are
 tracked in `docs/suggestions.md`.
 

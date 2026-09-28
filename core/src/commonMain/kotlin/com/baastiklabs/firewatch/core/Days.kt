@@ -25,15 +25,22 @@ data class DaySummary(
 )
 
 object Days {
-    /** Per-calendar-day totals. Days with no doses or cravings are absent. */
+    /**
+     * The one "which day" rule: the waking day (wake-up to the next wake-up) that [t] belongs to.
+     * A 1 AM piece counts toward the night before. Daily counts everywhere use this; continuous
+     * things (the blood-level wave, receptors, the hour heatmap) keep clock time.
+     */
+    fun wakingDate(data: FirewatchData, t: Long, tz: TimeZone): LocalDate =
+        com.baastiklabs.firewatch.core.engine.BatteryEngine.currentDay(data, t, tz).first.date
+
+    /** Per-waking-day totals. Days with no doses or cravings are absent. */
     fun summaries(data: FirewatchData, tz: TimeZone, now: Long): Map<LocalDate, DaySummary> {
-        val ref = data.referenceMg
         val result = HashMap<LocalDate, DaySummary>()
         for (dose in data.doses) {
-            val date = dose.at.localDate(tz)
+            val date = wakingDate(data, dose.at, tz)
             val s = result[date] ?: DaySummary(date)
             val mg = dose.absorbedMg()
-            val pieces = Absorption.pieces(mg, ref)
+            val pieces = data.piecesOf(dose)
             result[date] = s.copy(
                 absorbedMg = s.absorbedMg + mg,
                 pieces = s.pieces + pieces,
@@ -44,7 +51,7 @@ object Days {
             )
         }
         for (craving in data.cravings) {
-            val date = craving.at.localDate(tz)
+            val date = wakingDate(data, craving.at, tz)
             val s = result[date] ?: DaySummary(date)
             val outcome = Cravings.effectiveOutcome(data, craving, now, tz)
             result[date] = s.copy(
@@ -56,10 +63,10 @@ object Days {
     }
 
     fun dosesOn(data: FirewatchData, date: LocalDate, tz: TimeZone): List<Dose> =
-        data.doses.filter { it.at.localDate(tz) == date }
+        data.doses.filter { wakingDate(data, it.at, tz) == date }
 
     fun cravingsOn(data: FirewatchData, date: LocalDate, tz: TimeZone): List<Craving> =
-        data.cravings.filter { it.at.localDate(tz) == date }
+        data.cravings.filter { wakingDate(data, it.at, tz) == date }
 }
 
 /** How a craving ended, worked out from the logs (never stored, so older versions are unaffected). */

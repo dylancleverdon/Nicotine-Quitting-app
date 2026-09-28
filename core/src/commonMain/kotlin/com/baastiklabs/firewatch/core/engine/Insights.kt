@@ -89,7 +89,7 @@ class Insights(private val data: FirewatchData, private val tz: TimeZone, privat
         val w = Waking.day(data, date, tz)
         val nextWake = Waking.day(data, date.plus(1, DateTimeUnit.DAY), tz).wakeAt
         val doses = data.doses.filter { it.at >= w.wakeAt && it.at < nextWake }
-        val pieces = doses.sumOf { it.pieces(ref) }
+        val pieces = doses.sumOf { data.piecesOf(it) }
         val awake = w.awakeMinutes
         val cravings = data.cravings.filter { it.at >= w.wakeAt && it.at < nextWake }
         val clearMinutes = run {
@@ -121,7 +121,7 @@ class Insights(private val data: FirewatchData, private val tz: TimeZone, privat
             absorbedMg = doses.sumOf { it.absorbedMg() },
             labelMg = doses.sumOf { it.labelMg * it.multiplier },
             spikeMg = doses.filter { it.speed == SpeedProfile.SPIKE }.sumOf { it.absorbedMg() },
-            borrowedPieces = doses.filter { it.borrowed }.sumOf { it.pieces(ref) },
+            borrowedPieces = doses.filter { it.borrowed }.sumOf { data.piecesOf(it) },
             lowPieces = doses.sumOf { (it.rangeLowMg ?: it.absorbedMg()) / ref },
             highPieces = doses.sumOf { (it.rangeHighMg ?: it.absorbedMg()) / ref },
             hasRange = doses.any { it.rangeLowMg != null },
@@ -135,7 +135,7 @@ class Insights(private val data: FirewatchData, private val tz: TimeZone, privat
             quality = Quality.of(doses, ref),
             costSpent = doses.sumOf { (prices[it.productId]?.unitPrice ?: 0.0) * it.multiplier },
             barcode = barcode,
-            kindPieces = doses.groupBy { it.kind }.mapValues { (_, v) -> v.sumOf { it.pieces(ref) } },
+            kindPieces = doses.groupBy { it.kind }.mapValues { (_, v) -> v.sumOf { data.piecesOf(it) } },
         )
     }
 
@@ -146,6 +146,13 @@ class Insights(private val data: FirewatchData, private val tz: TimeZone, privat
     }
 
     // ---- Today ----
+
+    /** The blood-level curve for any waking day (the day stepper on day charts). */
+    fun dayCurve(date: LocalDate, stepMin: Int = 5): List<Pair<Long, Double>> {
+        if (date == today) return todayCurve(stepMin)
+        val w = Waking.day(data, date, tz)
+        return Kinetics.curve(data.doses, w.wakeAt - 2 * 60 * MIN, w.sleepAt + 60 * MIN, stepMin)
+    }
 
     fun todayCurve(stepMin: Int = 5): List<Pair<Long, Double>> {
         val w = Waking.day(data, today, tz)
@@ -192,7 +199,7 @@ class Insights(private val data: FirewatchData, private val tz: TimeZone, privat
         val grid = Array(7) { DoubleArray(24) }
         data.doses.filter { !it.estimated }.forEach { d ->
             val dt = Instant.fromEpochMilliseconds(d.at).toLocalDateTime(tz)
-            grid[dt.dayOfWeek.ordinal][dt.hour] += d.pieces(ref)
+            grid[dt.dayOfWeek.ordinal][dt.hour] += data.piecesOf(d)
         }
         return grid
     }
@@ -409,6 +416,11 @@ class Insights(private val data: FirewatchData, private val tz: TimeZone, privat
             if (lastDay == null) return@forEach
             listOf(7, 30, 90, 180).filter { n >= it }.forEach { m ->
                 out += Badge("Held ${Ladder.rung(pieces).label} for $m days", "Holding steady is a win", lastDay)
+            }
+        }
+        Control.steadyDates(data, now, tz).let { steady ->
+            Control.STEADY_MILESTONES.filter { steady.size >= it }.forEach { m ->
+                out += Badge("$m steady days", "Days at or under your pace, no cigarettes or vapes", steady[m - 1])
             }
         }
         Control.daysOffSmokeAndVape(data, now, tz)?.let { off ->

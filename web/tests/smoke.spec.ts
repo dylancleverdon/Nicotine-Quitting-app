@@ -25,6 +25,8 @@ test('back-dated start, logging and persistence', async ({ page }) => {
   await page.getByRole('button', { name: 'Start here' }).click()
   await expect(page.locator('.tier')).toHaveText('Flicker')
   await expect(page.getByText(/Stretch .* · Pull .* · Net/)).toBeVisible()
+  // Dose preview under the product buttons.
+  await expect(page.locator('.product .preview').first()).toBeVisible()
 
   // One tap logs a dose.
   await page.locator('.product', { hasText: 'Nicotine gum 4 mg' }).click()
@@ -60,6 +62,10 @@ test('back-dated start, logging and persistence', async ({ page }) => {
   await page.getByRole('button', { name: 'Insights' }).click()
   await expect(page.getByText('Blood-level wave')).toBeVisible()
   await page.screenshot({ path: 'test-results/today.png', fullPage: true })
+  // Day charts: step back to yesterday (no overlay).
+  await page.locator('.day-stepper button').first().click()
+  await expect(page.locator('.day-stepper b')).toHaveText('Yesterday')
+  await page.screenshot({ path: 'test-results/yesterday.png', fullPage: true })
   for (const s of ['Trends', 'Patterns', 'Going down']) {
     await page.getByRole('button', { name: s, exact: true }).click()
     await page.screenshot({ path: `test-results/${s.replace(' ', '-').toLowerCase()}.png`, fullPage: true })

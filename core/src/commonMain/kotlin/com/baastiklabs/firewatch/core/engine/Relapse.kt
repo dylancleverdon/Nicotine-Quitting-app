@@ -118,7 +118,7 @@ object Relapse {
                 val d = today.minus(i, DateTimeUnit.DAY)
                 gum.any { it.at.localDate(tz) == d }
             }.coerceAtLeast(1)
-            if (gum.sumOf { it.pieces(ref) } / days >= 6.0) return RelapseReason.EARLY_HEAVY_GUM
+            if (gum.sumOf { data.piecesOf(it) } / days >= 6.0) return RelapseReason.EARLY_HEAVY_GUM
         }
         if (data.cravings.count { it.at in week..now && it.intensity >= STRONG_CRAVING } >= 3) return RelapseReason.STRONG_CRAVINGS
         return null

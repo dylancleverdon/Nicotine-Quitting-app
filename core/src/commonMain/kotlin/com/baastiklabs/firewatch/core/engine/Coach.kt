@@ -124,7 +124,7 @@ object Coach {
         val clustered = strongToday.any { c -> strongToday.count { it.at in c.at until c.at + 2 * 60 * MIN } >= 2 }
         if (strongToday.size >= 3 || clustered) reasons += "you've had ${strongToday.size} strong cravings today"
         val piecesToday = data.doses.filter { it.at >= day.wakeAt && it.at < nextWake }
-            .sumOf { it.pieces(data.referenceMg) }
+            .sumOf { data.piecesOf(it) }
         if (piecesToday > target + 1.0) reasons += "you're already ${com.baastiklabs.firewatch.core.engine.Ladder.piecesText(piecesToday - target)} over today's target"
         if (data.settings.hideTimer) {
             val todayChecks = Checks.day(data, day.date, tz).charging

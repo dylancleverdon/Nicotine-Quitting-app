@@ -85,7 +85,7 @@ object Receptors {
             var n = 0
             var t = w.wakeAt
             while (t < nextWake) { sum += Kinetics.level(relevant, t); n++; t += 30 * MIN }
-            val pieces = doses.filter { it.at >= w.wakeAt && it.at < nextWake }.sumOf { it.pieces(ref) }
+            val pieces = doses.filter { it.at >= w.wakeAt && it.at < nextWake }.sumOf { data.piecesOf(it) }
             Triple(d, if (n > 0) sum / n else 0.0, pieces)
         }
 

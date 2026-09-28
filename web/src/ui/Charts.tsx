@@ -1,5 +1,6 @@
 // Small SVG charts. Every figure is an estimate; charts are for shape and comparison.
-import { dayMonth, hourLabel } from './format'
+import { useState } from 'preact/hooks'
+import { dayMonth, hourLabel, time } from './format'
 const W = 320
 
 /** Round axis values: 0 up to a "nice" top at or above [max], about [n] steps. */
@@ -38,13 +39,23 @@ export function indexTicks(labels: string[], n = 4, centred = false): [number, s
 export const dateLabels = (isos: string[]) => isos.map(dayMonth)
 
 /** Axis frame: y values down the left, x labels underneath. */
-export function Frame({ ticks, fmt, height, xt, children, indent }: { ticks?: number[]; fmt?: (v: number) => string; height: number; xt?: [number, string][]; children: any; indent?: number }) {
+export function Frame({ ticks, fmt, height, xt, children, indent, readout }: { ticks?: number[]; fmt?: (v: number) => string; height: number; xt?: [number, string][]; children: any; indent?: number; readout?: (p: number) => string | null }) {
   const top = ticks?.length ? ticks[ticks.length - 1] : 1
+  // Touch and drag to read any point; let go and it disappears.
+  const [pos, setPos] = useState<number | null>(null)
+  const at = (e: PointerEvent) => { const r = (e.currentTarget as HTMLElement).getBoundingClientRect(); setPos(Math.max(0, Math.min(1, (e.clientX - r.left) / r.width))) }
+  const label = pos != null && readout ? readout(pos) : null
   return (
     <div class="chart-frame">
       <div class="chart">
         {ticks && fmt && <div class="yaxis" style={{ height }}>{ticks.map((t) => <span style={{ bottom: `${(t / top) * 100}%` }}>{fmt(t)}</span>)}</div>}
-        <div class="plot">{children}</div>
+        <div class="plot" style={readout ? { touchAction: 'pan-y' } : undefined}
+          onPointerDown={readout ? (e: any) => { (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId); at(e) } : undefined}
+          onPointerMove={readout ? (e: any) => { if (pos != null) at(e) } : undefined}
+          onPointerUp={readout ? () => setPos(null) : undefined} onPointerCancel={readout ? () => setPos(null) : undefined} onPointerLeave={readout ? () => setPos(null) : undefined}>
+          {children}
+          {label && <><i class="scrub-line" style={{ left: `${pos! * 100}%` }} /><span class="scrub-label" style={{ left: `${pos! * 100}%`, transform: `translateX(${pos! < 0.2 ? 0 : pos! > 0.8 ? -100 : -50}%)` }}>{label}</span></>}
+        </div>
       </div>
       {xt && xt.length > 0 && <div class="xaxis" style={{ marginLeft: `${indent ?? (ticks && fmt ? 44 : 0)}px` }}>{xt.map(([p, l]) => <span style={{ left: `${p * 100}%`, transform: `translateX(${p < 0.04 ? 0 : p > 0.96 ? -100 : -50}%)` }}>{l}</span>)}</div>}
     </div>
@@ -63,7 +74,8 @@ export function Wave({ points, typical = [], shade = [], now, height = 140, axes
   const y = (v: number) => height - (v / max) * height
   const line = points.map((p, i) => `${i ? 'L' : 'M'}${x(p[0]).toFixed(1)},${y(p[1]).toFixed(1)}`).join('')
   return (
-    <Frame ticks={ticks} fmt={(v) => `${v} mg`} height={height} xt={timeTicks(t0, t1, axes ? 5 : 4)}>
+    <Frame ticks={ticks} fmt={(v) => `${v} mg`} height={height} xt={timeTicks(t0, t1, axes ? 5 : 4)}
+      readout={(p) => { const t = t0 + p * (t1 - t0); const pt = points.reduce((a, b) => (Math.abs(b[0] - t) < Math.abs(a[0] - t) ? b : a)); return `${time(pt[0])} · ≈ ${pt[1].toFixed(1)} mg` }}>
     <svg viewBox={`0 0 ${W} ${height}`} width="100%" height={height} preserveAspectRatio="none">
       <Grid ticks={ticks} y={y} />
       {shade.map(([a, b]) => b > a && <rect x={x(Math.max(a, t0))} y={0} width={Math.max(0, x(Math.min(b, t1)) - x(Math.max(a, t0)))} height={height} fill="var(--line)" opacity={0.35} />)}
@@ -84,7 +96,8 @@ export function Bars({ values, line, highs, faded, height = 140, fmt, x }: { val
   const slot = W / values.length, w = slot * 0.7
   const y = (v: number) => height - (v / max) * height
   return (
-    <Frame ticks={ticks} fmt={fmt} height={height} xt={x ? indexTicks(x, 4, true) : undefined}>
+    <Frame ticks={ticks} fmt={fmt} height={height} xt={x ? indexTicks(x, 4, true) : undefined}
+      readout={(p) => { const i = Math.min(values.length - 1, Math.floor(p * values.length)); return `${x?.[i] ? x[i] + ' · ' : ''}${fmt ? fmt(Number(values[i].toFixed(1))) : values[i].toFixed(1)}${line?.[i] != null ? ` (line ${line[i].toFixed(1)})` : ''}` }}>
     <svg viewBox={`0 0 ${W} ${height}`} width="100%" height={height} preserveAspectRatio="none">
       <Grid ticks={ticks} y={y} />
       <defs><pattern id="hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="2" height="6" fill="var(--primary)" /></pattern></defs>
@@ -114,7 +127,8 @@ export function Line({ values, second, stepped, color = 'var(--primary)', height
     }).join('')
   }
   return (
-    <Frame ticks={ticks} fmt={fmt} height={height} xt={x ? indexTicks(x) : undefined}>
+    <Frame ticks={ticks} fmt={fmt} height={height} xt={x ? indexTicks(x) : undefined}
+      readout={(p) => { const n = Math.max(values.length, second?.length ?? 0); const i = Math.round(p * (n - 1)); const f = (v?: number) => (v == null ? '–' : fmt ? fmt(Number(v.toFixed(1))) : v.toFixed(1)); return `${x?.[i] ? x[i] + ' · ' : ''}${f(values[i])}${second ? ` / ${f(second[i])}` : ''}` }}>
     <svg viewBox={`0 0 ${W} ${height}`} width="100%" height={height} preserveAspectRatio="none">
       <Grid ticks={ticks} y={(v) => height - (v / max) * height} />
       {second && second.length > 1 && <path d={path(second)} fill="none" stroke="var(--tertiary)" stroke-width={2} />}
@@ -172,7 +186,8 @@ export function ForecastChart({ points, now, height = 130 }: { points: number[][
   })
   const dot = (s: number) => `hsl(${160 - ((Math.min(10, Math.max(1, s)) - 1) / 9) * 160}, 45%, 55%)`
   return (
-    <Frame ticks={ticks} fmt={(v) => `${Math.round(v * 100)}%`} height={height} xt={timeTicks(t0, t1)}>
+    <Frame ticks={ticks} fmt={(v) => `${Math.round(v * 100)}%`} height={height} xt={timeTicks(t0, t1)}
+      readout={(p) => { const t = t0 + p * (t1 - t0); const pt = points.reduce((a, b) => (Math.abs(b[0] - t) < Math.abs(a[0] - t) ? b : a)); return pt[3] ? `${time(pt[0])} · asleep` : `${time(pt[0])} · ${Math.round(pt[1] * 100)}% · strength ≈ ${Math.round(pt[2])}` }}>
     <svg viewBox={`0 0 ${W} ${height}`} width="100%" height={height} preserveAspectRatio="none">
       <Grid ticks={ticks} y={y} />
       {sleep.map(([a, b]) => <rect x={x(a)} y={0} width={Math.max(0, x(b) - x(a))} height={height} fill="var(--line)" opacity={0.35} />)}
@@ -195,7 +210,8 @@ export function ReceptorChart({ history, plan, stay, typical, height = 150, date
   const today = Math.max(0, history.length - 1)
   const path = (vs: number[], off: number) => vs.map((v, i) => `${i ? 'L' : 'M'}${x(off + i).toFixed(1)},${y(v).toFixed(1)}`).join('')
   return (
-    <Frame ticks={ticks} fmt={(v) => `${Math.round(v * 100)}%`} height={height} xt={dates.length ? indexTicks(dateLabels(dates), 4) : undefined}>
+    <Frame ticks={ticks} fmt={(v) => `${Math.round(v * 100)}%`} height={height} xt={dates.length ? indexTicks(dateLabels(dates), 4) : undefined}
+      readout={(p) => { const i = Math.round(p * (total - 1)); const v = i < history.length ? history[i] : plan[i - today] ?? stay[i - today]; return `${dates[i] ? dayMonth(dates[i]) + ' · ' : ''}≈ ${Math.round((v ?? 0) * 100)}%${i >= history.length ? ' (plan)' : ''}` }}>
     <svg viewBox={`0 0 ${W} ${height}`} width="100%" height={height} preserveAspectRatio="none">
       <Grid ticks={ticks} y={y} />
       <rect x={0} y={y(typical)} width={W} height={height - y(typical)} fill="var(--tertiary)" opacity={0.15} />

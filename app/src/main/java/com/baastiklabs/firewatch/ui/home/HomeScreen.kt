@@ -97,10 +97,12 @@ fun HomeScreen(
     val today = now.localDate(tz)
     val minute = now / 60_000
     val summaries = remember(data, minute) { Days.summaries(data, tz, now) }
-    val todaySummary = summaries[today] ?: DaySummary(today)
+    // "Today" = the waking day: a 1 AM piece counts toward the night before.
+    val wakingToday = remember(data, minute) { Days.wakingDate(data, now, tz) }
+    val todaySummary = summaries[wakingToday] ?: DaySummary(wakingToday)
     val baseline = remember(data, minute) { Baseline.status(data, today, tz) }
     val activeCraving = remember(data, minute) { Cravings.active(data, now) }
-    val todayDoses = remember(data, minute) { data.doses.filter { it.at.localDate(tz) == today }.sortedByDescending { it.at } }
+    val todayDoses = remember(data, minute) { data.doses.filter { Days.wakingDate(data, it.at, tz) == wakingToday }.sortedByDescending { it.at } }
     val lastDoseAt = data.doses.maxOfOrNull { it.at }
 
     var optionsFor by remember { mutableStateOf<Product?>(null) }
@@ -131,6 +133,17 @@ fun HomeScreen(
     val lighter = remember(data, minute / 60) { com.baastiklabs.firewatch.core.engine.Control.lighterThanStart(data, now, tz) }
     val daysOff = remember(data, minute / 60) { com.baastiklabs.firewatch.core.engine.Control.daysOffSmokeAndVape(data, now, tz) }
     val journey = remember(data, minute / 60) { if (revealed) Insights(data, tz, now).journey() else null }
+    val steadyDays = remember(data, minute / 30) { com.baastiklabs.firewatch.core.engine.Control.steadyDays(data, now, tz) }
+    val steadyMilestone = com.baastiklabs.firewatch.core.engine.Control.newSteadyMilestone(data, steadyDays)
+    val practicing = com.baastiklabs.firewatch.core.engine.Control.practicingToday(data, now, tz)
+    val practiceFollowUp = remember(data, minute) { com.baastiklabs.firewatch.core.engine.Control.practiceFollowUp(data, now, tz) }
+    val previews = remember(data, minute) {
+        val t = target?.pieces
+        if (t == null || data.settings.hideTimer) emptyMap()
+        else data.homeProducts.mapNotNull { p ->
+            com.baastiklabs.firewatch.core.engine.BatteryEngine.preview(data, p, if (t > 0) t else 1.0 / 3.0, now, tz, com.baastiklabs.firewatch.data.AppActivity.last(context))?.let { p.id to it }
+        }.toMap()
+    }
     val welcomeBack = remember(data, minute) { com.baastiklabs.firewatch.core.engine.Control.welcomeBackDays(data, now, tz) }
     val headsUps = remember(data, minute) { Progress.headsUps(data, now, tz) }
     val wave = remember(data, minute) { Insights(data, tz, now).todayCurve(10) }
@@ -244,7 +257,6 @@ fun HomeScreen(
                         revealed30 = true
                         scope.launch { repo.logTimerCheck(charging = (battery?.charge ?: 1.0) < 0.999) }
                     },
-                    fitsNow = battery?.let { com.baastiklabs.firewatch.core.engine.BatteryEngine.fitsNow(data, it)?.name },
                 )
             } else {
                 StatusCard(todaySummary, baseline, summaries, lastDoseAt, now, onBackfill)
@@ -252,11 +264,19 @@ fun HomeScreen(
         }
         if (showTier) {
             val wins = listOfNotNull(
+                if (data.settings.showSteadyDays && steadyDays > 0) "✓ $steadyDays steady ${if (steadyDays == 1) "day" else "days"}" else null,
                 if (heldDays > 0 && target != null && !early) "✓ Held ${target.label} for $heldDays ${if (heldDays == 1) "day" else "days"}" else null,
                 lighter?.let { "✓ About ${(it * 100).toInt()}% lighter than when you started" },
                 daysOff?.takeIf { it > 0 }?.let { "✓ $it days off cigarettes and vapes" },
                 journey?.takeIf { it > 0 }?.let { "Journey to Clear Air: ${(it * 100).toInt()}%" },
             )
+            if (practicing) item {
+                Text(
+                    "Practice day: ${com.baastiklabs.firewatch.core.engine.Ladder.rung(data.settings.practicePieces).label} pace",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
             if (early) item {
                 Text(
                     "Early estimate · firming up as you log your first week" +
@@ -269,6 +289,33 @@ fun HomeScreen(
                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     wins.forEach { Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.tertiary) }
                 }
+            }
+        }
+        steadyMilestone?.takeIf { data.settings.showSteadyDays }?.let { m ->
+            item {
+                OfferCard(
+                    title = "$m steady days",
+                    body = "$m days at or under your pace with no cigarettes or vapes. That's real control.",
+                    primary = "Nice",
+                    onPrimary = { scope.launch { repo.updateSettings { it.copy(steadyMilestoneSeen = m) } } },
+                    secondary = null,
+                    onSecondary = {},
+                )
+            }
+        }
+        practiceFollowUp?.let { r ->
+            item {
+                OfferCard(
+                    title = "How was ${r.label} pace?",
+                    body = "Step down to it, or stay where you are. Either is fine.",
+                    primary = "Step down",
+                    onPrimary = {
+                        scope.launch { repo.updateSettings { it.copy(practiceDate = "", practicePieces = 0.0) } }
+                        moveTarget(r.pieces, "down")
+                    },
+                    secondary = "Stay here",
+                    onSecondary = { scope.launch { repo.updateSettings { it.copy(practiceDate = "", practicePieces = 0.0, stepDownSnoozedAt = repo.now()) } } },
+                )
             }
         }
         welcomeBack?.let { gap ->
@@ -308,6 +355,13 @@ fun HomeScreen(
                     onPrimary = { moveTarget(stepDown.pieces, "down") },
                     secondary = "Stay here",
                     onSecondary = { scope.launch { repo.updateSettings { it.copy(stepDownSnoozedAt = repo.now()) } } },
+                    tertiary = "Try it for a day",
+                    onTertiary = {
+                        scope.launch {
+                            repo.updateSettings { it.copy(practiceDate = wakingToday.toString(), practicePieces = stepDown.pieces) }
+                            snackbar.showSnackbar("Practice day: ${stepDown.label} pace for today")
+                        }
+                    },
                 )
             }
         }
@@ -404,6 +458,7 @@ fun HomeScreen(
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 row.forEach { product ->
                     ProductButton(
+                        preview = if (timerHidden) null else previews[product.id],
                         product = product,
                         referenceMg = data.referenceMg,
                         modifier = Modifier.weight(1f),
@@ -449,7 +504,7 @@ fun HomeScreen(
             }
         }
         items(todayDoses, key = { it.id }) { dose ->
-            DoseRow(dose, data.referenceMg, onClick = { editing = dose })
+            DoseRow(dose, data.refMgAt(dose.at), onClick = { editing = dose })
         }
         item {
             OutlinedButton(onClick = { relapseDialog = true }, modifier = Modifier.fillMaxWidth()) {
@@ -735,6 +790,7 @@ private fun StatusCard(
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun ProductButton(
+    preview: Double?,
     product: Product,
     referenceMg: Double,
     modifier: Modifier,
@@ -751,7 +807,7 @@ private fun ProductButton(
         contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
         shape = shape,
         modifier = modifier
-            .height(96.dp)
+            .height(if (preview != null) 108.dp else 96.dp)
             .clip(shape)
             .combinedClickable(onClick = onTap, onLongClick = onLongPress),
     ) {
@@ -763,7 +819,17 @@ private fun ProductButton(
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
-            Text(Fmt.piecesLabel(pieces), style = MaterialTheme.typography.bodySmall)
+            Column {
+                Text(Fmt.piecesLabel(pieces), style = MaterialTheme.typography.bodySmall)
+                // What logging it now would do to net (timing and size): neutral, never "earn it".
+                preview?.takeIf { kotlin.math.abs(it) >= 1 }?.let {
+                    Text(
+                        if (it > 0) "+${Fmt.duration((it * 60_000).toLong())} stretch" else "+${Fmt.duration((-it * 60_000).toLong())} pull",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.75f),
+                    )
+                }
+            }
         }
     }
 }

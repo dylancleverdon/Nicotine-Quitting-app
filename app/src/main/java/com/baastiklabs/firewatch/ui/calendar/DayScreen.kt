@@ -144,7 +144,7 @@ fun DayScreen(
                 }
             }) { entry ->
                 when (entry) {
-                    is Entry.DoseEntry -> DoseRow(entry.dose, data.referenceMg, onClick = { editingDose = entry.dose })
+                    is Entry.DoseEntry -> DoseRow(entry.dose, data.refMgAt(entry.dose.at), onClick = { editingDose = entry.dose })
                     is Entry.CravingEntry -> CravingRow(entry.craving, data, onClick = { editingCraving = entry.craving })
                     is Entry.SleepEntry -> ListItem(
                         colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.background),

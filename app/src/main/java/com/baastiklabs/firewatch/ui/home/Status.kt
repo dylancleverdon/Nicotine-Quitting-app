@@ -47,7 +47,6 @@ fun TierStatusCard(
     wave: List<Pair<Long, Double>>,
     sleepShade: List<Pair<Long, Long>>,
     quality: Double?,
-    fitsNow: String? = null,
     nowDoses: List<com.baastiklabs.firewatch.core.model.Dose> = emptyList(),
     relapseNext: Long? = null,
     timerHidden: Boolean = false,
@@ -79,7 +78,7 @@ fun TierStatusCard(
                 }
             }
             battery?.let {
-                if (timerHidden) HiddenBatteryRow(it, onReveal) else BatteryRow(it, now, fitsNow, relapseNext)
+                if (timerHidden) HiddenBatteryRow(it, onReveal) else BatteryRow(it, now, relapseNext)
             }
             Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
                 Stat("≈ ${Fmt.pieces(today.pieces)}", "pieces today", big = true)
@@ -109,7 +108,7 @@ fun TierStatusCard(
 }
 
 @Composable
-private fun BatteryRow(b: Battery, now: Long, fitsNow: String?, relapseNext: Long?) {
+private fun BatteryRow(b: Battery, now: Long, relapseNext: Long?) {
     val (title, detail) = if (relapseNext != null) "Next scheduled piece at ${Fmt.time(relapseNext)}" to "Relapse prevention mode: staying ahead of cravings" else when (b.state) {
         BatteryState.CLEAR -> "Clear for one if you want it" to "No rush. Every minute you wait counts as stretch."
         BatteryState.CHARGING -> "Next piece around ${b.readyAt?.let { Fmt.time(it) } ?: "later"}" to
@@ -124,7 +123,6 @@ private fun BatteryRow(b: Battery, now: Long, fitsNow: String?, relapseNext: Lon
         LinearProgressIndicator(progress = { b.charge.coerceIn(0.0, 1.0).toFloat() }, modifier = Modifier.fillMaxWidth())
         Text(detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         if (b.closeToBed) Text("Close to bedtime: nicotine can make it harder to fall asleep.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        fitsNow?.let { Text("A $it fits now", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
         if (relapseNext == null) StretchLine(b.stretchMinutesToday, b.pullMinutesToday)
     }
 }
@@ -156,13 +154,24 @@ fun StretchLine(stretchMin: Double, pullMin: Double) {
 
 /** A prompt card with a primary and a secondary action. */
 @Composable
-fun OfferCard(title: String, body: String, primary: String, onPrimary: () -> Unit, secondary: String?, onSecondary: () -> Unit) {
+fun OfferCard(
+    title: String,
+    body: String,
+    primary: String,
+    onPrimary: () -> Unit,
+    secondary: String?,
+    onSecondary: () -> Unit,
+    tertiary: String? = null,
+    onTertiary: () -> Unit = {},
+) {
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer), shape = RoundedCornerShape(20.dp)) {
         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             Text(body, style = MaterialTheme.typography.bodyMedium)
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+            androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Button(onClick = onPrimary) { Text(primary) }
+                if (tertiary != null) OutlinedButton(onClick = onTertiary) { Text(tertiary) }
                 if (secondary != null) OutlinedButton(onClick = onSecondary) { Text(secondary) }
             }
         }

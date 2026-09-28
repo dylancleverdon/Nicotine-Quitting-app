@@ -36,7 +36,7 @@ export interface InsightsData {
 export interface Snapshot {
   today: string; baselineState: 'none' | 'progress' | 'complete'; baselineDay: number; baselineAverage: number | null
   revealed: boolean; measured: Rung | null; target: Rung | null; battery: Battery | null
-  stepDown: Rung | null; stepDownNote: string | null; stepUp: Rung | null; stepUpWhy: string | null; stepUpSameDay: boolean; cravingEndings: NamedValue[]; checks: NamedValue[]; checksToday: number; early: boolean; earlyUpdate: number | null; heldDays: number; held: string[][]; lighterThanStart: number | null; daysOffSmokeAndVape: number | null; welcomeBack: string[] | null; headsUps: string[]
+  stepDown: Rung | null; stepDownNote: string | null; stepUp: Rung | null; stepUpWhy: string | null; stepUpSameDay: boolean; cravingEndings: NamedValue[]; checks: NamedValue[]; checksToday: number; early: boolean; earlyUpdate: number | null; heldDays: number; held: string[][]; lighterThanStart: number | null; daysOffSmokeAndVape: number | null; welcomeBack: string[] | null; previews: Record<string, number>; steadyDays: number; wakingToday: string; steadyMilestone: number | null; practicing: boolean; practiceFollowUp: Rung | null; taperSteps: NamedValue[]; taperBasis: string | null; headsUps: string[]
   qualityScore: number | null; qualityLabel: string | null; swapTip: string | null; activeCraving: CravingView | null
   todayPieces: number; todayMg: number; todayCravings: number; todayRodeOut: number; lastDoseAt: number | null
   todayDoses: DoseView[]; todayCravingList: CravingView[]; wave: number[][]; wakeAt: number; sleepAt: number; typical: number[]
@@ -56,7 +56,7 @@ export const Core = {
   newId: (): string => core.newId(Date.now()),
   compute: (records: string): Snapshot => JSON.parse(core.compute(records, Date.now(), lastActivity())),
   waitedForFull: (records: string, doseId: string): boolean => core.waitedForFull(records, doseId),
-  day: (records: string, iso: string): { doses: DoseView[]; cravings: CravingView[] } => JSON.parse(core.day(records, iso, Date.now())),
+  day: (records: string, iso: string): { doses: DoseView[]; cravings: CravingView[]; wave: number[][]; wakeAt: number; sleepAt: number } => JSON.parse(core.day(records, iso, Date.now())),
   piecesOf: (product: any, records: string): number => core.absorbedPieces(JSON.stringify(product), records),
   doseFor: (product: any, at: number, opts: { multiplier?: number; duration?: string; acidic?: boolean; tags?: string[] } = {}): any =>
     JSON.parse(core.doseFor(JSON.stringify(product), core.newId(Date.now()), at, Date.now(), opts.multiplier ?? 1, opts.duration ?? 'FULL', opts.acidic ?? false, (opts.tags ?? []).join(','))),

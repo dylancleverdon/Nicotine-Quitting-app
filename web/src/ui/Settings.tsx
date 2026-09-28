@@ -15,6 +15,14 @@ export function Settings({ toast, go, updateInfo }: { toast: (m: string) => void
   const snap = S.snapshot.value!
   const [editing, setEditing] = useState<any>(null)
   const [pending, setPending] = useState(unsent())
+  const [refTo, setRefTo] = useState<string | null>(null)
+  const [refDate, setRefDate] = useState('')
+  const applyRef = async (from: number) => {
+    await S.save('refchange', { id: Core.newId(), at: Date.now(), from, productId: refTo, previousProductId: s.referenceProductId })
+    await S.updateSettings({ referenceProductId: refTo })
+    setRefTo(null); setRefDate('')
+    toast('One piece is now ' + (S.products.value.find((p) => p.id === refTo)?.name ?? ''))
+  }
   const exportNow = () => {
     const blob = new Blob([JSON.stringify(S.exportFile(), null, 2)], { type: 'application/json' })
     const a = document.createElement('a')
@@ -56,6 +64,8 @@ export function Settings({ toast, go, updateInfo }: { toast: (m: string) => void
       <div class="small">Time format</div>
       <div class="row wrap">{[['system', 'Device setting'], ['12h', '12-hour (AM/PM)'], ['24h', '24-hour']].map(([v, l]) =>
         <button class={`chip ${(s.timeFormat ?? 'system') === v ? 'on' : ''}`} onClick={() => S.updateSettings({ timeFormat: v })}>{l}</button>)}</div>
+      <label class="row small"><input type="checkbox" style={{ width: 'auto' }} checked={s.showSteadyDays ?? true} onChange={() => S.updateSettings({ showSteadyDays: !(s.showSteadyDays ?? true) })} /> Show steady days on the home card</label>
+      <label class="row small"><input type="checkbox" style={{ width: 'auto' }} checked={!!s.detailedCharts} onChange={() => S.updateSettings({ detailedCharts: !s.detailedCharts })} /> Detailed charts: range choices and earlier/later on Insights charts</label>
       <label class="row small"><input type="checkbox" style={{ width: 'auto' }} checked={!!s.hideTimer} onChange={() => S.updateSettings({ hideTimer: !s.hideTimer })} /> Hide next piece timer: the time shows only when you tap, so Firewatch can learn how often you check</label>
       <label class="row small"><input type="checkbox" style={{ width: 'auto' }} checked={s.windDown} onChange={() => S.updateSettings({ windDown: !s.windDown })} /> Wind down: no "clear for one" in the last hour before bed</label>
       <label class="row small"><input type="checkbox" style={{ width: 'auto' }} checked={s.dailyCheckIn} onChange={() => S.updateSettings({ dailyCheckIn: !s.dailyCheckIn })} /> Daily check-in (cravings, mood, sleep)</label>
@@ -79,7 +89,7 @@ export function Settings({ toast, go, updateInfo }: { toast: (m: string) => void
       ))}</div>
       <button class="btn outline" onClick={() => setEditing({ id: '', name: '', kind: 'POUCH', labelMg: 0, absorption: 0.4, speed: 'BUILD', onHome: true })}>Add a product</button>
       <div class="row"><span class="grow small">One piece is</span>
-        <select style={{ width: 200 }} value={s.referenceProductId} onChange={(e) => S.updateSettings({ referenceProductId: (e.target as HTMLSelectElement).value })}>
+        <select style={{ width: 200 }} value={s.referenceProductId} onChange={(e) => { const v = (e.target as HTMLSelectElement).value; if (v !== s.referenceProductId) setRefTo(v) }}>
           {S.products.value.map((p) => <option value={p.id}>{p.name}</option>)}</select></div>
 
       <h3 class="label">Money</h3>
@@ -106,6 +116,15 @@ export function Settings({ toast, go, updateInfo }: { toast: (m: string) => void
         <button class="btn outline" onClick={() => go('why')}>Why Firewatch works this way</button></div>
 
       <div class="footer">Firewatch by Baastik Labs · © 2026 Baastik Labs<br />≈ All nicotine figures are estimates.</div>
+      {refTo && <div class="sheet-bg" onClick={() => setRefTo(null)}><div class="sheet" onClick={(e) => e.stopPropagation()}>
+        <h2>Change what counts as one piece</h2>
+        <div class="small">From today on, {S.products.value.find((p) => p.id === refTo)?.name} counts as one piece. Past days keep the old piece size.</div>
+        <button class="btn" onClick={() => applyRef(Date.now())}>From today on</button>
+        <div class="small">Or back-date the change. <b>This changes your past totals and may change your tier.</b></div>
+        <div class="row"><input type="date" value={refDate} onInput={(e) => setRefDate((e.target as HTMLInputElement).value)} />
+          <button class="btn outline" disabled={!refDate} onClick={() => applyRef(new Date(refDate + 'T00:00').getTime())}>Back-date</button></div>
+        <button class="btn text" onClick={() => setRefTo(null)}>Cancel</button>
+      </div></div>}
       {editing && <ProductEditor product={editing} onClose={() => setEditing(null)} />}
     </main>
   )

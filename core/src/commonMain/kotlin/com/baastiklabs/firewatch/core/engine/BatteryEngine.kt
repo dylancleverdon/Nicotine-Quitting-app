@@ -56,8 +56,13 @@ object BatteryEngine {
         data.doses.filter { it.at >= day.wakeAt && it.at < nextWake }.sortedBy { it.at }
 
     /**
-     * Simulates a waking day minute by minute up to [until]. Awake = from wake-up to bedtime, plus
-     * any late-night time up to [awakeUntil]. [stopBefore] stops just before that dose (for the cheer).
+     * The battery for one waking day up to [until], jumping from event to event (fast). Awake = from
+     * wake-up to bedtime, plus any late-night time up to [awakeUntil]. [stopBefore] stops just before
+     * that dose (for the cheer).
+     * - Every dose empties the battery, whatever its size; it refills over one gap while awake.
+     * - Timing: a dose before the battery is full adds pull (the time it still needed); minutes
+     *   held with a full battery (before bedtime) add stretch.
+     * - Size: p pieces above one add (p − 1) × gap of pull; below one add (1 − p) × gap of stretch.
      */
     private fun simulate(
         data: FirewatchData,
@@ -69,45 +74,101 @@ object BatteryEngine {
         stopBefore: Dose? = null,
     ): Sim {
         val doses = dayDoses(data, day, nextWake)
-        val ref = data.referenceMg
+        var charge = 1.0
+        var stretch = 0.0
+        var pull = 0.0
+        var fullBeforeLast: Boolean? = null
+        val awakeEnd = maxOf(day.sleepAt, awakeUntil)
+        // Stretch only counts once there's a target to hold off against.
+        val stretchFrom = data.rungChanges.firstOrNull()?.at ?: Long.MAX_VALUE
+        val end = minOf(until, nextWake)
+        var t = day.wakeAt
+        fun advance(to: Long) {
+            if (to <= t) return
+            val refillEnd = minOf(to, awakeEnd)
+            if (refillEnd > t) {
+                val fullAt = t + ((1.0 - charge).coerceAtLeast(0.0) * interval * MIN).toLong()
+                val sStart = maxOf(fullAt, t, stretchFrom)
+                val sEnd = minOf(refillEnd, day.sleepAt)
+                if (sEnd > sStart) stretch += (sEnd - sStart) / MIN.toDouble()
+                charge = (charge + (refillEnd - t) / MIN.toDouble() / interval).coerceAtMost(1.0)
+            }
+            t = to
+        }
+        for (d in doses) {
+            if (d.at > end) break
+            advance(d.at)
+            if (stopBefore != null && d.id == stopBefore.id) return Sim(charge, stretch, pull, charge >= 1.0 - 1e-9)
+            val full = charge >= 1.0 - 1e-9
+            if (!full) pull += (1.0 - charge) * interval
+            val p = data.piecesOf(d)
+            if (p > 1.0) pull += (p - 1.0) * interval else stretch += (1.0 - p) * interval
+            fullBeforeLast = full
+            charge = 0.0
+        }
+        advance(end)
+        return Sim(charge, stretch, pull, fullBeforeLast)
+    }
+
+    /** The same rules stepped minute by minute (the reference the fast version is tested against). */
+    internal fun simulateByMinute(data: FirewatchData, day: WakingDay, nextWake: Long, interval: Double, until: Long, awakeUntil: Long): Triple<Double, Double, Double> {
+        val doses = dayDoses(data, day, nextWake)
         var charge = 1.0
         var stretch = 0.0
         var pull = 0.0
         var di = 0
-        var fullBeforeLast: Boolean? = null
         val awakeEnd = maxOf(day.sleepAt, awakeUntil)
-        // Stretch only counts once there's a target to hold off against.
         val stretchFrom = data.rungChanges.firstOrNull()?.at ?: Long.MAX_VALUE
         var t = day.wakeAt
         val end = minOf(until, nextWake)
         while (t <= end) {
             while (di < doses.size && doses[di].at <= t) {
                 val d = doses[di]
-                if (stopBefore != null && d.id == stopBefore.id) {
-                    return Sim(charge, stretch, pull, charge >= 1.0 - 1e-9)
-                }
-                // Size-honest pull: only the part of the dose that didn't fit in the battery.
-                val pieces = Absorption.pieces(d.absorbedMg(), ref)
-                pull += (pieces - charge).coerceAtLeast(0.0) * interval
-                fullBeforeLast = charge >= 1.0 - 1e-9
-                charge = (charge - pieces).coerceAtLeast(0.0)
+                if (charge < 1.0 - 1e-9) pull += (1.0 - charge) * interval
+                val p = data.piecesOf(d)
+                if (p > 1.0) pull += (p - 1.0) * interval else stretch += (1.0 - p) * interval
+                charge = 0.0
                 di++
             }
-            if (t < awakeEnd) {
+            if (t < awakeEnd && t < end) {
                 if (charge >= 1.0 - 1e-9 && t < day.sleepAt && t >= stretchFrom) stretch += 1.0
                 charge = (charge + 1.0 / interval).coerceAtMost(1.0)
             }
             t += MIN
         }
-        return Sim(charge, stretch, pull, fullBeforeLast)
+        return Triple(charge, stretch, pull)
+    }
+
+    /** For tests: the waking day that [t] falls in, with the next wake-up. */
+    internal fun dayOf(data: FirewatchData, t: Long, tz: TimeZone) = currentDay(data, t, tz)
+
+    /** The rung in force for the battery on this waking day: a practice day uses the next rung. */
+    fun practiceTarget(data: FirewatchData, day: WakingDay, fallback: Double): Double {
+        val s = data.settings
+        return if (s.practiceDate.isNotEmpty() && s.practiceDate == day.date.toString() && s.practicePieces > 0) s.practicePieces else fallback
+    }
+
+    /**
+     * What logging [product] now would do to today's net, in minutes: positive = stretch, negative =
+     * pull (timing and size combined). Null without a target, or on a Relapse prevention mode day.
+     */
+    fun preview(data: FirewatchData, product: com.baastiklabs.firewatch.core.model.Product, targetPieces: Double, now: Long, tz: TimeZone, lastActivityAt: Long = 0L): Double? {
+        val b = now(data, targetPieces, now, tz, lastActivityAt)
+        val (day, _) = currentDay(data, now, tz)
+        if (Relapse.isModeDay(data, day.date, tz)) return null
+        val interval = b.intervalMinutes
+        val p = Absorption.pieces(Absorption.absorbedMg(product), data.refMgAt(now))
+        val timing = -(1.0 - b.charge).coerceAtLeast(0.0) * interval
+        val size = if (p > 1.0) -(p - 1.0) * interval else (1.0 - p) * interval
+        return timing + size
     }
 
     /** The target rung (pieces a day) in force at time [t], or null before any target. */
     fun targetAt(data: FirewatchData, t: Long): Double? = data.rungChanges.lastOrNull { it.at <= t }?.pieces
 
     fun now(data: FirewatchData, targetPieces: Double, now: Long, tz: TimeZone, lastActivityAt: Long = 0L): Battery {
-        val interval = intervalFor(targetPieces)
         val (day, nextWake) = currentDay(data, now, tz)
+        val interval = intervalFor(practiceTarget(data, day, targetPieces))
         val lateDose = dayDoses(data, day, nextWake).lastOrNull { it.at >= day.sleepAt }?.at ?: 0L
         val activity = maxOf(lastActivityAt, lateDose).takeIf { it in day.sleepAt..now } ?: 0L
         val sim = simulate(data, day, nextWake, interval, now, activity)
@@ -163,7 +224,7 @@ object BatteryEngine {
         val target = targetAt(data, day.wakeAt) ?: data.rungChanges.firstOrNull { it.at < day.sleepAt }?.pieces ?: return null
         val nextWake = Waking.day(data, date.plus(1, DateTimeUnit.DAY), tz).wakeAt
         val lateDose = dayDoses(data, day, nextWake).lastOrNull { it.at >= day.sleepAt }?.at ?: 0L
-        val sim = simulate(data, day, nextWake, intervalFor(target), now, lateDose)
+        val sim = simulate(data, day, nextWake, intervalFor(practiceTarget(data, day, target)), now, lateDose)
         if (Relapse.isModeDay(data, date, tz)) return DayBattery(date, 0.0, 0.0, paused = true)
         return DayBattery(date, sim.stretch, sim.pull)
     }
@@ -196,17 +257,4 @@ object BatteryEngine {
         return sim.fullBeforeLast == true || sim.charge >= 1.0 - 1e-9
     }
 
-    /**
-     * "A gum 2 mg fits now": while charging with at least half a piece of room, the biggest home
-     * product that fits the current charge (by its estimated pieces). Null otherwise.
-     */
-    fun fitsNow(data: FirewatchData, battery: Battery): com.baastiklabs.firewatch.core.model.Product? {
-        if (battery.state != BatteryState.CHARGING || battery.charge < 0.5) return null
-        val ref = data.referenceMg
-        return data.products
-            .filter { it.onHome && !it.archived && it.borrowedFrom == null }
-            .map { it to Absorption.pieces(Absorption.absorbedMg(it), ref) }
-            .filter { (_, p) -> p > 0.0 && p <= battery.charge + 1e-9 }
-            .maxByOrNull { it.second }?.first
-    }
 }

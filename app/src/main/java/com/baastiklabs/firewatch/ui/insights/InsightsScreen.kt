@@ -23,6 +23,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import kotlinx.datetime.minus
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -89,6 +90,25 @@ fun InsightsScreen(data: FirewatchData, now: Long, watch: @Composable () -> Unit
             Text("Log a few doses and your graphs appear here.", modifier = Modifier.padding(16.dp))
             return@Column
         }
+        var range by rememberSaveable { mutableStateOf(42) }
+        var endOff by rememberSaveable { mutableStateOf(0) }
+        val detailed = data.settings.detailedCharts && section !in listOf("Today", "Cravings ahead", "Receptors", "Ladder")
+        if (detailed) {
+            Row(
+                Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+            ) {
+                listOf(7 to "7 days", 30 to "30 days", 90 to "90 days", 100_000 to "All").forEach { (v, l) ->
+                    FilterChip(selected = range == v, onClick = { range = v; endOff = 0 }, label = { Text(l) })
+                }
+                if (range < 100_000) {
+                    androidx.compose.material3.TextButton(onClick = { endOff += range }) { Text("‹ Earlier") }
+                    androidx.compose.material3.TextButton(onClick = { endOff = (endOff - range).coerceAtLeast(0) }, enabled = endOff > 0) { Text("Later ›") }
+                }
+            }
+        }
+        androidx.compose.runtime.CompositionLocalProvider(LocalWindow provides (if (detailed) range to endOff else 42 to 0)) {
         LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             when (section) {
                 "Today" -> item { TodaySection(ins, data, now) }
@@ -100,12 +120,13 @@ fun InsightsScreen(data: FirewatchData, now: Long, watch: @Composable () -> Unit
                 "Going up" -> item { GoingUpSection(ins, data) }
                 "Going down" -> item { GoingDownSection(ins, data, now) }
                 "Mix" -> item { MixSection(ins) }
-                "Forecasts" -> item { ForecastSection(ins) }
+                "Forecasts" -> item { ForecastSection(ins, data, now) }
                 "Milestones" -> item { MilestonesSection(ins, now) }
                 "Ladder" -> item { LadderSection(data, now, tz) }
             }
             item { watch() }
             item { EstimateNote() }
+        }
         }
     }
 }
@@ -124,6 +145,15 @@ fun ChartCard(title: String, subtitle: String? = null, content: @Composable () -
 @Composable
 private fun Col(content: @Composable () -> Unit) = Column(verticalArrangement = Arrangement.spacedBy(12.dp)) { content() }
 
+/** Opt-in "Detailed charts": how many days multi-day charts show, and how far back they end. */
+private val LocalWindow = androidx.compose.runtime.compositionLocalOf { 42 to 0 }
+
+@Composable
+private fun <T> List<T>.win(): List<T> {
+    val (range, endOff) = LocalWindow.current
+    return dropLast(endOff.coerceAtMost((size - 1).coerceAtLeast(0))).takeLast(range)
+}
+
 private fun fmt1(x: Double) = String.format(Locale.getDefault(), "%.1f", x)
 
 // Axis formatters and date labels.
@@ -137,32 +167,49 @@ private fun kdates(ds: List<kotlinx.datetime.LocalDate>) = ds.map { Fmt.dayMonth
 
 @Composable
 private fun TodaySection(ins: Insights, data: FirewatchData, now: Long) = Col {
-    val curve = ins.todayCurve()
-    val w = ins.days.last()
+    // Day charts: choose which day to view (no overlay, no comparison).
+    var back by rememberSaveable { mutableStateOf(0) }
+    val today = ins.days.last().date
+    val date = today.minus(back, kotlinx.datetime.DateTimeUnit.DAY)
+    val w = ins.days.firstOrNull { it.date == date } ?: ins.days.last()
+    val oldest = ins.days.first().date
+    Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+        androidx.compose.material3.TextButton(onClick = { back++ }, enabled = date > oldest) { Text("‹") }
+        Text(
+            when (back) { 0 -> "Today"; 1 -> "Yesterday"; else -> Fmt.dayTitle(java.time.LocalDate.of(date.year, date.monthNumber, date.dayOfMonth)) },
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            modifier = Modifier.weight(1f),
+        )
+        androidx.compose.material3.TextButton(onClick = { back-- }, enabled = back > 0) { Text("›") }
+    }
+    val curve = remember(ins, date) { ins.dayCurve(date) }
     val typicalSlots = ins.typicalCurve()
     val dayStart = w.date.let { java.time.LocalDate.of(it.year, it.monthNumber, it.dayOfMonth) }
         .atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
-    val typical = typicalSlots.mapIndexed { i, v -> dayStart + i * 30 * 60_000L to v }
+    val typical = if (back > 0) emptyList() else typicalSlots.mapIndexed { i, v -> dayStart + i * 30 * 60_000L to v }
         .filter { curve.isNotEmpty() && it.first in curve.first().first..curve.last().first }
-    ChartCard("Blood-level wave", "Each dose is a hill or spike. Sleep is shaded; the dashed line is your typical day.") {
-        WaveChart(
+    ChartCard("Blood-level wave", if (back == 0) "Each dose is a hill or spike. Sleep is shaded; the dashed line is your typical day." else "Each dose is a hill or spike. Sleep is shaded.") {
+        if (curve.size < 2) Text("Nothing logged that day.", style = MaterialTheme.typography.bodySmall)
+        else WaveChart(
             curve,
             typical = typical,
             shaded = listOf(curve.first().first to w.wakeAt, w.sleepAt to curve.last().first),
-            now = now,
+            now = if (back == 0) now else null,
         )
     }
-    ChartCard("Dose strip", "Today's doses across 24 hours, sized by amount and coloured by type.") {
+    ChartCard("Dose strip", "That day's doses across 24 hours, sized by amount and coloured by type.") {
         DoseStrip(w.doses.map { d ->
             val t = d.at.toLocalDateTime()
-            Triple((t.hour * 60 + t.minute) / 1440f, d.pieces(data.referenceMg), kindColor(d.kind))
+            Triple((t.hour * 60 + t.minute) / 1440f, data.piecesOf(d), kindColor(d.kind))
         })
     }
-    ChartCard("Today so far") {
+    ChartCard(if (back == 0) "Today so far" else "That day") {
         Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
             Stat("≈ ${Fmt.pieces(w.pieces)}", "pieces")
             Stat(fmt1(w.clearHours) + " h", "clear hours")
-            Stat(Fmt.duration(((w.awakeHours * 60 - w.mouthMinutes).coerceAtLeast(0.0) * 60_000).toLong()), "mouth-free")
+            Stat("${w.doses.size}", if (w.doses.size == 1) "dose" else "doses")
         }
     }
 }
@@ -254,7 +301,7 @@ private fun ReceptorSection(data: FirewatchData, now: Long, tz: TimeZone) = Col 
 
 @Composable
 private fun StretchSection(ins: Insights) = Col {
-    val days = ins.stretchPull.takeLast(42)
+    val days = ins.stretchPull.win()
     if (days.isEmpty()) {
         ChartCard("Stretch & pull", "Starts once you're working at a target rung.") {}
         return@Col
@@ -292,7 +339,7 @@ private fun StretchSection(ins: Insights) = Col {
 
 @Composable
 private fun TrendsSection(ins: Insights) = Col {
-    val days = ins.days.takeLast(42)
+    val days = ins.days.win()
     val offset = ins.days.size - days.size
     val bands = listOf(
         1.0 to Color(0x2250A890), 3.0 to Color(0x1A8FC7B8), 5.0 to Color(0x14FFB35C), 8.0 to Color(0x14FF7A2F), 99.0 to Color(0x14E0443A),
@@ -384,7 +431,7 @@ private fun PatternsSection(ins: Insights, data: FirewatchData, tz: TimeZone) = 
 
 @Composable
 private fun GoingUpSection(ins: Insights, data: FirewatchData) = Col {
-    val days = ins.fullDays.takeLast(42)
+    val days = ins.fullDays.win()
     val tz = TimeZone.currentSystemDefault()
     val held = remember(data, ins.today) { com.baastiklabs.firewatch.core.engine.Control.heldSeries(data, System.currentTimeMillis(), tz).filter { it.third != null } }
     if (held.isNotEmpty()) {
@@ -408,7 +455,7 @@ private fun GoingUpSection(ins: Insights, data: FirewatchData) = Col {
     ChartCard("Clear hours", "Hours each day your estimated level sat near zero while awake. Watch it rise.") {
         TrendLine(days.map { it.clearHours }, color = MaterialTheme.colorScheme.tertiary, yFmt = hrs, xLabels = dates(days))
     }
-    val overnight = ins.overnightGaps().takeLast(42)
+    val overnight = ins.overnightGaps().win()
     if (overnight.size >= 2) {
         ChartCard("Overnight gap", "Last dose at night to first the next morning.") {
             TrendLine(overnight.map { it.second / 60 }, color = MaterialTheme.colorScheme.tertiary, yFmt = hrs, xLabels = kdates(overnight.map { it.first }))
@@ -435,9 +482,6 @@ private fun GoingUpSection(ins: Insights, data: FirewatchData) = Col {
             Text("Toward ${s.rewardName.ifBlank { "your reward" }}: ${(saved / s.rewardCost * 100).roundToInt().coerceAtMost(100)}%", style = MaterialTheme.typography.bodySmall)
         }
     }
-    ChartCard("Mouth-free hours", "Awake time without a pouch or gum in.") {
-        TrendLine(days.map { ((it.awakeHours * 60 - it.mouthMinutes) / 60).coerceAtLeast(0.0) }, color = MaterialTheme.colorScheme.tertiary, yFmt = hrs, xLabels = dates(days))
-    }
     val beaten = ins.beatenTriggers()
     ChartCard("Beaten triggers", "Of each trigger's last 10 appearances, how many passed without nicotine (from tagged cravings).") {
         if (beaten.isEmpty()) Text("Tag a craving (coffee, stress…) while riding it out to fill this in.", style = MaterialTheme.typography.bodySmall)
@@ -447,7 +491,7 @@ private fun GoingUpSection(ins: Insights, data: FirewatchData) = Col {
 
 @Composable
 private fun GoingDownSection(ins: Insights, data: FirewatchData, now: Long) = Col {
-    val days = ins.fullDays.takeLast(42)
+    val days = ins.fullDays.win()
     ChartCard("Average dose size", "Absorbed mg per dose. Catches moves like 6 mg to 3 mg.") {
         TrendLine(days.map { if (it.doses.isEmpty()) 0.0 else it.absorbedMg / it.doses.size }, yFmt = mgs, xLabels = dates(days))
     }
@@ -469,7 +513,7 @@ private fun GoingDownSection(ins: Insights, data: FirewatchData, now: Long) = Co
         ins.heaviness()?.let { Text("Last 7 days: ${fmt1(it)} of 6", style = MaterialTheme.typography.bodyMedium) }
     }
     ChartCard("Background level", "A slow line modelled on cotinine, nicotine's breakdown product. It drifts down even through messy days.") {
-        val bg = ins.backgroundSeries().takeLast(42)
+        val bg = ins.backgroundSeries().win()
         TrendLine(bg.map { it.second }, yFmt = mgs, xLabels = kdates(bg.map { it.first }))
     }
     ChartCard("Double-ups", "Doses stacked while the last one was still peaking, per week.") {
@@ -493,7 +537,7 @@ private fun GoingDownSection(ins: Insights, data: FirewatchData, now: Long) = Co
     }
     if (data.checkIns.size >= 2) {
         ChartCard("Daily check-in", "Craving strength (orange) and mood (teal), 1–5.") {
-            val last = data.checkIns.takeLast(42)
+            val last = data.checkIns.win()
             TrendLine(last.map { it.craving.toDouble() }, second = last.map { it.mood.toDouble() }, secondColor = MaterialTheme.colorScheme.tertiary, yFmt = num, top = 5.0)
         }
     }
@@ -522,7 +566,7 @@ private fun MixSection(ins: Insights) = Col {
             Stat("${label.roundToInt()} mg", "on the labels")
             Stat("≈ ${absorbed.roundToInt()} mg", "absorbed")
         }
-        TrendLine(ins.days.takeLast(42).map { it.labelMg }, second = ins.days.takeLast(42).map { it.absorbedMg }, yFmt = mgs, xLabels = dates(ins.days.takeLast(42)))
+        TrendLine(ins.days.win().map { it.labelMg }, second = ins.days.win().map { it.absorbedMg }, yFmt = mgs, xLabels = dates(ins.days.win()))
     }
     val borrowed = ins.days.sumOf { it.borrowedPieces }
     val total = ins.days.sumOf { it.pieces }.coerceAtLeast(0.001)
@@ -532,7 +576,21 @@ private fun MixSection(ins: Insights) = Col {
 }
 
 @Composable
-private fun ForecastSection(ins: Insights) = Col {
+private fun ForecastSection(ins: Insights, data: FirewatchData, now: Long) = Col {
+    val plan = remember(data, now / 3_600_000) { com.baastiklabs.firewatch.core.engine.Control.taperPlan(data, now, TimeZone.currentSystemDefault()) }
+    if (plan != null && plan.steps.isNotEmpty()) {
+        ChartCard(
+            "If you take each step",
+            "Stepping down each time it's offered (every ${plan.holdDays} days). Optional: staying steady is a win too. ${plan.basis}.",
+        ) {
+            plan.steps.forEach { st ->
+                Row(Modifier.fillMaxWidth()) {
+                    Text(st.rung.label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                    Text("around ${Fmt.shortDateK(st.date)}", style = MaterialTheme.typography.bodyMedium)
+                }
+            }
+        }
+    }
     ChartCard("Journey to Clear Air", "From your baseline to nicotine-free.") {
         val j = ins.journey()
         if (j == null) Text("Starts after your baseline week.", style = MaterialTheme.typography.bodySmall)

@@ -50,7 +50,7 @@ object Progress {
         val day = Waking.day(data, date, tz)
         val next = Waking.day(data, date.plus(1, DateTimeUnit.DAY), tz)
         val ref = data.referenceMg
-        val pieces = data.doses.filter { it.at >= day.wakeAt && it.at < next.wakeAt }.sumOf { it.pieces(ref) }
+        val pieces = data.doses.filter { it.at >= day.wakeAt && it.at < next.wakeAt }.sumOf { data.piecesOf(it) }
         return DayPace(date, pieces, day.awakeMinutes)
     }
 
@@ -82,6 +82,8 @@ object Progress {
         if (target <= 0) return null
         // First week: the "Your starting point" card replaces the early estimate instead.
         if (Control.isEarly(data)) return null
+        // A practice day (or its "How was it?" follow-up) stands in for the offer.
+        if (Control.practicingToday(data, now, tz) || Control.practiceFollowUp(data, now, tz) != null) return null
         val since = data.rungChanges.lastOrNull()?.at ?: return null
         val hold = data.settings.holdDays
         if (now - data.settings.stepDownSnoozedAt < 24 * 60 * MIN) return null

@@ -142,55 +142,90 @@ class EngineTest {
     private fun pullFor(vararg doses: com.baastiklabs.firewatch.core.model.Dose, pieces: Double = 5.0) =
         com.baastiklabs.firewatch.core.engine.BatteryEngine.day(withTarget(doses.toList(), pieces), kotlinx.datetime.LocalDate(2026, 9, 10), tz, at(10, 23))!!
 
+    private val BE = com.baastiklabs.firewatch.core.engine.BatteryEngine
+    private val d10 = kotlinx.datetime.LocalDate(2026, 9, 10)
+    private fun dayUntil(data: FirewatchData, until: Long) = BE.day(data, d10, tz, until)!!
+
     @Test
-    fun `pull carries dose size and the wait stays one gap`() {
-        val gap = 16 * 60 / 5.0
-        val gum2 = product(DefaultProducts.GUM_2MG)
-        val zyn6 = product(DefaultProducts.ZYN_6MG)
-        assertEquals(0.0, pullFor(gum2.toDose("a", at(10, 9), 0)).pullMin, 1.0)
-        assertEquals(0.0, pullFor(gum4.toDose("a", at(10, 9), 0)).pullMin, 1.0)
-        assertEquals(0.2 * gap, pullFor(zyn6.toDose("a", at(10, 9), 0)).pullMin, 2.0)
-        assertEquals(gap, pullFor(gum4.toDose("a", at(10, 9), 0), gum4.toDose("b", at(10, 9), 0)).pullMin, 2.0)
-        // Two gum 2 mg together = one gum 4 mg: same pull, same wait.
-        val split = withTarget(listOf(gum2.toDose("a", at(10, 9), 0), gum2.toDose("b", at(10, 9, 1), 0)), 5.0)
-        val whole = withTarget(listOf(gum4.toDose("a", at(10, 9), 0)), 5.0)
-        assertEquals(0.0, pullFor(gum2.toDose("a", at(10, 9), 0), gum2.toDose("b", at(10, 9, 1), 0)).pullMin, 1.0)
-        val ws = Progress.battery(split, 5.0, at(10, 9, 5), tz).readyAt!!
-        val ww = Progress.battery(whole, 5.0, at(10, 9, 5), tz).readyAt!!
-        assertTrue(kotlin.math.abs(ws - ww) <= 2 * 60_000L)
-        // A double never waits more than one gap.
+    fun `every dose empties the battery and the next piece is one gap later`() {
+        // Bonfire: 5 a day, gap 3h 12m. A small Zyn 3 mg with a full battery still empties it.
+        val zyn3 = product(DefaultProducts.ZYN_3MG)
+        val data = withTarget(listOf(zyn3.toDose("a", at(10, 9), 0)), 5.0)
+        val b = Progress.battery(data, 5.0, at(10, 9, 1), tz)
+        assertTrue(b.charge < 0.01)
+        assertTrue(kotlin.math.abs(b.readyAt!! - (at(10, 9) + 192 * 60_000L)) <= 2 * 60_000L)
+        // A double doesn't wait longer than one gap either.
         val dbl = withTarget(listOf(gum4.toDose("a", at(10, 9), 0), gum4.toDose("b", at(10, 9), 0)), 5.0)
-        assertTrue(Progress.battery(dbl, 5.0, at(10, 9, 1), tz).readyAt!! <= at(10, 9) + (gap * 60_000).toLong() + 2 * 60_000L)
+        assertTrue(kotlin.math.abs(Progress.battery(dbl, 5.0, at(10, 9, 1), tz).readyAt!! - (at(10, 9) + 192 * 60_000L)) <= 2 * 60_000L)
+    }
+
+    @Test
+    fun `dose size shows up in stretch and pull`() {
+        // Taken at wake-up (7:00) with a full battery, so only the size effect counts.
+        fun net(vararg doses: com.baastiklabs.firewatch.core.model.Dose) = dayUntil(withTarget(doses.toList(), 5.0), at(10, 7, 1)).netMin
+        assertEquals(96.0, net(product(DefaultProducts.GUM_2MG).toDose("a", at(10, 7), 0)), 1.0)
+        assertEquals(76.8, net(product(DefaultProducts.ZYN_3MG).toDose("a", at(10, 7), 0)), 1.0)
+        assertEquals(0.0, net(gum4.toDose("a", at(10, 7), 0)), 1.0)
+        assertEquals(-38.4, net(product(DefaultProducts.ZYN_6MG).toDose("a", at(10, 7), 0)), 1.0)
+        assertEquals(-192.0, net(gum4.toDose("a", at(10, 7), 0), gum4.toDose("b", at(10, 7), 0)), 1.0)
+        // The preview says the same before logging.
+        val empty = withTarget(emptyList(), 5.0)
+        assertEquals(-38.4, BE.preview(empty, product(DefaultProducts.ZYN_6MG), 5.0, at(10, 9), tz)!!, 1.0)
+        assertEquals(96.0, BE.preview(empty, product(DefaultProducts.GUM_2MG), 5.0, at(10, 9), tz)!!, 1.0)
+        // Half-full battery: timing and size combine (Zyn 6 mg: 96m + 38m ≈ 2h 14m of pull).
+        val half = withTarget(listOf(gum4.toDose("a", at(10, 9), 0)), 5.0)
+        assertEquals(-134.4, BE.preview(half, product(DefaultProducts.ZYN_6MG), 5.0, at(10, 10, 36), tz)!!, 2.0)
+    }
+
+    @Test
+    fun `steady pace nets zero whatever the product`() {
+        // Net over one full cycle (between the 2nd and 3rd dose) is ~0 at 5 a day.
+        fun cycle(p: com.baastiklabs.firewatch.core.model.Product, every: Long): Double {
+            val doses = (0 until 6).map { p.toDose("x$it", at(10, 7) + it * every * 60_000L, 0) }
+            val data = withTarget(doses, 5.0)
+            val a = dayUntil(data, at(10, 7) + every * 60_000L - 60_000L).netMin
+            val b = dayUntil(data, at(10, 7) + 2 * every * 60_000L - 60_000L).netMin
+            return b - a
+        }
+        assertEquals(0.0, cycle(product(DefaultProducts.ZYN_6MG), 230), 3.0)
+        assertEquals(0.0, cycle(product(DefaultProducts.GUM_2MG), 96), 3.0)
+        assertEquals(0.0, cycle(gum4, 192), 3.0)
+        // Two gum 2 mg together count exactly like one gum 4 mg.
+        val gum2 = product(DefaultProducts.GUM_2MG)
+        val split = withTarget(listOf(gum2.toDose("a", at(10, 9), 0), gum2.toDose("b", at(10, 9), 0)), 5.0)
+        val whole = withTarget(listOf(gum4.toDose("a", at(10, 9), 0)), 5.0)
+        assertEquals(dayUntil(whole, at(10, 20)).netMin, dayUntil(split, at(10, 20)).netMin, 1.0)
+        assertEquals(Progress.battery(whole, 5.0, at(10, 9, 5), tz).readyAt, Progress.battery(split, 5.0, at(10, 9, 5), tz).readyAt)
     }
 
     @Test
     fun `five zyn 6 a day at full battery give a negative net`() {
         val zyn6 = product(DefaultProducts.ZYN_6MG)
-        // Each taken the moment the battery is full (gap 3h 12m from 7:00).
         val doses = (0 until 5).map { i -> zyn6.toDose("z$i", at(10, 7) + (i * 192L + 1) * 60_000L, 0) }
-        val d = pullFor(*doses.toTypedArray())
-        assertTrue(d.netMin < 0, "net ${d.netMin}")
+        assertTrue(dayUntil(withTarget(doses, 5.0), at(10, 23)).netMin < 0)
     }
 
     @Test
-    fun `range doses use the middle estimate for the battery`() {
-        val vape = com.baastiklabs.firewatch.core.model.Dose("v", "x", at(10, 9), kind = ProductKind.VAPE, speed = SpeedProfile.SPIKE, rangeLowMg = 1.0, rangeHighMg = 3.0)
-        val data = withTarget(listOf(vape), 5.0)
-        val b = Progress.battery(data, 5.0, at(10, 9), tz)
-        // Drains by the middle (2.0 mg), the same figure "pieces today" shows.
-        assertEquals((1.0 - Absorption.pieces(2.0, data.referenceMg)).coerceAtLeast(0.0), b.charge, 0.02)
+    fun `range doses use the middle estimate`() {
+        val vape = com.baastiklabs.firewatch.core.model.Dose("v", "x", at(10, 7), kind = ProductKind.VAPE, speed = SpeedProfile.SPIKE, rangeLowMg = 1.0, rangeHighMg = 3.0)
+        // Middle 2.0 mg = one piece: no size effect.
+        assertEquals(0.0, dayUntil(withTarget(listOf(vape), 5.0), at(10, 7, 1)).netMin, 1.0)
     }
 
     @Test
-    fun `what fits now names the biggest home product that fits`() {
-        val e = com.baastiklabs.firewatch.core.engine.BatteryEngine
-        val data = withTarget(listOf(gum4.toDose("a", at(10, 9), 0)), 5.0)
-        // Half-way through the gap: about half a piece of room.
-        val b = Progress.battery(data, 5.0, at(10, 9) + 100 * 60_000L, tz)
-        val fit = e.fitsNow(data, b)
-        assertNotNull(fit)
-        assertTrue(Absorption.pieces(Absorption.absorbedMg(fit), data.referenceMg) <= b.charge + 1e-9)
-        assertNull(e.fitsNow(data, Progress.battery(data, 5.0, at(10, 9, 10), tz)))
+    fun `fast battery maths matches the minute-by-minute version`() {
+        val zyn6 = product(DefaultProducts.ZYN_6MG)
+        val gum2 = product(DefaultProducts.GUM_2MG)
+        val doses = listOf(gum4.toDose("a", at(10, 8, 13), 0), zyn6.toDose("b", at(10, 10, 2), 0), gum2.toDose("c", at(10, 10, 40), 0),
+            gum4.toDose("d", at(10, 15, 7), 0), zyn6.toDose("e", at(10, 22, 50), 0), gum4.toDose("f", at(11, 1, 30), 0))
+        val data = withTarget(doses, 5.0)
+        val (day, next) = BE.dayOf(data, at(10, 12), tz)
+        listOf(at(10, 9), at(10, 12), at(10, 18), at(10, 23, 30), at(11, 2)).forEach { until ->
+            val slow = BE.simulateByMinute(data, day, next, 192.0, until, at(11, 1, 30))
+            val fast = BE.day(data, d10, tz, until)!!
+            assertEquals(slow.second, fast.stretchMin, 3.0, "stretch at $until")
+            assertEquals(slow.third, fast.pullMin, 3.0, "pull at $until")
+        }
     }
 
     @Test
@@ -603,5 +638,89 @@ class EngineTest {
         val gap = CT.welcomeBackDays(data, at(15, 9), tz)!!
         assertEquals(listOf(11, 12, 13, 14), gap.map { it.dayOfMonth })
         assertNull(CT.welcomeBackDays(data.copy(settings = s.copy(welcomeBackDismissedAt = at(15, 9))), at(15, 10), tz))
+    }
+
+    // ---- 0.10: one day everywhere, steady days, practice day, forecasts, reference changes ----
+
+    @Test
+    fun `a 1am piece belongs to the previous waking day everywhere`() {
+        val late = gum4.toDose("late", at(10, 23, 30) + 90 * 60_000L, 0)   // 1:00 on the 11th
+        val data = withTarget(listOf(gum4.toDose("a", at(10, 9), 0), late))
+        val d10 = kotlinx.datetime.LocalDate(2026, 9, 10)
+        assertEquals(d10, Days.wakingDate(data, late.at, tz))
+        val sums = Days.summaries(data, tz, at(11, 12))
+        assertEquals(2, sums.getValue(d10).doseCount)
+        assertNull(sums[kotlinx.datetime.LocalDate(2026, 9, 11)])
+        assertEquals(2.0, Progress.pace(data, d10, tz).pieces, 0.01)
+        assertEquals(2, Insights(data, tz, at(11, 12)).days.first { it.date == d10 }.doses.size)
+        assertEquals(2, Days.dosesOn(data, d10, tz).size)
+    }
+
+    @Test
+    fun `steady days only go up`() {
+        // 4 a day on a 4-a-day rung, spaced a gap apart: steady. A cigarette day: not steady.
+        val cig = product(DefaultProducts.CIGARETTE)
+        val doses = (2..9).flatMap { d -> (0 until 4).map { i -> gum4.toDose("d$d-$i", at(d, 7) + i * 240 * 60_000L + 60_000L, 0) } } +
+            cig.toDose("c", at(5, 20), 0)
+        val data = FirewatchData(products = DefaultProducts.all(), doses = doses, rungChanges = listOf(RungChange("r", at(1, 8), 4.0, "start")))
+        val ct = com.baastiklabs.firewatch.core.engine.Control
+        val all = ct.steadyDates(data, at(10, 12), tz).map { it.dayOfMonth }
+        assertTrue(5 !in all && all.containsAll(listOf(2, 3, 4, 6, 7, 8, 9)), "$all")
+        // More data never lowers the count.
+        val later = ct.steadyDays(data.copy(doses = data.doses + cig.toDose("c2", at(10, 10), 0)), at(11, 12), tz)
+        assertTrue(later >= all.size)
+        // Back-dated days use pieces.
+        val est = (2..3).flatMap { d -> (0 until 4).map { i -> gum4.toDose("e$d-$i", at(d, 9) + i * 3_600_000L, 0).copy(estimated = true) } }
+        val backdated = FirewatchData(products = DefaultProducts.all(), doses = est, rungChanges = listOf(RungChange("r", at(1, 8), 4.0, "start")))
+        assertEquals(2, ct.steadyDays(backdated, at(4, 12), tz))
+        assertEquals(7, ct.newSteadyMilestone(data, 7))
+        assertNull(ct.newSteadyMilestone(data.copy(settings = com.baastiklabs.firewatch.core.model.Settings(steadyMilestoneSeen = 7)), 8))
+    }
+
+    @Test
+    fun `practice day uses the next rung for one day only`() {
+        val s = com.baastiklabs.firewatch.core.model.Settings(practiceDate = "2026-09-10", practicePieces = 3.0)
+        val data = withTarget(listOf(gum4.toDose("a", at(10, 9), 0)), 4.0).copy(settings = s)
+        // Campfire 4 → practising Flicker 3: gap 5h 20m instead of 4h.
+        assertTrue(kotlin.math.abs(Progress.battery(data, 4.0, at(10, 10), tz).readyAt!! - (at(10, 9) + 320 * 60_000L)) <= 2 * 60_000L)
+        assertEquals(4.0, data.targetPieces)
+        val ct = com.baastiklabs.firewatch.core.engine.Control
+        assertTrue(ct.practicingToday(data, at(10, 10), tz))
+        assertNull(ct.practiceFollowUp(data, at(10, 10), tz))
+        assertEquals(3.0, ct.practiceFollowUp(data, at(11, 9), tz)!!.pieces)
+        // The next day is back to the usual gap.
+        val next = data.copy(doses = data.doses + gum4.toDose("b", at(11, 9), 0))
+        assertTrue(kotlin.math.abs(Progress.battery(next, 4.0, at(11, 10), tz).readyAt!! - (at(11, 9) + 240 * 60_000L)) <= 2 * 60_000L)
+    }
+
+    @Test
+    fun `taper forecast shows a plan from day one`() {
+        val ct = com.baastiklabs.firewatch.core.engine.Control
+        val data = withTarget(emptyList(), 4.0)
+        val plan = ct.taperPlan(data, at(1, 9), tz)!!
+        assertEquals("Based on your plan", plan.basis)
+        // 4 → 3 → 2 → 1 → ½ → ⅓ → Clear Air, one rung per 7 days.
+        assertEquals(com.baastiklabs.firewatch.core.engine.Tier.CLEAR_AIR, plan.steps.last().rung.tier)
+        assertEquals(6, plan.steps.size)
+        assertEquals(kotlinx.datetime.LocalDate(2026, 9, 8), plan.steps.first().date)
+    }
+
+    @Test
+    fun `reference piece changes can start today or be back-dated`() {
+        val gum2 = product(DefaultProducts.GUM_2MG)
+        val old = gum4.toDose("old", at(5, 9), 0)
+        val new = gum4.toDose("new", at(12, 9), 0)
+        val base = FirewatchData(products = DefaultProducts.all(), doses = listOf(old, new),
+            settings = com.baastiklabs.firewatch.core.model.Settings(referenceProductId = DefaultProducts.GUM_2MG))
+        // From the 10th on, gum 2 mg is one piece; before that gum 4 mg was.
+        val fromToday = base.copy(refChanges = listOf(com.baastiklabs.firewatch.core.model.RefChange("r", at(10, 9), at(10, 9), gum2.id, DefaultProducts.GUM_4MG)))
+        assertEquals(1.0, fromToday.piecesOf(old), 0.01)
+        assertEquals(2.0, fromToday.piecesOf(new), 0.01)
+        // Back-dated to the 1st: both use gum 2 mg.
+        val backdated = base.copy(refChanges = listOf(com.baastiklabs.firewatch.core.model.RefChange("r", at(10, 9), at(1, 0), gum2.id, DefaultProducts.GUM_4MG)))
+        assertEquals(2.0, backdated.piecesOf(old), 0.01)
+        // Stored and read back as a record.
+        val env = com.baastiklabs.firewatch.core.records.RecordCodec.refChange(fromToday.refChanges.first(), null, 1L)
+        assertEquals(1, FirewatchData.fromRecords(listOf(env)).refChanges.size)
     }
 }

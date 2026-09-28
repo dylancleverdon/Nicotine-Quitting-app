@@ -7,11 +7,13 @@ import com.baastiklabs.firewatch.core.model.DefaultProducts
 import com.baastiklabs.firewatch.core.model.Dose
 import com.baastiklabs.firewatch.core.model.ModeChange
 import com.baastiklabs.firewatch.core.model.TimerCheck
+import com.baastiklabs.firewatch.core.model.RefChange
 import com.baastiklabs.firewatch.core.model.Product
 import com.baastiklabs.firewatch.core.model.RungChange
 import com.baastiklabs.firewatch.core.model.Settings
 import com.baastiklabs.firewatch.core.model.SleepEvent
 import com.baastiklabs.firewatch.core.Absorption
+import com.baastiklabs.firewatch.core.absorbedMg
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
@@ -43,6 +45,7 @@ object RecordTypes {
     const val CHECKIN = "checkin"
     const val MODE = "mode"
     const val TIMER_CHECK = "timercheck"
+    const val REF_CHANGE = "refchange"
 
     const val SETTINGS_ID = "settings"
 }
@@ -102,6 +105,9 @@ object RecordCodec {
     fun timerCheck(c: TimerCheck, previousJson: String?, now: Long, deleted: Boolean = false) =
         encode(RecordTypes.TIMER_CHECK, c.id, c.at, c, TimerCheck.serializer(), previousJson, now, deleted)
 
+    fun refChange(c: RefChange, previousJson: String?, now: Long, deleted: Boolean = false) =
+        encode(RecordTypes.REF_CHANGE, c.id, c.at, c, RefChange.serializer(), previousJson, now, deleted)
+
     fun settings(s: Settings, previousJson: String?, now: Long) =
         encode(RecordTypes.SETTINGS, RecordTypes.SETTINGS_ID, null, s, Settings.serializer(), previousJson, now)
 }
@@ -117,6 +123,7 @@ data class FirewatchData(
     val checkIns: List<CheckIn> = emptyList(),
     val modeChanges: List<ModeChange> = emptyList(),
     val timerChecks: List<TimerCheck> = emptyList(),
+    val refChanges: List<RefChange> = emptyList(),
 ) {
     /** Relapse prevention mode is on right now. */
     val relapseOn: Boolean get() = modeChanges.lastOrNull { it.mode == "relapse" }?.on == true
@@ -131,11 +138,27 @@ data class FirewatchData(
         products.filter { it.onHome && !it.archived }.sortedWith(compareBy({ it.order }, { it.name }))
     }
 
-    /** Absorbed mg that counts as one piece. */
-    val referenceMg: Double by lazy {
-        productsById[settings.referenceProductId]?.let { Absorption.absorbedMg(it) }
-            ?.takeIf { it > 0.0 } ?: DefaultProducts.REFERENCE_MG
+    /** Absorbed mg that counts as one piece (the current reference product). */
+    val referenceMg: Double by lazy { mgOf(settings.referenceProductId) }
+
+    private fun mgOf(productId: String): Double =
+        productsById[productId]?.let { Absorption.absorbedMg(it) }?.takeIf { it > 0.0 } ?: DefaultProducts.REFERENCE_MG
+
+    private val refTimeline: List<RefChange> by lazy { refChanges.sortedBy { it.from } }
+
+    /**
+     * Absorbed mg that counted as one piece at time [t]: the reference in force then (see
+     * [RefChange]). Without any changes this is always [referenceMg].
+     */
+    fun refMgAt(t: Long): Double {
+        if (refTimeline.isEmpty()) return referenceMg
+        val last = refTimeline.lastOrNull { it.from <= t } ?: return mgOf(refTimeline.first().previousProductId)
+        return mgOf(last.productId)
     }
+
+    /** A dose's pieces with the reference in force when it was taken. */
+    fun piecesOf(d: com.baastiklabs.firewatch.core.model.Dose): Double =
+        Absorption.pieces(d.absorbedMg(), refMgAt(d.at))
 
     companion object {
         fun fromRecords(records: Collection<RecordEnvelope>): FirewatchData {
@@ -155,6 +178,7 @@ data class FirewatchData(
                 checkIns = decodeAll(RecordTypes.CHECKIN, CheckIn.serializer()).sortedBy { it.at },
                 modeChanges = decodeAll(RecordTypes.MODE, ModeChange.serializer()).sortedBy { it.at },
                 timerChecks = decodeAll(RecordTypes.TIMER_CHECK, TimerCheck.serializer()).sortedBy { it.at },
+                refChanges = decodeAll(RecordTypes.REF_CHANGE, RefChange.serializer()).sortedBy { it.at },
             )
         }
     }
