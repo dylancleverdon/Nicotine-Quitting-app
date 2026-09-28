@@ -75,3 +75,4 @@ textarea { resize: vertical; }
 .xaxis { position: relative; height: 14px; font-size: 10px; color: var(--muted); }
 .xaxis span { position: absolute; top: 0; white-space: nowrap; }
 .tap-reveal { cursor: pointer; display: flex; flex-direction: column; gap: 6px; } .craving-line { padding: 4px 2px; }
+.wins { display: flex; flex-direction: column; gap: 2px; color: var(--tertiary); }

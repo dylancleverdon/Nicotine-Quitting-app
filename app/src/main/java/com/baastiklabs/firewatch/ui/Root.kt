@@ -91,6 +91,7 @@ fun FirewatchRoot(vm: FirewatchViewModel) {
         route = when {
             route.startsWith("day/") -> "calendar"
             route == "backfill" -> "home"
+            route.startsWith("fill/") -> "home"
             route == "why" || route == "tour" -> "help"
             route == "help" -> "home"
             else -> "settings"
@@ -119,7 +120,18 @@ fun FirewatchRoot(vm: FirewatchViewModel) {
     ) { padding ->
         Box(Modifier.padding(padding).fillMaxSize()) {
             when {
-                route == "home" -> HomeScreen(vm, data, now, snackbar, onBackfill = { route = "backfill" }, onHelp = { route = "help" })
+                route == "home" -> HomeScreen(vm, data, now, snackbar, onBackfill = { route = "backfill" }, onHelp = { route = "help" }, onFill = { d -> route = "fill/" + d.joinToString(",") })
+                route.startsWith("fill/") -> {
+                    val days = route.removePrefix("fill/").split(",").filter { it.isNotBlank() }.map { kotlinx.datetime.LocalDate.parse(it) }
+                    com.baastiklabs.firewatch.ui.onboarding.BackfillScreen(
+                        vm, data, only = days, title = "Add what you had",
+                        onDone = {
+                            scope.launch { vm.repository.updateSettings { it.copy(welcomeBackDismissedAt = vm.repository.now()) } }
+                            route = if (days.size == 1) "day/${days.first()}" else "home"
+                        },
+                        onCancel = { route = if (days.size == 1) "day/${days.first()}" else "home" },
+                    )
+                }
                 route == "help" -> com.baastiklabs.firewatch.ui.help.HelpScreen(onBack = { route = "home" }, onTour = { route = "tour" }, onWhy = { route = "why" })
                 route == "why" -> com.baastiklabs.firewatch.ui.help.WhyScreen(onBack = { route = "help" })
                 route == "tour" -> com.baastiklabs.firewatch.ui.help.TourScreen(onDone = { route = "help" }, onWhy = { route = "why" })
@@ -147,6 +159,7 @@ fun FirewatchRoot(vm: FirewatchViewModel) {
                     date = LocalDate.parse(route.removePrefix("day/")),
                     snackbar = snackbar,
                     onBack = { route = "calendar" },
+                    onFill = { d -> route = "fill/$d" },
                 )
                 route == "products" -> ProductsScreen(vm, data, onBack = { route = "settings" })
                 route == "about" -> AboutScreen(onBack = { route = "settings" })

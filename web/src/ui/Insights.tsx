@@ -105,6 +105,15 @@ export function Insights() {
         <Card title="Comparisons">{ins.comparisons.map((c) => <div class="small">{c.label}: ≈ {pieces(c.value)} vs {pieces(Number(c.extra))}</div>)}</Card>
       </>}
       {sec === 'Going up' && <>
+        {snap.held.some((h) => Number(h[2]) >= 0) && (() => {
+          const hs = snap.held.filter((h) => Number(h[2]) >= 0)
+          const held = hs.filter((h) => Number(h[1]) <= Number(h[2]) + 0.25).length
+          return <Card title="Holding steady" sub="Pieces a day against the rung you were working at (line). Every day at or under it is a win, whether or not you're tapering.">
+            <Bars values={hs.map((h) => Number(h[1]))} line={hs.map((h) => Number(h[2]))} fmt={n} x={dateLabels(hs.map((h) => h[0]))}
+              faded={hs.map((h) => Number(h[1]) > Number(h[2]) + 0.25)} />
+            <div class="stats"><Stat v={held} l={`of the last ${hs.length} days held`} />{snap.heldDays > 0 && snap.target && <Stat v={snap.heldDays} l={`days held at ${snap.target.label}`} />}</div>
+          </Card>
+        })()}
         <Card title="Clear hours" sub="Hours each day your level sat near zero while awake."><Line values={full.map((d) => d.clearHours)} color="var(--tertiary)" fmt={h} x={dl(full)} /></Card>
         <Card title="Wins"><div class="stats"><Stat v={`≈ ${pieces(ins.avoidedPieces)}`} l="pieces avoided" /><Stat v={`${ins.avoidedMg.toFixed(1)} mg`} l="nicotine avoided" />
           <Stat v={ins.winRate != null ? `${Math.round(ins.winRate * 100)}%` : '–'} l="craving win rate" /></div></Card>

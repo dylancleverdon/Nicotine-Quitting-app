@@ -52,13 +52,20 @@ import kotlinx.datetime.toJavaLocalDate
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun BackfillScreen(vm: FirewatchViewModel, data: FirewatchData, onDone: () -> Unit, onCancel: () -> Unit) {
+fun BackfillScreen(
+    vm: FirewatchViewModel,
+    data: FirewatchData,
+    onDone: () -> Unit,
+    onCancel: () -> Unit,
+    only: List<kotlinx.datetime.LocalDate>? = null,
+    title: String = "Estimate your last week",
+) {
     val scope = rememberCoroutineScope()
     val haptic = LocalHapticFeedback.current
     val tz = TimeZone.currentSystemDefault()
     val today = remember { System.currentTimeMillis().localDate(tz) }
     val firstReal = remember { data.doses.filter { !it.estimated }.minOfOrNull { it.at }?.localDate(tz) }
-    val days = remember { Backfill.days(today).filter { firstReal == null || it < firstReal } }
+    val days = remember { only ?: Backfill.days(today).filter { firstReal == null || it < firstReal } }
     val products = remember(data.products) {
         data.products.filter { !it.archived }.sortedWith(compareBy({ !it.onHome }, { it.order }, { it.name }))
     }
@@ -78,11 +85,11 @@ fun BackfillScreen(vm: FirewatchViewModel, data: FirewatchData, onDone: () -> Un
 
     Surface(color = MaterialTheme.colorScheme.background, modifier = Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize().systemBarsPadding().padding(20.dp)) {
-            Text("Estimate your last week", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+            Text(title, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
             Text(Fmt.dayTitle(day.toJavaLocalDate()), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
             LinearProgressIndicator(progress = { (index + 1f) / days.size }, modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp))
             Text(
-                "Tap each thing you used that day, once per use. Rough is fine. Hold to take one off.",
+                "Tap each thing you used that day, once per use. Rough is fine: no times needed, it's spread across your waking day. Hold to take one off.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

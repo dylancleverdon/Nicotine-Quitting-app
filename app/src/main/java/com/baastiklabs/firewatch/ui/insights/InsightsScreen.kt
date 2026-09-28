@@ -385,6 +385,26 @@ private fun PatternsSection(ins: Insights, data: FirewatchData, tz: TimeZone) = 
 @Composable
 private fun GoingUpSection(ins: Insights, data: FirewatchData) = Col {
     val days = ins.fullDays.takeLast(42)
+    val tz = TimeZone.currentSystemDefault()
+    val held = remember(data, ins.today) { com.baastiklabs.firewatch.core.engine.Control.heldSeries(data, System.currentTimeMillis(), tz).filter { it.third != null } }
+    if (held.isNotEmpty()) {
+        ChartCard("Holding steady", "Pieces a day against the rung you were working at (line). Every day at or under it is a win, whether or not you're tapering.") {
+            BarChart(
+                held.map { (_, p, t) -> Bar(p, color = if (p <= t!! + 0.25) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.outline) },
+                line = held.map { it.third!! },
+                lineColor = MaterialTheme.colorScheme.primary,
+                yFmt = num,
+                xLabels = kdates(held.map { it.first }),
+            )
+            val n = held.count { (_, p, t) -> p <= t!! + 0.25 }
+            val now = System.currentTimeMillis()
+            val atRung = com.baastiklabs.firewatch.core.engine.Control.heldDays(data, now, tz)
+            Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+                Stat("$n", "of the last ${held.size} days held")
+                data.targetPieces?.takeIf { atRung > 0 }?.let { Stat("$atRung", "days held at ${com.baastiklabs.firewatch.core.engine.Ladder.rung(it).label}") }
+            }
+        }
+    }
     ChartCard("Clear hours", "Hours each day your estimated level sat near zero while awake. Watch it rise.") {
         TrendLine(days.map { it.clearHours }, color = MaterialTheme.colorScheme.tertiary, yFmt = hrs, xLabels = dates(days))
     }

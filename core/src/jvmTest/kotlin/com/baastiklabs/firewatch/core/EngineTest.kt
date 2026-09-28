@@ -113,9 +113,14 @@ class EngineTest {
     }
 
     @Test
-    fun `wind down hides clear in the last hour`() {
+    fun `wind down is a note and never hides the guidance`() {
         val data = withTarget(emptyList())
-        assertEquals(BatteryState.WIND_DOWN, Progress.battery(data, 4.0, at(10, 22, 30), tz).state)
+        val b = Progress.battery(data, 4.0, at(10, 22, 30), tz)
+        assertEquals(BatteryState.CLEAR, b.state)
+        assertTrue(b.closeToBed)
+        assertTrue(!Progress.battery(data, 4.0, at(10, 20), tz).closeToBed)
+        // Off in Settings: no note.
+        assertTrue(!Progress.battery(data.copy(settings = com.baastiklabs.firewatch.core.model.Settings(windDown = false)), 4.0, at(10, 22, 30), tz).closeToBed)
     }
 
     @Test
@@ -543,16 +548,60 @@ class EngineTest {
     }
 
     @Test
-    fun `multi-day step up needs two signals`() {
-        // 5 days each 1 piece over a 4-a-day target: one signal only (days over).
-        val doses = (5..9).flatMap { d -> (0 until 5).map { i -> gum4.toDose("d$d-$i", at(d, 8 + i * 3), 0) } }
-        val one = FirewatchData(products = DefaultProducts.all(), doses = doses,
+    fun `multi-day step up needs two signals, creeping up needs one`() {
+        // On target (4 a day) but strong cravings rising: one signal only.
+        val onTarget = (1..9).flatMap { d -> (0 until 4).map { i -> gum4.toDose("d$d-$i", at(d, 8 + i * 4), 0) } }
+        val cr = (5..9).map { Craving("s$it", at(it, 10), 8) }
+        val one = FirewatchData(products = DefaultProducts.all(), doses = onTarget, cravings = cr,
             rungChanges = listOf(RungChange("r", at(1, 8), 4.0, "start")))
         assertNull(CO.stepUp(one, at(10, 7, 30), tz))
-        // Add a rise in strong cravings over those days: two signals.
-        val cr = (5..9).map { Craving("s$it", at(it, 10), 8) }
-        val two = one.copy(cravings = cr)
+        // Strong cravings now ending in an early piece (the 12:00 piece taken at 11:05), after milder
+        // ones before: several signals together.
+        val mild = (1..4).map { Craving("m$it", at(it, 11), 3) }
+        val strongEarly = (5..9).map { Craving("s$it", at(it, 11), 8) }
+        val shifted = onTarget.map { d -> if (d.id.endsWith("-1") && d.at >= at(5, 0)) d.copy(at = d.at - 55 * 60_000L) else d }
+        val two = one.copy(doses = shifted, cravings = mild + strongEarly)
         val s = CO.stepUp(two, at(10, 7, 30), tz)!!
         assertTrue(!s.sameDay && s.reasons.size >= 2, "$s")
+        // Creeping up: a week measuring a heavier rung is enough on its own.
+        val over = (1..9).flatMap { d -> (0 until 5).map { i -> gum4.toDose("o$d-$i", at(d, 8 + i * 3), 0) } }
+        val creep = FirewatchData(products = DefaultProducts.all(), doses = over, rungChanges = listOf(RungChange("r", at(1, 8), 4.0, "start")))
+        val c = CO.stepUp(creep, at(10, 7, 30), tz)!!
+        assertTrue(c.reasons.single().contains("last 7 days measure") && c.rung.pieces == 5.0, "$c")
+    }
+
+    // ---- Find, then control ----
+
+    private val CT = com.baastiklabs.firewatch.core.engine.Control
+
+    @Test
+    fun `early target starts at 8 and firms up over the first week`() {
+        val early = listOf(RungChange("e", at(1, 7), 8.0, CT.EARLY))
+        val day1 = FirewatchData(products = DefaultProducts.all(), rungChanges = early, doses = listOf(gum4.toDose("a", at(1, 9), 0)))
+        assertNull(CT.earlyTargetUpdate(day1, at(1, 12), tz))  // no full day yet
+        // Three days of 3 a day: (8×4 + 3×3)/7 ≈ 5.9 → 6.
+        val doses = (1..3).flatMap { d -> (0 until 3).map { i -> gum4.toDose("d$d-$i", at(d, 8 + i * 5), 0) } }
+        assertEquals(6.0, CT.earlyTargetUpdate(day1.copy(doses = doses), at(4, 9), tz))
+        // Not early any more: nothing.
+        assertNull(CT.earlyTargetUpdate(day1.copy(doses = doses, rungChanges = listOf(RungChange("s", at(1, 7), 4.0, "start"))), at(4, 9), tz))
+    }
+
+    @Test
+    fun `holding steady counts and earns badges`() {
+        val doses = (1..40).flatMap { d -> (0 until 4).map { i -> gum4.toDose("d$d-$i", at(1, 8) + (d - 1) * 86_400_000L + i * 4 * 3_600_000L, 0) } }
+        val data = FirewatchData(products = DefaultProducts.all(), doses = doses, rungChanges = listOf(RungChange("r", at(2, 8), 4.0, "start")))
+        val now = at(1, 12) + 39L * 86_400_000L
+        assertTrue(CT.heldDays(data, now, tz) >= 30)
+        assertTrue(Insights(data, tz, now).badges().any { it.title.startsWith("Held") && "30 days" in it.title })
+    }
+
+    @Test
+    fun `welcome back offers the gap days once`() {
+        val s = com.baastiklabs.firewatch.core.model.Settings(onboardingDone = true)
+        val data = FirewatchData(products = DefaultProducts.all(), settings = s, doses = listOf(gum4.toDose("a", at(10, 9), 0)))
+        assertNull(CT.welcomeBackDays(data, at(11, 9), tz))
+        val gap = CT.welcomeBackDays(data, at(15, 9), tz)!!
+        assertEquals(listOf(11, 12, 13, 14), gap.map { it.dayOfMonth })
+        assertNull(CT.welcomeBackDays(data.copy(settings = s.copy(welcomeBackDismissedAt = at(15, 9))), at(15, 10), tz))
     }
 }

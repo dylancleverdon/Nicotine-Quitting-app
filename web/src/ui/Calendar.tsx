@@ -1,3 +1,4 @@
+import { Backfill } from './Onboarding'
 import { useState } from 'preact/hooks'
 import { Core } from '../core'
 import * as S from '../store'
@@ -45,6 +46,8 @@ function DayView({ iso, back }: { iso: string; back: () => void }) {
   S.snapshot.value
   const detail = Core.day(S.json(), iso)
   const [adding, setAdding] = useState(false)
+  const [filling, setFilling] = useState(false)
+  if (filling) return <Backfill only={[iso]} title="Add what you had" onDone={() => setFilling(false)} onCancel={() => setFilling(false)} />
   return (
     <main>
       <div class="row"><button class="btn text" onClick={back}>‹ Back</button><h2>{dayTitle(iso)}</h2></div>
@@ -53,9 +56,14 @@ function DayView({ iso, back }: { iso: string; back: () => void }) {
         {detail.cravings.map((c) => <div class="item" onClick={() => confirm('Delete this craving?') && S.remove(c.id)}><div>Craving · {c.intensity} {c.name}<br /><span>{time(c.at)} · {c.result.toLowerCase()}</span></div></div>)}
         {!detail.doses.length && !detail.cravings.length && <div class="muted">Nothing logged this day.</div>}
       </div>
-      {adding ? <div class="card soft"><b>Which product? (logged at noon)</b>
-        {S.products.value.map((p) => <button class="btn outline" onClick={() => { S.logProduct(p, new Date(iso + 'T12:00').getTime()); setAdding(false) }}>{p.name}</button>)}</div>
-        : <button class="btn outline" onClick={() => setAdding(true)}>Add a dose I forgot to log</button>}
+      <button class="btn" onClick={() => setFilling(true)}>Add what you had (no times needed)</button>
+      {adding ? <div class="card soft"><b>Which product? Pick the time after.</b>
+        {S.products.value.map((p) => <button class="btn outline" onClick={() => {
+          const t = prompt('What time? (e.g. 14:30)', '12:00') ?? '12:00'
+          const [h, m] = t.split(':').map(Number)
+          S.logProduct(p, new Date(`${iso}T${String(h || 12).padStart(2, '0')}:${String(m || 0).padStart(2, '0')}`).getTime()); setAdding(false)
+        }}>{p.name}</button>)}</div>
+        : <button class="btn text" onClick={() => setAdding(true)}>Add one at an exact time</button>}
     </main>
   )
 }

@@ -69,6 +69,7 @@ fun OnboardingScreen(vm: FirewatchViewModel, data: FirewatchData) {
     val startGum = {
         scope.launch {
             vm.repository.startGum()
+            vm.repository.setTarget(com.baastiklabs.firewatch.core.engine.Control.EARLY_PIECES, com.baastiklabs.firewatch.core.engine.Control.EARLY)
             vm.updateState.lastSeenVersion = BuildConfig.VERSION_NAME
             vm.repository.updateSettings { it.copy(onboardingDone = true) }
         }
@@ -121,6 +122,8 @@ fun OnboardingScreen(vm: FirewatchViewModel, data: FirewatchData) {
                     } else if (choice == "gum") {
                         if (android.os.Build.VERSION.SDK_INT >= 33) notifyPermission.launch(android.Manifest.permission.POST_NOTIFICATIONS) else startGum()
                     } else {
+                        // Guidance from day one: an early estimate of 8 a day that firms up over the week.
+                        scope.launch { vm.repository.setTarget(com.baastiklabs.firewatch.core.engine.Control.EARLY_PIECES, com.baastiklabs.firewatch.core.engine.Control.EARLY) }
                         finish()
                     }
                 }) { Text(if (step < STEPS - 1) "Next" else if (backfill) "Estimate my week" else "Start") }
@@ -139,7 +142,7 @@ private fun StartStep(choice: String, onChoose: (String) -> Unit) {
     ChoiceCard(
         selected = choice == "baseline",
         title = "Establish a baseline",
-        body = "Just log as usual for 7 days. Most accurate; your tier appears on day 8.",
+        body = "Just log as usual. Firewatch starts you at an early estimate of 8 pieces a day and firms it up over your first week.",
         onClick = { onChoose("baseline") },
     )
     ChoiceCard(

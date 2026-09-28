@@ -33,14 +33,14 @@ export function Onboarding() {
       </>}
       {step === 3 && <>
         <h2>How do you want to start?</h2>
-        {[['baseline', 'Establish a baseline', 'Just log as usual for 7 days. Your tier appears on day 8.'], ['backfill', 'Estimate my last week', 'Go through the last 7 days and tap roughly what you used each day. No times needed. Your tier shows up straight away.'],
+        {[['baseline', 'Establish a baseline', 'Just log as usual. Firewatch starts you at an early estimate of 8 pieces a day and firms it up over your first week.'], ['backfill', 'Estimate my last week', 'Go through the last 7 days and tap roughly what you used each day. No times needed. Your tier shows up straight away.'],
           ['gum', "I'm just starting gum and want help sticking to it", 'Turns on Relapse prevention mode: a reminder to chew every 2 hours, to stay ahead of cravings (reminders are Android-only for now). Firewatch still measures your use, so tiers are ready when you are.']].map(([v, t, b]) =>
           <div class={`card ${choice === v ? 'accent' : 'soft'}`} onClick={() => setChoice(v as any)} style={{ cursor: 'pointer' }}><b>{t}</b><div class="small">{b}</div></div>)}
       </>}
       <div class="row" style={{ marginTop: 'auto' }}>
         {step > 0 && <button class="btn text" onClick={() => setStep(step - 1)}>Back</button>}
         <span class="grow" />
-        <button class="btn" onClick={async () => { if (step < 3) setStep(step + 1); else if (backfill) setFilling(true); else { if (choice === 'gum') await S.startGum(); finish() } }}>{step < 3 ? 'Next' : backfill ? 'Estimate my week' : 'Start'}</button>
+        <button class="btn" onClick={async () => { if (step < 3) setStep(step + 1); else if (backfill) setFilling(true); else { if (choice === 'gum') await S.startGum(); await S.setTarget(8, 'early'); finish() } }}>{step < 3 ? 'Next' : backfill ? 'Estimate my week' : 'Start'}</button>
       </div>
     </main>
   )
@@ -49,9 +49,9 @@ export function Onboarding() {
 const VAPES: [string, string][] = [['FEW', "Friend's vape · a couple of hits"], ['SESSION', "Friend's vape · a proper session"], ['ALL_NIGHT', "Friend's vape · on and off all night"]]
 
 /** The back-dated week: a page per day, tap each product once per use. */
-export function Backfill({ onDone, onCancel }: { onDone: () => void; onCancel: () => void }) {
+export function Backfill({ onDone, onCancel, only, title = 'Estimate your last week' }: { onDone: () => void; onCancel: () => void; only?: string[]; title?: string }) {
   const realFirst = S.live('dose').filter((d) => !d.estimated).map((d) => new Date(d.at).toISOString().slice(0, 10)).sort()[0]
-  const days = Core.backfillDays(isoToday()).filter((d) => !realFirst || d < realFirst)
+  const days = only ?? Core.backfillDays(isoToday()).filter((d) => !realFirst || d < realFirst)
   const [i, setI] = useState(0)
   const [entries, setEntries] = useState<Record<string, { counts: Record<string, number>; vapes: Record<string, number> }>>({})
   useEffect(() => { if (!days.length) onDone() }, [])
@@ -66,10 +66,10 @@ export function Backfill({ onDone, onCancel }: { onDone: () => void; onCancel: (
   )
   return (
     <main>
-      <div class="label">Estimate your last week</div>
+      <div class="label">{title}</div>
       <h1>{dayTitle(day)}</h1>
       <div class="bar"><i style={{ width: `${((i + 1) / days.length) * 100}%` }} /></div>
-      <div class="muted">Tap each thing you used that day, once per use. Rough is fine.</div>
+      <div class="muted">Tap each thing you used that day, once per use. Rough is fine: no times needed, it's spread across your waking day.</div>
       {S.products.value.map((p) => tile(p.name, e.counts[p.id] ?? 0,
         () => set({ ...e, counts: { ...e.counts, [p.id]: (e.counts[p.id] ?? 0) + 1 } }),
         () => set({ ...e, counts: { ...e.counts, [p.id]: Math.max(0, (e.counts[p.id] ?? 0) - 1) } })))}

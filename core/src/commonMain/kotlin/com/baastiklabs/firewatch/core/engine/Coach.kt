@@ -138,6 +138,14 @@ object Coach {
 
         // ---- Last 5 days vs the 14 before ----
         if (now - snoozed < 3 * 24 * 60 * MIN) return null
+        // Creeping up: the last 7 days measure a heavier rung than the one D is working at.
+        if (!Control.isEarly(data)) {
+            val measured = Progress.measuredRung(data, today, tz)
+            val sinceChange = data.rungChanges.lastOrNull()?.at ?: 0L
+            if (measured != null && measured.pieces > target + 1e-6 && now - sinceChange >= 7 * 24 * 60 * MIN) {
+                return StepUp(Ladder.rung(measured.pieces), listOf("your last 7 days measure ${measured.label}"), sameDay = false)
+            }
+        }
         val since = data.rungChanges.lastOrNull()?.at ?: return null
         if (now - since < 3 * 24 * 60 * MIN) return null
         val recentFrom = day.wakeAt - 5 * 24 * 60 * MIN

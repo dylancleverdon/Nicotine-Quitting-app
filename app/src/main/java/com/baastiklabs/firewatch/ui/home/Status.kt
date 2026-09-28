@@ -123,6 +123,7 @@ private fun BatteryRow(b: Battery, now: Long, fitsNow: String?, relapseNext: Lon
         Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
         LinearProgressIndicator(progress = { b.charge.coerceIn(0.0, 1.0).toFloat() }, modifier = Modifier.fillMaxWidth())
         Text(detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (b.closeToBed) Text("Close to bedtime: nicotine can make it harder to fall asleep.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         fitsNow?.let { Text("A $it fits now", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
         if (relapseNext == null) StretchLine(b.stretchMinutesToday, b.pullMinutesToday)
     }

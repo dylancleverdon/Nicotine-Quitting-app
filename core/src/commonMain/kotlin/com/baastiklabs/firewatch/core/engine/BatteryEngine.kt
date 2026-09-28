@@ -76,6 +76,8 @@ object BatteryEngine {
         var di = 0
         var fullBeforeLast: Boolean? = null
         val awakeEnd = maxOf(day.sleepAt, awakeUntil)
+        // Stretch only counts once there's a target to hold off against.
+        val stretchFrom = data.rungChanges.firstOrNull()?.at ?: Long.MAX_VALUE
         var t = day.wakeAt
         val end = minOf(until, nextWake)
         while (t <= end) {
@@ -92,7 +94,7 @@ object BatteryEngine {
                 di++
             }
             if (t < awakeEnd) {
-                if (charge >= 1.0 - 1e-9 && t < day.sleepAt) stretch += 1.0
+                if (charge >= 1.0 - 1e-9 && t < day.sleepAt && t >= stretchFrom) stretch += 1.0
                 charge = (charge + 1.0 / interval).coerceAtMost(1.0)
             }
             t += MIN
@@ -134,13 +136,14 @@ object BatteryEngine {
                     if (ready > day.sleepAt) { state = BatteryState.FULL_AT_WAKE; readyAt = nextWake }
                     else { state = BatteryState.CHARGING; readyAt = ready }
                 }
-                data.settings.windDown && now > day.sleepAt - 60 * MIN -> state = BatteryState.WIND_DOWN
                 else -> state = BatteryState.CLEAR
             }
         }
         // Relapse prevention mode: waiting longer isn't the goal, so stretch and pull pause.
-        if (Relapse.isModeDay(data, day.date, tz)) return Battery(charge, state, readyAt, 0.0, interval, 0.0)
-        return Battery(charge, state, readyAt, sim.stretch, interval, sim.pull)
+        // Wind-down is a note only: it never replaces the guidance.
+        val closeToBed = data.settings.windDown && now in (day.sleepAt - 60 * MIN) until day.sleepAt
+        if (Relapse.isModeDay(data, day.date, tz)) return Battery(charge, state, readyAt, 0.0, interval, 0.0, closeToBed)
+        return Battery(charge, state, readyAt, sim.stretch, interval, sim.pull, closeToBed)
     }
 
     /** When the first piece is allowed, from the morning-delay goal (clock time or minutes after waking). */

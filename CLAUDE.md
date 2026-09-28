@@ -1,11 +1,13 @@
 # Firewatch by Baastik Labs: notes for Claude Code
 
-Personal Android app that tracks nicotine use in "pieces" and helps D taper down.
-The full product spec is `docs/design-spec.md`. The owner ("D") is non-technical: Claude Code
-builds, releases and maintains everything.
+Nicotine tracker and coach (Android + web) for anyone who uses nicotine. It counts use in "pieces"
+and, in this order: finds where the user's use really is, helps them control it, and helps them
+taper if they want. Read `docs/vision.md` (vision and principles) before changing behaviour; the
+living spec is `docs/design-spec.md` (1.0 original in `docs/history/`). The owner ("D") is
+non-technical: Claude Code builds, releases and maintains everything.
 
 ## Rule zero: the self-updater outranks everything
-- New versions must reach D's phone with zero taps. Never ship a change that could break
+- New versions must reach users' phones with zero taps. Never ship a change that could break
   `app/src/main/java/com/baastiklabs/firewatch/update/` or the release pipeline.
 - The `Updater E2E` workflow (emulator) must pass before anything reaches the `apk` branch.
 - Keep `targetSdk` current (silent self-updates need a recent one). Bump it yearly.
@@ -49,10 +51,24 @@ builds, releases and maintains everything.
   `app/src/e2e/` holds test-only hooks for the updater E2E test.
 - Android builds need the SDK; if this container can't reach dl.google.com, rely on CI.
 
-## Product principles (from the spec)
-- Logging takes ~2 seconds, one-handed. Every figure is labelled as an estimate.
-- No nagging: no "time for your next piece" notifications, except in the opt-in Relapse prevention mode
-  (`core/.../engine/Relapse.kt`, `app/.../reminders/RelapseReminders.kt`). Keep that exception. No red screens,
-  no streaks that reset.
+## Product principles (from docs/vision.md; every change must follow them)
+- Priority order when features compete: **find** the real level > **control** it > **taper** (optional).
+  New users start at an early estimate of 8 pieces a day (`Control.EARLY`); step-ups are offered the
+  same day a day runs heavy. Never add a "just for today" step-up.
+- Holding steady is a win and gets celebrated. Tapering is offered, never pushed: step-down offers
+  always include "Stay here". Clear Air stays visible and within reach, never downplayed.
+- Never judge. Tone: factual by default, calm coach for wins, neutral for misses. Never condescending,
+  never spin a miss positively, never show a negative comparison ("last week you were lighter").
+  Motivating figures (Log tab wins) only ever show positive facts.
+- The app must never become a trigger: logging takes ~2 seconds; **no buttons in the craving flow**
+  (how a craving ended is inferred from the logs); the next-piece timer can be hidden.
+- A tool, not a nag: the **only** notifications are in the opt-in Relapse prevention mode
+  (`core/.../engine/Relapse.kt`, `app/.../reminders/RelapseReminders.kt`). Keep that exception, add no others.
+- A relapse means cigarettes or vapes (including a friend's), never gum or pouches. Any product can be
+  tracked; delivery method shows in the quality score with no extra coaching.
+- Private: nothing shareable. Easy to come back: after a gap, "Welcome back" offers back-dating.
+- Back-dating defaults to no times (rough counts spread across the waking day); exact time optional.
+- Tiny learning curve: advanced features are opt-in and live in Settings. No red screens, no streaks
+  that reset. Every figure is labelled as an estimate.
 - Help, the welcome tour and "Why Firewatch works this way" are written once in `core/.../Help.kt` and shown by
-  both apps. Update them when a feature changes.
+  both apps. Update them (and `docs/design-spec.md`) when a feature changes.

@@ -81,7 +81,15 @@ import java.time.LocalDate
 import java.time.LocalTime
 
 @Composable
-fun HomeScreen(vm: FirewatchViewModel, data: FirewatchData, now: Long, snackbar: SnackbarHostState, onBackfill: () -> Unit = {}, onHelp: () -> Unit = {}) {
+fun HomeScreen(
+    vm: FirewatchViewModel,
+    data: FirewatchData,
+    now: Long,
+    snackbar: SnackbarHostState,
+    onBackfill: () -> Unit = {},
+    onHelp: () -> Unit = {},
+    onFill: (List<kotlinx.datetime.LocalDate>) -> Unit = {},
+) {
     val repo = vm.repository
     val scope = rememberCoroutineScope()
     val haptic = LocalHapticFeedback.current
@@ -110,7 +118,20 @@ fun HomeScreen(vm: FirewatchViewModel, data: FirewatchData, now: Long, snackbar:
     val battery = remember(data, minute) { target?.let { Progress.battery(data, if (it.pieces > 0) it.pieces else 1.0 / 3.0, now, tz, com.baastiklabs.firewatch.data.AppActivity.last(context)) } }
     val stepDown = remember(data, minute) { if (revealed) Progress.stepDownOffer(data, now, tz) else null }
     val readiness = remember(data, minute) { data.targetPieces?.let { Coach.readiness(data, it, now) } }
-    val stepUpFull = remember(data, minute) { if (revealed && stepDown == null) Coach.stepUp(data, now, tz) else null }
+    val early = com.baastiklabs.firewatch.core.engine.Control.isEarly(data)
+    val showTier = revealed || early
+    val stepUpFull = remember(data, minute) { if (showTier && stepDown == null) Coach.stepUp(data, now, tz) else null }
+    // First week: the early target (8 a day) firms up as days are logged.
+    androidx.compose.runtime.LaunchedEffect(data, minute) {
+        com.baastiklabs.firewatch.core.engine.Control.earlyTargetUpdate(data, now, tz)?.let {
+            repo.setTarget(it, com.baastiklabs.firewatch.core.engine.Control.EARLY)
+        }
+    }
+    val heldDays = remember(data, minute) { com.baastiklabs.firewatch.core.engine.Control.heldDays(data, now, tz) }
+    val lighter = remember(data, minute / 60) { com.baastiklabs.firewatch.core.engine.Control.lighterThanStart(data, now, tz) }
+    val daysOff = remember(data, minute / 60) { com.baastiklabs.firewatch.core.engine.Control.daysOffSmokeAndVape(data, now, tz) }
+    val journey = remember(data, minute / 60) { if (revealed) Insights(data, tz, now).journey() else null }
+    val welcomeBack = remember(data, minute) { com.baastiklabs.firewatch.core.engine.Control.welcomeBackDays(data, now, tz) }
     val headsUps = remember(data, minute) { Progress.headsUps(data, now, tz) }
     val wave = remember(data, minute) { Insights(data, tz, now).todayCurve(10) }
     val todayWake = remember(data, minute) { Waking.day(data, today, tz) }
@@ -205,7 +226,7 @@ fun HomeScreen(vm: FirewatchViewModel, data: FirewatchData, now: Long, snackbar:
         }
         if (data.relapseOn) item { com.baastiklabs.firewatch.ui.relapse.RelapseIndicator(if (timerHidden) null else relapseNext, relapseProduct) }
         item {
-            if (revealed) {
+            if (showTier) {
                 TierStatusCard(
                     measured = measured,
                     target = target,
@@ -229,7 +250,40 @@ fun HomeScreen(vm: FirewatchViewModel, data: FirewatchData, now: Long, snackbar:
                 StatusCard(todaySummary, baseline, summaries, lastDoseAt, now, onBackfill)
             }
         }
-        if (revealed && target == null && measured != null) {
+        if (showTier) {
+            val wins = listOfNotNull(
+                if (heldDays > 0 && target != null && !early) "✓ Held ${target.label} for $heldDays ${if (heldDays == 1) "day" else "days"}" else null,
+                lighter?.let { "✓ About ${(it * 100).toInt()}% lighter than when you started" },
+                daysOff?.takeIf { it > 0 }?.let { "✓ $it days off cigarettes and vapes" },
+                journey?.takeIf { it > 0 }?.let { "Journey to Clear Air: ${(it * 100).toInt()}%" },
+            )
+            if (early) item {
+                Text(
+                    "Early estimate · firming up as you log your first week" +
+                        ((baseline as? com.baastiklabs.firewatch.core.BaselineStatus.InProgress)?.let { " (day ${it.dayNumber} of 7)" } ?: "") + ".",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            if (wins.isNotEmpty()) item {
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    wins.forEach { Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.tertiary) }
+                }
+            }
+        }
+        welcomeBack?.let { gap ->
+            item {
+                OfferCard(
+                    title = "Welcome back",
+                    body = "Want to add what you had while you were away? Rough counts per day, no times needed.",
+                    primary = "Add those days",
+                    onPrimary = { onFill(gap) },
+                    secondary = "Not now",
+                    onSecondary = { scope.launch { repo.updateSettings { it.copy(welcomeBackDismissedAt = repo.now()) } } },
+                )
+            }
+        }
+        if (revealed && (target == null || early) && measured != null) {
             item {
                 OfferCard(
                     title = "Your starting point: ${measured.tier.title}",
@@ -249,10 +303,10 @@ fun HomeScreen(vm: FirewatchViewModel, data: FirewatchData, now: Long, snackbar:
                     body = "You've held ${target.label} for ${data.settings.holdDays} days." + (if (readiness?.confident == true) {
                         if (ready) " From your cravings, the next rung should feel like about a ${readiness.predictedNext.toInt()} out of 10, and you ride out ${readiness.capacity}s."
                         else " Heads-up: your cravings suggest the next rung may feel like a ${readiness.predictedNext.toInt()}, above the ${readiness.capacity} you usually ride out. Holding a bit longer is fine too."
-                    } else "") + (com.baastiklabs.firewatch.core.engine.Checks.trendNote(data, today, tz)?.let { " $it" } ?: ""),
+                    } else "") + (com.baastiklabs.firewatch.core.engine.Checks.trendNote(data, today, tz)?.let { " $it" } ?: "") + " Or stay here, that's fine too.",
                     primary = "Step down",
                     onPrimary = { moveTarget(stepDown.pieces, "down") },
-                    secondary = "Not yet",
+                    secondary = "Stay here",
                     onSecondary = { scope.launch { repo.updateSettings { it.copy(stepDownSnoozedAt = repo.now()) } } },
                 )
             }

@@ -147,6 +147,8 @@ data class Settings(
     val tourSeen: Boolean = false,
     /** Opt-in "Hide next piece timer": the time shows only on a tap, and each tap is counted. */
     val hideTimer: Boolean = false,
+    /** "Welcome back" was answered (back-dated or "Not now") at this time. */
+    val welcomeBackDismissedAt: Long = 0,
 )
 
 /** A tap to see the hidden next-piece time. [charging]: the battery wasn't full yet. */

@@ -4,7 +4,7 @@ import { expect, test } from '@playwright/test'
 test('back-dated start, logging and persistence', async ({ page }) => {
   await page.goto('./')
   // Welcome tour first (skippable).
-  await expect(page.getByText('What Firewatch does')).toBeVisible()
+  await expect(page.getByText('Take control of your nicotine')).toBeVisible()
   await page.getByRole('button', { name: 'Skip' }).click()
   await expect(page.getByText('by Baastik Labs').first()).toBeVisible()
   for (let i = 0; i < 3; i++) await page.getByRole('button', { name: 'Next' }).click()
@@ -94,4 +94,16 @@ test('back-dated start, logging and persistence', async ({ page }) => {
   const file = JSON.parse(text)
   expect(file.app).toBe('Firewatch by Baastik Labs')
   expect(file.records.filter((r: any) => r.type === 'dose').length).toBe(36)
+})
+
+// A brand-new user on the baseline path gets guidance straight away: an early estimate of 8 a day.
+test('early estimate for new users', async ({ page }) => {
+  await page.goto('./')
+  await page.getByRole('button', { name: 'Skip' }).click()
+  for (let i = 0; i < 3; i++) await page.getByRole('button', { name: 'Next' }).click()
+  await page.getByRole('button', { name: 'Start' }).click()
+  await page.locator('.product', { hasText: 'Nicotine gum 4 mg' }).click()
+  await expect(page.getByText(/Early estimate/)).toBeVisible()
+  await expect(page.locator('.tier')).toHaveText('Blaze')
+  await page.screenshot({ path: 'test-results/early.png', fullPage: true })
 })

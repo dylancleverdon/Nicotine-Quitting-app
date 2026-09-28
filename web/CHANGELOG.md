@@ -1,5 +1,14 @@
 # Firewatch web changelog
 
+## 0.7.0 · 2026-09-28
+- New users get guidance from day one: an early estimate of 8 pieces a day that firms up to your real level over your first week.
+- Holding steady is a win: the Log tab shows how long you've held your level (and other wins, like time off cigarettes and vapes), plus a new Holding steady chart and badges.
+- Step-up offer: also appears when your last 7 days measure a heavier level than the one you're working at.
+- Step-down offers now say "Or stay here, that's fine too", with a Stay here button.
+- Wind-down no longer hides your next-piece guidance. It's now just a note near bedtime.
+- Back after a break? "Welcome back" lets you add what you had, day by day, with rough counts and no times needed. The same "Add what you had" is on every Calendar day.
+- A refreshed welcome tour and "Why Firewatch works this way", matching what Firewatch is for: knowing where you are, staying in control, and cutting down if you want.
+
 ## 0.6.0 · 2026-09-28
 - New, optional: **Hide next piece timer** (Settings → Your plan). The next-piece time shows only when you tap it, and Firewatch learns how often you check. That feeds Insights and the step-up and step-down offers.
 - Cravings: log one with a tap, then put the app down. There are no more "It passed" or "I used" buttons. Firewatch works out how each craving ended from your logs. Riding it out and waiting for a full battery both count as wins. A cigarette or vape counts as a relapse; an early gum or pouch counts as early. See Insights → Patterns → How cravings ended.

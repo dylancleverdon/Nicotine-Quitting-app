@@ -404,6 +404,18 @@ class Insights(private val data: FirewatchData, private val tz: TimeZone, privat
         listOf(1, 10, 50, 100).forEach { n ->
             resolved.getOrNull(n - 1)?.let { out += Badge("$n craving${if (n > 1) "s" else ""} ridden out", "Urges beaten without nicotine", it.at.localDate(tz)) }
         }
+        Control.heldByRung(data, now, tz).forEach { (pieces, held) ->
+            val (n, lastDay) = held
+            if (lastDay == null) return@forEach
+            listOf(7, 30, 90, 180).filter { n >= it }.forEach { m ->
+                out += Badge("Held ${Ladder.rung(pieces).label} for $m days", "Holding steady is a win", lastDay)
+            }
+        }
+        Control.daysOffSmokeAndVape(data, now, tz)?.let { off ->
+            listOf(7, 30, 90, 365).filter { off >= it }.forEach { m ->
+                out += Badge("$m days off cigarettes and vapes", "A big deal", today.minus(off - m, DateTimeUnit.DAY))
+            }
+        }
         return out.sortedBy { it.earnedOn }
     }
 

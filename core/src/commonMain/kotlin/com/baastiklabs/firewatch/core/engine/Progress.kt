@@ -18,6 +18,7 @@ data class DayPace(val date: LocalDate, val pieces: Double, val awakeMinutes: Do
     val scaled: Double get() = if (awakeMinutes <= 0) pieces else pieces * Ladder.WAKING_MINUTES / awakeMinutes
 }
 
+/** WIND_DOWN is no longer produced (0.9): wind-down is a note on the normal guidance ([Battery.closeToBed]). */
 enum class BatteryState { CLEAR, CHARGING, FULL_AT_WAKE, MORNING_DELAY, WIND_DOWN, ASLEEP }
 
 data class Battery(
@@ -30,6 +31,8 @@ data class Battery(
     val intervalMinutes: Double,
     /** Minutes today pieces were taken before the battery was full. */
     val pullMinutesToday: Double = 0.0,
+    /** In the last hour before usual bedtime (wind-down on): show a bedtime note, keep the guidance. */
+    val closeToBed: Boolean = false,
 ) {
     val netMinutesToday: Double get() = stretchMinutesToday - pullMinutesToday
 }
@@ -77,6 +80,8 @@ object Progress {
     fun stepDownOffer(data: FirewatchData, now: Long, tz: TimeZone): Rung? {
         val target = data.targetPieces ?: return null
         if (target <= 0) return null
+        // First week: the "Your starting point" card replaces the early estimate instead.
+        if (Control.isEarly(data)) return null
         val since = data.rungChanges.lastOrNull()?.at ?: return null
         val hold = data.settings.holdDays
         if (now - data.settings.stepDownSnoozedAt < 24 * 60 * MIN) return null

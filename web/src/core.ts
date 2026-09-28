@@ -4,7 +4,7 @@ import { FirewatchCore } from 'firewatch-core'
 const core = FirewatchCore.getInstance()
 
 export interface Rung { pieces: number; tier: string; label: string; plain: string }
-export interface Battery { charge: number; state: 'CLEAR' | 'CHARGING' | 'FULL_AT_WAKE' | 'MORNING_DELAY' | 'WIND_DOWN' | 'ASLEEP'; readyAt: number | null; stretchMin: number; pullMin: number; fitsNow?: string | null }
+export interface Battery { charge: number; state: 'CLEAR' | 'CHARGING' | 'FULL_AT_WAKE' | 'MORNING_DELAY' | 'WIND_DOWN' | 'ASLEEP'; readyAt: number | null; stretchMin: number; pullMin: number; fitsNow?: string | null; closeToBed?: boolean }
 export interface StretchDay { date: string; stretchMin: number; pullMin: number; paused?: boolean }
 export interface Relapse { on: boolean; nextAt: number | null; gapMin: number; productId: string | null; productName: string | null; recommend: string | null; movingOn: boolean; modeDays: string[] }
 export interface CravingWindow { from: number; to: number; peakAt: number; likelihood: number; strength: number }
@@ -36,7 +36,7 @@ export interface InsightsData {
 export interface Snapshot {
   today: string; baselineState: 'none' | 'progress' | 'complete'; baselineDay: number; baselineAverage: number | null
   revealed: boolean; measured: Rung | null; target: Rung | null; battery: Battery | null
-  stepDown: Rung | null; stepDownNote: string | null; stepUp: Rung | null; stepUpWhy: string | null; stepUpSameDay: boolean; cravingEndings: NamedValue[]; checks: NamedValue[]; checksToday: number; headsUps: string[]
+  stepDown: Rung | null; stepDownNote: string | null; stepUp: Rung | null; stepUpWhy: string | null; stepUpSameDay: boolean; cravingEndings: NamedValue[]; checks: NamedValue[]; checksToday: number; early: boolean; earlyUpdate: number | null; heldDays: number; held: string[][]; lighterThanStart: number | null; daysOffSmokeAndVape: number | null; welcomeBack: string[] | null; headsUps: string[]
   qualityScore: number | null; qualityLabel: string | null; swapTip: string | null; activeCraving: CravingView | null
   todayPieces: number; todayMg: number; todayCravings: number; todayRodeOut: number; lastDoseAt: number | null
   todayDoses: DoseView[]; todayCravingList: CravingView[]; wave: number[][]; wakeAt: number; sleepAt: number; typical: number[]

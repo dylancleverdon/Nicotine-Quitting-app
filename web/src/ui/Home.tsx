@@ -1,4 +1,4 @@
-import { useRef, useState } from 'preact/hooks'
+import { useEffect, useRef, useState } from 'preact/hooks'
 import { Core } from '../core'
 import { savedName, sendFeedback } from '../feedback'
 import * as S from '../store'
@@ -6,7 +6,7 @@ import { Meter, Wave } from './Charts'
 import { CheckInSheet, CravingSheet, DoseSheet, VapeSheet, doseLine } from './Sheets'
 import { TAGS, cravingColor, duration, isoToday, mg, pieces, piecesLabel, signedDuration, time } from './format'
 
-export function Home({ toast, go }: { toast: (msg: string, undo?: () => void) => void; go: (r: string) => void }) {
+export function Home({ toast, go, backfill }: { toast: (msg: string, undo?: () => void) => void; go: (r: string) => void; backfill?: (days: string[]) => void }) {
   const snap = S.snapshot.value!
   const settings = S.settings.value
   const [options, setOptions] = useState<any>(null)
@@ -24,6 +24,9 @@ export function Home({ toast, go }: { toast: (msg: string, undo?: () => void) =>
   }
   const [fb, setFb] = useState<{ type: string; text: string; details: string; name: string } | null>(null)
   const rp = snap.relapse
+  // First week: the early target (8 a day) firms up as days are logged.
+  useEffect(() => { if (snap.earlyUpdate != null) S.setTarget(snap.earlyUpdate, 'early') }, [snap.earlyUpdate])
+  const showTier = snap.revealed || snap.early
   const press = useRef<number | null>(null)
   const longFired = useRef(false)
 
@@ -60,10 +63,11 @@ export function Home({ toast, go }: { toast: (msg: string, undo?: () => void) =>
         <div class="small">{rp.nextAt && !hidden ? `Next scheduled piece at ${time(rp.nextAt)}` : ''}{rp.productName ? ` · ${rp.productName}` : ''}</div>
         <div class="muted">Reminders are Android-only for now.</div></div>}
       <div class="card">
-        {snap.revealed ? <>
+        {showTier ? <>
           {(snap.target ?? snap.measured) && <>
             <p class="tier">{(snap.target ?? snap.measured)!.tier}</p>
             <div class="small">{(snap.target ?? snap.measured)!.plain}</div>
+            {snap.early && <div class="muted">Early estimate · firming up as you log your first week{snap.baselineState === 'progress' ? ` (day ${snap.baselineDay} of 7)` : ''}.</div>}
             {snap.target && snap.measured && snap.measured.pieces !== snap.target.pieces &&
               <div class="muted">Working at {snap.target.label}. Your last 7 days measure {snap.measured.label}.</div>}
           </>}
@@ -76,6 +80,7 @@ export function Home({ toast, go }: { toast: (msg: string, undo?: () => void) =>
               battery.state === 'FULL_AT_WAKE' ? 'Full when you wake up' : battery.state === 'MORNING_DELAY' ? `First piece goal: ${battery.readyAt ? time(battery.readyAt) : ''}` :
               battery.state === 'WIND_DOWN' ? 'Winding down for bed' : 'Sleeping hours · Fresh start when you wake up'}</b>
             <Meter value={battery.charge} />
+            {battery.closeToBed && <div class="small muted">Close to bedtime: nicotine can make it harder to fall asleep.</div>}
             {battery.fitsNow && <div class="small muted">A {battery.fitsNow} fits now</div>}
             {!rp.on && <div class="small stretch" style={{ color: battery.stretchMin - battery.pullMin >= 0 ? 'var(--tertiary)' : 'var(--muted)' }}>
               Stretch {duration(battery.stretchMin * 60000)} · Pull {duration(battery.pullMin * 60000)} · Net {signedDuration(battery.stretchMin - battery.pullMin)}</div>}
@@ -96,20 +101,32 @@ export function Home({ toast, go }: { toast: (msg: string, undo?: () => void) =>
           <div class="stat small"><b>{snap.todayRodeOut}/{snap.todayCravings}</b><span>urges beaten</span></div>
           {snap.qualityLabel && <div class="stat small"><b>{snap.qualityLabel.split(' · ')[0].split(' ')[0]} {Math.round(snap.qualityScore!)}</b><span>quality</span></div>}
         </div>
-        {snap.revealed && snap.wave.length > 2 && <Wave points={snap.wave} height={64} axes={false} now={Date.now()} shade={[[snap.wave[0][0], snap.wakeAt], [snap.sleepAt, snap.wave[snap.wave.length - 1][0]]]} />}
-        {snap.revealed && snap.wave.length > 2 && <div class="now-mg"><b>≈ {snap.nowMg.toFixed(1)} mg</b> in your system now</div>}
+        {(snap.heldDays > 0 || snap.lighterThanStart != null || (snap.daysOffSmokeAndVape ?? 0) > 0 || snap.insights.journey != null) && <div class="wins small">
+          {snap.heldDays > 0 && snap.target && <div>✓ Held {snap.target.label} for {snap.heldDays} {snap.heldDays === 1 ? 'day' : 'days'}</div>}
+          {snap.lighterThanStart != null && <div>✓ About {Math.round(snap.lighterThanStart * 100)}% lighter than when you started</div>}
+          {(snap.daysOffSmokeAndVape ?? 0) > 0 && <div>✓ {snap.daysOffSmokeAndVape} days off cigarettes and vapes</div>}
+          {snap.insights.journey != null && snap.insights.journey > 0 && <div>Journey to Clear Air: {Math.round(snap.insights.journey * 100)}%</div>}
+        </div>}
+        {showTier && snap.wave.length > 2 && <Wave points={snap.wave} height={64} axes={false} now={Date.now()} shade={[[snap.wave[0][0], snap.wakeAt], [snap.sleepAt, snap.wave[snap.wave.length - 1][0]]]} />}
+        {showTier && snap.wave.length > 2 && <div class="now-mg"><b>≈ {snap.nowMg.toFixed(1)} mg</b> in your system now</div>}
       </div>
 
-      {snap.revealed && !snap.target && snap.measured && <div class="card accent">
+      {snap.welcomeBack && <div class="card accent">
+        <h2>Welcome back</h2>
+        <div class="small">Want to add what you had while you were away? Rough counts per day, no times needed.</div>
+        <div class="row"><button class="btn" onClick={() => backfill?.(snap.welcomeBack!)}>Add those days</button>
+          <button class="btn outline" onClick={() => S.updateSettings({ welcomeBackDismissedAt: Date.now() })}>Not now</button></div>
+      </div>}
+      {snap.revealed && (!snap.target || snap.early) && snap.measured && <div class="card accent">
         <h2>Your starting point: {snap.measured.tier}</h2>
         <div class="small">{snap.measured.plain} Work from here?</div>
         <div><button class="btn" onClick={() => moveTarget(snap.measured!.pieces, 'start')}>Start here</button></div>
       </div>}
       {snap.stepDown && snap.target && <div class="card accent">
         <h2>Ready for {snap.stepDown.label}?</h2>
-        <div class="small">You've held {snap.target.label} for {settings.holdDays} days. {snap.stepDownNote}</div>
+        <div class="small">You've held {snap.target.label} for {settings.holdDays} days. {snap.stepDownNote} Or stay here, that's fine too.</div>
         <div class="row"><button class="btn" onClick={() => moveTarget(snap.stepDown!.pieces, 'down')}>Step down</button>
-          <button class="btn outline" onClick={() => S.updateSettings({ stepDownSnoozedAt: Date.now() })}>Not yet</button></div>
+          <button class="btn outline" onClick={() => S.updateSettings({ stepDownSnoozedAt: Date.now() })}>Stay here</button></div>
       </div>}
       {snap.stepUp && snap.target && <div class="card accent">
         <h2>This rung is tough right now</h2>

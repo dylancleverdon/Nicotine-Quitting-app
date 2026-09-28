@@ -44,7 +44,7 @@ import kotlinx.serialization.json.JsonElement
 external object JsJodaTimeZoneModule
 
 @Serializable data class RungDto(val pieces: Double, val tier: String, val label: String, val plain: String)
-@Serializable data class BatteryDto(val charge: Double, val state: String, val readyAt: Double?, val stretchMin: Double, val pullMin: Double, val fitsNow: String? = null)
+@Serializable data class BatteryDto(val charge: Double, val state: String, val readyAt: Double?, val stretchMin: Double, val pullMin: Double, val fitsNow: String? = null, val closeToBed: Boolean = false)
 @Serializable data class StretchDay(val date: String, val stretchMin: Double, val pullMin: Double, val paused: Boolean = false)
 @Serializable data class RelapseDto(
     val on: Boolean, val nextAt: Double?, val gapMin: Double, val productId: String?, val productName: String?,
@@ -92,6 +92,17 @@ external object JsJodaTimeZoneModule
     /** "Hide next piece timer": per waking day for the last 42 days [date, total, charging]. */
     val checks: List<NamedValue>,
     val checksToday: Int,
+    /** The provisional first-week target (8 a day, firming up). */
+    val early: Boolean,
+    /** When the first-week target should firm up to this many pieces (the app writes it). */
+    val earlyUpdate: Double?,
+    val heldDays: Int,
+    /** Last 42 full days: [date, pieces (scaled), target that day or -1]. */
+    val held: List<List<String>>,
+    val lighterThanStart: Double?,
+    val daysOffSmokeAndVape: Int?,
+    /** "Welcome back": the gap days to offer for back-dating (ISO dates), or null. */
+    val welcomeBack: List<String>?,
     val headsUps: List<String>,
     val qualityScore: Double?,
     val qualityLabel: String?,
@@ -211,7 +222,7 @@ object FirewatchCore {
         val battery = target?.let { Progress.battery(d, if (it.pieces > 0) it.pieces else 1.0 / 3.0, now, tz, lastActivityMs.toLong()) }
         val stepDown = if (revealed) Progress.stepDownOffer(d, now, tz) else null
         val readiness = d.targetPieces?.let { Coach.readiness(d, it, now) }
-        val stepUpFull = if (revealed && stepDown == null) Coach.stepUp(d, now, tz) else null
+        val stepUpFull = if ((revealed || com.baastiklabs.firewatch.core.engine.Control.isEarly(d)) && stepDown == null) Coach.stepUp(d, now, tz) else null
         val stepUp = stepUpFull?.rung
         val todayDay = ins.days.lastOrNull()?.takeIf { it.date == today }
         val todayDoses = d.doses.filter { it.at.localDate(tz) == today }
@@ -262,7 +273,7 @@ object FirewatchCore {
             revealed = revealed,
             measured = measured?.dto(),
             target = target?.dto(),
-            battery = battery?.let { BatteryDto(it.charge, it.state.name, it.readyAt?.toDouble(), it.stretchMinutesToday, it.pullMinutesToday, com.baastiklabs.firewatch.core.engine.BatteryEngine.fitsNow(d, it)?.name) },
+            battery = battery?.let { BatteryDto(it.charge, it.state.name, it.readyAt?.toDouble(), it.stretchMinutesToday, it.pullMinutesToday, com.baastiklabs.firewatch.core.engine.BatteryEngine.fitsNow(d, it)?.name, it.closeToBed) },
             stepDown = stepDown?.dto(),
             stepDownNote = listOfNotNull(readiness?.takeIf { it.confident }?.let {
                 if (it.ready) "From your cravings, the next rung should feel like about a ${it.predictedNext.toInt()} out of 10, and you ride out ${it.capacity}s."
@@ -273,6 +284,13 @@ object FirewatchCore {
             stepUpSameDay = stepUpFull?.sameDay ?: false,
             cravingEndings = ins.cravingEndings().entries.sortedBy { it.key.ordinal }.map { NamedValue(it.key.title, it.value.toDouble(), if (it.key.win) "win" else "") },
             checks = com.baastiklabs.firewatch.core.engine.Checks.history(d, today, tz, 42).map { NamedValue(it.date.toString(), it.total.toDouble(), it.charging.toString()) },
+            early = com.baastiklabs.firewatch.core.engine.Control.isEarly(d),
+            earlyUpdate = com.baastiklabs.firewatch.core.engine.Control.earlyTargetUpdate(d, now, tz),
+            heldDays = com.baastiklabs.firewatch.core.engine.Control.heldDays(d, now, tz),
+            held = com.baastiklabs.firewatch.core.engine.Control.heldSeries(d, now, tz).map { (date, p, t) -> listOf(date.toString(), p.toString(), (t ?: -1.0).toString()) },
+            lighterThanStart = com.baastiklabs.firewatch.core.engine.Control.lighterThanStart(d, now, tz),
+            daysOffSmokeAndVape = com.baastiklabs.firewatch.core.engine.Control.daysOffSmokeAndVape(d, now, tz),
+            welcomeBack = com.baastiklabs.firewatch.core.engine.Control.welcomeBackDays(d, now, tz)?.map { it.toString() },
             checksToday = com.baastiklabs.firewatch.core.engine.Checks.day(d, com.baastiklabs.firewatch.core.engine.BatteryEngine.currentDay(d, now, tz).first.date, tz).total,
             headsUps = Progress.headsUps(d, now, tz).map { it.message },
             qualityScore = Quality.of(todayDoses, ref),

@@ -16,6 +16,7 @@ const TABS = [['home', 'Log'], ['insights', 'Insights'], ['calendar', 'Calendar'
 
 export function App() {
   const [route, setRoute] = useState('home')
+  const [fillDays, setFillDays] = useState<string[] | null>(null)
   const [toast, setToast] = useState<{ msg: string; undo?: () => void } | null>(null)
   const [whatsNew, setWhatsNew] = useState<string | null>(null)
   const [checked, setChecked] = useState('Checking for updates on each open')
@@ -41,7 +42,8 @@ export function App() {
   if (!S.settings.value.onboardingDone) return <Onboarding />
   return (
     <>
-      {route === 'home' && <Home toast={show} go={setRoute} />}
+      {route === 'home' && <Home toast={show} go={setRoute} backfill={(d) => { setFillDays(d); setRoute('fill') }} />}
+      {route === 'fill' && fillDays && <Backfill only={fillDays} title="Add what you had" onDone={() => { S.updateSettings({ welcomeBackDismissedAt: Date.now() }); setRoute('home') }} onCancel={() => setRoute('home')} />}
       {route === 'insights' && <Insights />}
       {route === 'calendar' && <Calendar />}
       {route === 'settings' && <Settings toast={show} go={setRoute} updateInfo={checked} />}
@@ -49,7 +51,7 @@ export function App() {
       {route === 'why' && <Why onBack={() => setRoute('help')} />}
       {route === 'tour' && <Tour onDone={() => setRoute('help')} onWhy={() => setRoute('why')} />}
       {route === 'backfill' && <Backfill onDone={() => setRoute('home')} onCancel={() => setRoute('home')} />}
-      {!['backfill', 'tour'].includes(route) && <nav class="tabs">{TABS.map(([r, l]) => <button class={route === r ? 'on' : ''} onClick={() => setRoute(r)}>{l}</button>)}</nav>}
+      {!['backfill', 'tour', 'fill'].includes(route) && <nav class="tabs">{TABS.map(([r, l]) => <button class={route === r ? 'on' : ''} onClick={() => setRoute(r)}>{l}</button>)}</nav>}
       {toast && <div class="toast">{toast.msg}{toast.undo && <button class="btn text" onClick={() => { toast.undo!(); setToast(null) }}>Undo</button>}</div>}
       {whatsNew && <div class="sheet-bg" onClick={() => setWhatsNew(null)}><div class="sheet"><h2>What's new</h2>
         <div class="small" style={{ whiteSpace: 'pre-wrap' }}>{'Version ' + whatsNew}</div><button class="btn" onClick={() => setWhatsNew(null)}>Got it</button></div></div>}

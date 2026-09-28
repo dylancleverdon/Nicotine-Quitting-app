@@ -86,6 +86,7 @@ fun DayScreen(
     date: LocalDate,
     snackbar: SnackbarHostState,
     onBack: () -> Unit,
+    onFill: (kotlinx.datetime.LocalDate) -> Unit = {},
 ) {
     val tz = TimeZone.currentSystemDefault()
     val scope = rememberCoroutineScope()
@@ -154,8 +155,11 @@ fun DayScreen(
                 }
             }
             item {
+                androidx.compose.material3.Button(onClick = { onFill(kDate) }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
+                    Text("Add what you had (no times needed)")
+                }
                 OutlinedButton(onClick = { pickingProduct = true }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
-                    Text("Add a dose I forgot to log")
+                    Text("Add one at an exact time")
                 }
             }
         }
