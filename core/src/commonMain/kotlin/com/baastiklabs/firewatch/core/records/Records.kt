@@ -6,6 +6,7 @@ import com.baastiklabs.firewatch.core.model.Craving
 import com.baastiklabs.firewatch.core.model.DefaultProducts
 import com.baastiklabs.firewatch.core.model.Dose
 import com.baastiklabs.firewatch.core.model.ModeChange
+import com.baastiklabs.firewatch.core.model.TimerCheck
 import com.baastiklabs.firewatch.core.model.Product
 import com.baastiklabs.firewatch.core.model.RungChange
 import com.baastiklabs.firewatch.core.model.Settings
@@ -41,6 +42,7 @@ object RecordTypes {
     const val RUNG = "rung"
     const val CHECKIN = "checkin"
     const val MODE = "mode"
+    const val TIMER_CHECK = "timercheck"
 
     const val SETTINGS_ID = "settings"
 }
@@ -97,6 +99,9 @@ object RecordCodec {
     fun mode(m: ModeChange, previousJson: String?, now: Long, deleted: Boolean = false) =
         encode(RecordTypes.MODE, m.id, m.at, m, ModeChange.serializer(), previousJson, now, deleted)
 
+    fun timerCheck(c: TimerCheck, previousJson: String?, now: Long, deleted: Boolean = false) =
+        encode(RecordTypes.TIMER_CHECK, c.id, c.at, c, TimerCheck.serializer(), previousJson, now, deleted)
+
     fun settings(s: Settings, previousJson: String?, now: Long) =
         encode(RecordTypes.SETTINGS, RecordTypes.SETTINGS_ID, null, s, Settings.serializer(), previousJson, now)
 }
@@ -111,6 +116,7 @@ data class FirewatchData(
     val rungChanges: List<RungChange> = emptyList(),
     val checkIns: List<CheckIn> = emptyList(),
     val modeChanges: List<ModeChange> = emptyList(),
+    val timerChecks: List<TimerCheck> = emptyList(),
 ) {
     /** Relapse prevention mode is on right now. */
     val relapseOn: Boolean get() = modeChanges.lastOrNull { it.mode == "relapse" }?.on == true
@@ -148,6 +154,7 @@ data class FirewatchData(
                 rungChanges = decodeAll(RecordTypes.RUNG, RungChange.serializer()).sortedBy { it.at },
                 checkIns = decodeAll(RecordTypes.CHECKIN, CheckIn.serializer()).sortedBy { it.at },
                 modeChanges = decodeAll(RecordTypes.MODE, ModeChange.serializer()).sortedBy { it.at },
+                timerChecks = decodeAll(RecordTypes.TIMER_CHECK, TimerCheck.serializer()).sortedBy { it.at },
             )
         }
     }

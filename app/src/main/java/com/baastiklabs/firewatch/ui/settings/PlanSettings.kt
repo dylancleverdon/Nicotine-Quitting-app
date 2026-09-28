@@ -95,6 +95,11 @@ fun PlanSettings(vm: FirewatchViewModel, data: FirewatchData) {
                 FilterChip(selected = s.timeFormat == v, onClick = { update { it.copy(timeFormat = v) } }, label = { Text(label) })
             }
         }
+        ToggleRow(
+            "Hide next piece timer",
+            "The time shows only when you tap it, so Firewatch can learn how often you check",
+            s.hideTimer,
+        ) { v -> update { it.copy(hideTimer = v) } }
         ToggleRow("Wind down before bed", "No \"clear for one\" in the last hour before bed", s.windDown) { v -> update { it.copy(windDown = v) } }
         ToggleRow("Daily check-in", "Three quick taps: craving strength, mood and sleep", s.dailyCheckIn) { v -> update { it.copy(dailyCheckIn = v) } }
     }

@@ -126,7 +126,7 @@ class Insights(private val data: FirewatchData, private val tz: TimeZone, privat
             highPieces = doses.sumOf { (it.rangeHighMg ?: it.absorbedMg()) / ref },
             hasRange = doses.any { it.rangeLowMg != null },
             cravings = cravings.size,
-            rodeOut = cravings.count { Cravings.effectiveOutcome(it, data.doses, now) == CravingOutcome.RODE_OUT },
+            rodeOut = cravings.count { Cravings.effectiveOutcome(data, it, now) == CravingOutcome.RODE_OUT },
             mouthMinutes = doses.sumOf { mouthMinutes(it) },
             clearHours = clearMinutes / 60.0,
             awakeHours = awake / 60.0,
@@ -204,7 +204,7 @@ class Insights(private val data: FirewatchData, private val tz: TimeZone, privat
     fun beatenTriggers(): List<Triple<String, Int, Int>> {
         val events = data.doses.flatMap { d -> d.tags.map { Triple(it, d.at, false) } } +
             data.cravings.flatMap { c ->
-                val beat = Cravings.effectiveOutcome(c, data.doses, now) == CravingOutcome.RODE_OUT
+                val beat = Cravings.effectiveOutcome(data, c, now) == CravingOutcome.RODE_OUT
                 c.tags.map { Triple(it, c.at, beat) }
             }
         return events.groupBy { it.first }.map { (tag, list) ->
@@ -260,8 +260,15 @@ class Insights(private val data: FirewatchData, private val tz: TimeZone, privat
         return avoided / product.unitsPerPack to product.name
     }
 
+    /** How cravings ended over the last [days] days (in-progress ones left out). */
+    fun cravingEndings(days: Int = 14): Map<com.baastiklabs.firewatch.core.CravingResult, Int> =
+        data.cravings.filter { now - it.at < days * 24 * 60 * MIN }
+            .map { com.baastiklabs.firewatch.core.Cravings.result(data, it, now, tz) }
+            .filter { it != com.baastiklabs.firewatch.core.CravingResult.PENDING }
+            .groupingBy { it }.eachCount()
+
     fun cravingWinRate(): Double? {
-        val resolved = data.cravings.map { Cravings.effectiveOutcome(it, data.doses, now) }.filter { it != CravingOutcome.OPEN }
+        val resolved = data.cravings.map { Cravings.effectiveOutcome(data, it, now) }.filter { it != CravingOutcome.OPEN }
         return if (resolved.isEmpty()) null else resolved.count { it == CravingOutcome.RODE_OUT }.toDouble() / resolved.size
     }
 
@@ -393,7 +400,7 @@ class Insights(private val data: FirewatchData, private val tz: TimeZone, privat
             out += Badge("Nicotine-free morning", "Nothing for 4 hours after waking", it.date)
         }
         days.firstOrNull { it.date < today && it.pieces == 0.0 }?.let { out += Badge("First clear day", "A whole day with no nicotine", it.date) }
-        val resolved = data.cravings.filter { Cravings.effectiveOutcome(it, data.doses, now) == CravingOutcome.RODE_OUT }.sortedBy { it.at }
+        val resolved = data.cravings.filter { Cravings.effectiveOutcome(data, it, now) == CravingOutcome.RODE_OUT }.sortedBy { it.at }
         listOf(1, 10, 50, 100).forEach { n ->
             resolved.getOrNull(n - 1)?.let { out += Badge("$n craving${if (n > 1) "s" else ""} ridden out", "Urges beaten without nicotine", it.at.localDate(tz)) }
         }
@@ -419,7 +426,6 @@ class Insights(private val data: FirewatchData, private val tz: TimeZone, privat
         }
         triggerCounts().firstOrNull()?.let { out += "\"${it.first}\" is the tag that shows up most around doses (${it.second} times)." }
         cravingWinRate()?.let { out += "You've ridden out ${(it * 100).toInt()}% of logged cravings." }
-        averageCravingMinutes()?.let { out += "Cravings you timed lasted about ${it.toInt()} minutes on average." }
         return out
     }
 

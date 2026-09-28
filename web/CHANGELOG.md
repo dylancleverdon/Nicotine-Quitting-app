@@ -1,5 +1,11 @@
 # Firewatch web changelog
 
+## 0.6.0 · 2026-09-28
+- New, optional: **Hide next piece timer** (Settings → Your plan). The next-piece time shows only when you tap it, and Firewatch learns how often you check. That feeds Insights and the step-up and step-down offers.
+- Cravings: log one with a tap, then put the app down. There are no more "It passed" or "I used" buttons. Firewatch works out how each craving ended from your logs. Riding it out and waiting for a full battery both count as wins. A cigarette or vape counts as a relapse; an early gum or pouch counts as early. See Insights → Patterns → How cravings ended.
+- The step-up offer now catches a rough day the same day (big pull, strong cravings, running over, lots of checking, or a relapse), and says why. It's about finding the level you're really at.
+- Suggestions: clearer messages when one can't be sent. Unsent ones wait in Settings → Unsent suggestions, with Send now and Delete. Nothing retries on its own.
+
 ## 0.5.0 · 2026-09-28
 - Every chart now has numbers: values up the side (mg, pieces, %, hours) and times or dates along the bottom, following your 12/24-hour setting.
 - New: **Suggest something / report a bug** at the very bottom of the Log tab. Ideas and bug reports go straight to a private list, with the app version attached, so nothing gets lost in texts. Works offline too (it sends later).

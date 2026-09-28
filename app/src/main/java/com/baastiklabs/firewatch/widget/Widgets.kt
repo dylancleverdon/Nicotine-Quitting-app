@@ -80,7 +80,10 @@ class QuickLogWidget : GlanceAppWidget() {
         Fmt.systemUse24h = android.text.format.DateFormat.is24HourFormat(context)
         Fmt.applyTimeFormat(data.settings.timeFormat)
         val relapseNext = com.baastiklabs.firewatch.core.engine.Relapse.nextAt(data, now, tz)
-        val status = if (relapseNext != null) "Next scheduled piece ${Fmt.time(relapseNext)}" to 1.0 else data.targetPieces?.let { target ->
+        val hideTimer = data.settings.hideTimer
+        val status = if (hideTimer) data.targetPieces?.let { t ->
+            "Open Firewatch to see your next piece time" to Progress.battery(data, if (t > 0) t else 1.0 / 3.0, now, tz).charge.coerceIn(0.0, 1.0)
+        } else if (relapseNext != null) "Next scheduled piece ${Fmt.time(relapseNext)}" to 1.0 else data.targetPieces?.let { target ->
             val b = Progress.battery(data, if (target > 0) target else 1.0 / 3.0, now, tz, com.baastiklabs.firewatch.data.AppActivity.last(context))
             when (b.state) {
                 BatteryState.CLEAR -> "Clear for one if you want it"
@@ -182,13 +185,10 @@ class CravingWidget : GlanceAppWidget() {
         provideContent {
             Column(GlanceModifier.fillMaxSize().background(Bg).cornerRadius(20.dp).padding(10.dp)) {
                 if (active != null) {
-                    Text("Riding out a ${active.intensity}…", style = TextStyle(color = OnDark, fontSize = 14.sp, fontWeight = FontWeight.Bold))
-                    Spacer(GlanceModifier.height(6.dp))
-                    Row(GlanceModifier.fillMaxWidth()) {
-                        Button(text = "It passed", onClick = actionRunCallback<FinishCravingAction>(actionParametersOf(levelKey to 1)), modifier = GlanceModifier.defaultWeight().padding(2.dp),
-                            colors = ButtonDefaults.buttonColors(backgroundColor = Ember, contentColor = ColorProvider(Color(0xFF2A1206))))
-                        Button(text = "I used", onClick = actionRunCallback<FinishCravingAction>(actionParametersOf(levelKey to 0)), modifier = GlanceModifier.defaultWeight().padding(2.dp))
-                    }
+                    // No buttons: thinking about the app mid-craving can feed the craving.
+                    Text("Craving logged at ${Fmt.time(active.at)}.", style = TextStyle(color = OnDark, fontSize = 14.sp, fontWeight = FontWeight.Bold))
+                    Spacer(GlanceModifier.height(4.dp))
+                    Text("You've got this.", style = TextStyle(color = Muted, fontSize = 12.sp))
                 } else {
                     Text("Craving? How strong (1–10)", style = TextStyle(color = OnDark, fontSize = 13.sp, fontWeight = FontWeight.Bold))
                     Text("1 passing · 5 distracting · 10 worst", style = TextStyle(color = Muted, fontSize = 11.sp))
@@ -234,13 +234,4 @@ class LogCravingAction : ActionCallback {
     }
 }
 
-class FinishCravingAction : ActionCallback {
-    override suspend fun onAction(context: Context, glanceId: GlanceId, parameters: ActionParameters) {
-        val repo = app(context).graph.repository
-        repo.ensureLoaded()
-        val active = Cravings.active(repo.data.value, System.currentTimeMillis()) ?: return
-        repo.finishCraving(active.id, if ((parameters[levelKey] ?: 1) == 1) CravingOutcome.RODE_OUT else CravingOutcome.USED)
-        refreshWidgets(context)
-    }
-}
 

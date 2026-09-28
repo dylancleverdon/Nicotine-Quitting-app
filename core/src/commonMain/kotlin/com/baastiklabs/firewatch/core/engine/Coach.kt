@@ -1,5 +1,6 @@
 package com.baastiklabs.firewatch.core.engine
 
+import com.baastiklabs.firewatch.core.CravingResult
 import com.baastiklabs.firewatch.core.Cravings
 import com.baastiklabs.firewatch.core.localDate
 import com.baastiklabs.firewatch.core.model.CravingOutcome
@@ -45,7 +46,7 @@ object Coach {
     }
 
     fun profile(data: FirewatchData, now: Long): Profile {
-        val resolved = data.cravings.map { it to Cravings.effectiveOutcome(it, data.doses, now) }
+        val resolved = data.cravings.map { it to Cravings.effectiveOutcome(data, it, now) }
             .filter { it.second != CravingOutcome.OPEN }
         val levels = (1..10).map { l ->
             val near = resolved.filter { kotlin.math.abs(it.first.intensity - l) <= 1 }
@@ -85,25 +86,87 @@ object Coach {
         return Readiness(predicted, p.capacity, !p.confident || predicted <= p.capacity + 0.5, p.confident)
     }
 
+    /** A step-up offer and the plain-language reasons behind it. [sameDay]: triggered by today alone. */
+    data class StepUp(val rung: Rung, val reasons: List<String>, val sameDay: Boolean) {
+        val why: String get() = reasons.joinToString(" and ").replaceFirstChar { it.uppercase() } + "."
+    }
+
+    fun stepUpOffer(data: FirewatchData, now: Long, tz: TimeZone): Rung? = stepUp(data, now, tz)?.rung
+
     /**
-     * Offer a step back up when the current rung is too much right now: over the last 5 days,
-     * strong cravings beyond capacity keep coming, most urges end in use, or days run over target.
+     * Offer a step back up when the current rung is too much right now. It aims to catch a rough day
+     * the same day, before it turns into a relapse. Any one of these today is enough:
+     * - pull reaches one full gap; 3+ cravings above what D usually rides out (or 2+ within 2 hours);
+     * - more than 1 piece over today's target; timer checks while refilling at least double the usual
+     *   (and 6+, when "Hide next piece timer" is on); a craving answered with a cigarette or vape.
+     * Or, over the last 5 days against the 14 before, two or more of: 3+ days over target, more early
+     * doses and relapses, more strong cravings, more timer checks while refilling, stronger cravings.
+     * "I'm OK" hides a same-day offer until tomorrow and a multi-day one for 3 days.
      */
-    fun stepUpOffer(data: FirewatchData, now: Long, tz: TimeZone): Rung? {
+    fun stepUp(data: FirewatchData, now: Long, tz: TimeZone): StepUp? {
         val target = data.targetPieces ?: return null
-        if (now - data.settings.stepUpSnoozedAt < 3 * 24 * 60 * MIN) return null
+        val next = Ladder.nextUp(target)
+        if (next.pieces <= target) return null
+        val today = now.localDate(tz)
+        val snoozed = data.settings.stepUpSnoozedAt
+        if (snoozed > 0 && snoozed.localDate(tz) == today) return null
+        val p = profile(data, now)
+        val strongAt = p.capacity + 1
+        val (day, nextWake) = BatteryEngine.currentDay(data, now, tz)
+        fun cravingsIn(from: Long, to: Long) = data.cravings.filter { it.at in from until to }
+
+        // ---- Today ----
+        val reasons = ArrayList<String>()
+        val interval = BatteryEngine.intervalFor(if (target > 0) target else 1.0 / 3.0)
+        val pull = BatteryEngine.day(data, day.date, tz, now)?.pullMin ?: 0.0
+        if (pull >= interval) reasons += "today's pull has reached ${hm(pull)}"
+        val strongToday = cravingsIn(day.wakeAt, minOf(now + 1, nextWake)).filter { it.intensity > strongAt }
+        val clustered = strongToday.any { c -> strongToday.count { it.at in c.at until c.at + 2 * 60 * MIN } >= 2 }
+        if (strongToday.size >= 3 || clustered) reasons += "you've had ${strongToday.size} strong cravings today"
+        val piecesToday = data.doses.filter { it.at >= day.wakeAt && it.at < nextWake }
+            .sumOf { it.pieces(data.referenceMg) }
+        if (piecesToday > target + 1.0) reasons += "you're already ${com.baastiklabs.firewatch.core.engine.Ladder.piecesText(piecesToday - target)} over today's target"
+        if (data.settings.hideTimer) {
+            val todayChecks = Checks.day(data, day.date, tz).charging
+            val usual = Checks.history(data, day.date, tz, 14).map { it.charging }.average().takeIf { !it.isNaN() } ?: 0.0
+            if (todayChecks >= 6 && todayChecks >= 2 * usual) reasons += "you've checked the timer $todayChecks times while it was refilling"
+        }
+        val relapseToday = cravingsIn(day.wakeAt, minOf(now + 1, nextWake))
+            .any { Cravings.result(data, it, now, tz) == CravingResult.RELAPSE }
+        if (relapseToday) reasons += "a craving today ended with a cigarette or vape"
+        if (reasons.isNotEmpty()) return StepUp(next, reasons, sameDay = true)
+
+        // ---- Last 5 days vs the 14 before ----
+        if (now - snoozed < 3 * 24 * 60 * MIN) return null
         val since = data.rungChanges.lastOrNull()?.at ?: return null
         if (now - since < 3 * 24 * 60 * MIN) return null
-        val p = profile(data, now)
-        val windowStart = now - 5 * 24 * 60 * MIN
-        val recent = data.cravings.filter { it.at >= windowStart }
-        val tooStrong = recent.count { it.intensity > p.capacity + 1 }
-        val used = recent.count { Cravings.effectiveOutcome(it, data.doses, now) == CravingOutcome.USED }
-        val today = now.localDate(tz)
+        val recentFrom = day.wakeAt - 5 * 24 * 60 * MIN
+        val priorFrom = recentFrom - 14 * 24 * 60 * MIN
+        val recent = cravingsIn(recentFrom, day.wakeAt)
+        val prior = cravingsIn(priorFrom, recentFrom)
+        fun rate(n: Int, days: Int) = n / days.toDouble()
+        val multi = ArrayList<String>()
         val overDays = (1..5).count { Progress.pace(data, today.minus(it, DateTimeUnit.DAY), tz).scaled > target + 0.75 }
-        val struggling = tooStrong >= 8 || (recent.size >= 5 && used * 2 > recent.size) || overDays >= 3
-        return if (struggling) Ladder.nextUp(target) else null
+        if (overDays >= 3) multi += "$overDays of the last 5 days ran over"
+        fun misses(cs: List<com.baastiklabs.firewatch.core.model.Craving>) =
+            cs.count { Cravings.result(data, it, now, tz).let { r -> r == CravingResult.EARLY || r == CravingResult.RELAPSE } }
+        val missR = misses(recent)
+        if (missR >= 3 && rate(missR, 5) > 1.5 * rate(misses(prior), 14)) multi += "more cravings have been ending in an early piece"
+        val strongR = recent.count { it.intensity > strongAt }
+        if (strongR >= 3 && rate(strongR, 5) > 1.5 * rate(prior.count { it.intensity > strongAt }, 14)) multi += "strong cravings are coming more often"
+        if (recent.size >= 3 && prior.size >= 3 && recent.map { it.intensity }.average() >= prior.map { it.intensity }.average() + 1) multi += "cravings have been getting stronger"
+        if (data.settings.hideTimer) {
+            val h = Checks.history(data, today, tz, 19)
+            if (h.size >= 10) {
+                val r = h.takeLast(5).sumOf { it.charging }
+                val b = h.dropLast(5).map { it.charging }.average()
+                if (r >= 5 && r / 5.0 >= 1.5 * b) multi += "you've been checking the timer more while it refills"
+            }
+        }
+        return if (multi.size >= 2) StepUp(next, multi, sameDay = false) else null
     }
+
+    private fun hm(min: Double): String { val m = min.toInt(); return if (m >= 60) "${m / 60}h ${m % 60}m" else "${m}m" }
 
     /**
      * "Where your body really is": measured pace, plus cravings above capacity that were white-

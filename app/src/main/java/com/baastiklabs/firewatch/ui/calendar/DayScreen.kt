@@ -227,19 +227,13 @@ fun DayScreen(
         AlertDialog(
             onDismissRequest = { editingCraving = null },
             title = { Text("Craving · ${craving.intensity} ${CravingScale.level(craving.intensity).name}") },
-            text = { Text("Started ${Fmt.time(craving.at)}. How did it end?") },
-            confirmButton = {
-                Row {
-                    TextButton(onClick = {
-                        editingCraving = null
-                        scope.launch { vm.repository.saveCraving(craving.copy(outcome = CravingOutcome.RODE_OUT)) }
-                    }) { Text("Rode it out") }
-                    TextButton(onClick = {
-                        editingCraving = null
-                        scope.launch { vm.repository.saveCraving(craving.copy(outcome = CravingOutcome.USED)) }
-                    }) { Text("Used") }
-                }
+            text = {
+                Text(
+                    "Started ${Fmt.time(craving.at)} · ${com.baastiklabs.firewatch.core.Cravings.result(data, craving, System.currentTimeMillis()).title.lowercase()}.\n\n" +
+                        "Worked out from your logs: a piece within 45 minutes is linked to the craving.",
+                )
             },
+            confirmButton = { TextButton(onClick = { editingCraving = null }) { Text("OK") } },
             dismissButton = {
                 TextButton(onClick = {
                     editingCraving = null
@@ -271,13 +265,8 @@ fun DayScreen(
 
 @Composable
 private fun CravingRow(craving: Craving, data: FirewatchData, onClick: () -> Unit) {
-    val outcome = Cravings.effectiveOutcome(craving, data.doses, System.currentTimeMillis())
     val level = CravingScale.level(craving.intensity)
-    val result = when (outcome) {
-        CravingOutcome.RODE_OUT -> "rode it out" + (craving.endedAt?.let { " in ${Fmt.duration(it - craving.at)}" } ?: "")
-        CravingOutcome.USED -> "used"
-        CravingOutcome.OPEN -> "in progress"
-    }
+    val result = com.baastiklabs.firewatch.core.Cravings.result(data, craving, System.currentTimeMillis()).title.lowercase()
     ListItem(
         colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.background),
         modifier = Modifier.clickable(onClick = onClick),

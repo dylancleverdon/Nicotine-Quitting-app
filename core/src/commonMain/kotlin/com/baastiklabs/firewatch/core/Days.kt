@@ -46,7 +46,7 @@ object Days {
         for (craving in data.cravings) {
             val date = craving.at.localDate(tz)
             val s = result[date] ?: DaySummary(date)
-            val outcome = Cravings.effectiveOutcome(craving, data.doses, now)
+            val outcome = Cravings.effectiveOutcome(data, craving, now, tz)
             result[date] = s.copy(
                 cravings = s.cravings + 1,
                 cravingsRodeOut = s.cravingsRodeOut + if (outcome == CravingOutcome.RODE_OUT) 1 else 0,
@@ -62,26 +62,63 @@ object Days {
         data.cravings.filter { it.at.localDate(tz) == date }
 }
 
+/** How a craving ended, worked out from the logs (never stored, so older versions are unaffected). */
+enum class CravingResult(val title: String, val win: Boolean) {
+    /** Still within the 45-minute window, nothing logged yet. */
+    PENDING("In progress", false),
+    RODE_OUT("Rode it out", true),
+    /** A piece came, but only once the battery was full (or on schedule). */
+    WAITED("Waited for the right time", true),
+    /** An early gum, lozenge, patch or pouch. A miss, not a relapse. */
+    EARLY("Early", false),
+    /** A cigarette or vape (including a friend's). */
+    RELAPSE("Relapse", false),
+    /** A piece during the baseline week, before there's a target to judge against. */
+    BASELINE("Had a piece", false),
+}
+
 object Cravings {
-    /** A dose within this long after a craving started means D used. */
-    const val USED_WINDOW_MS = 30 * 60_000L
+    /** A dose within this long after a craving started is linked to it. */
+    const val WINDOW_MS = 45 * 60_000L
+    @Deprecated("Use WINDOW_MS") const val USED_WINDOW_MS = WINDOW_MS
+    const val AUTO_CLOSE_MS = WINDOW_MS
 
-    /** An unanswered craving is assumed ridden out after this long. */
-    const val AUTO_CLOSE_MS = 60 * 60_000L
+    fun isRelapseDose(d: Dose): Boolean =
+        d.kind == com.baastiklabs.firewatch.core.model.ProductKind.CIGARETTE ||
+            d.kind == com.baastiklabs.firewatch.core.model.ProductKind.VAPE || d.borrowed
 
-    fun effectiveOutcome(craving: Craving, doses: List<Dose>, now: Long): CravingOutcome {
-        if (craving.outcome != CravingOutcome.OPEN) return craving.outcome
-        val usedSoonAfter = doses.any { it.at >= craving.at && it.at - craving.at <= USED_WINDOW_MS }
-        return when {
-            usedSoonAfter -> CravingOutcome.USED
-            now - craving.at >= AUTO_CLOSE_MS -> CravingOutcome.RODE_OUT
-            else -> CravingOutcome.OPEN
+    /**
+     * How [craving] ended: no dose within 45 minutes = rode it out; a dose once the battery was full
+     * (or on schedule in Relapse prevention mode) = waited; a cigarette or vape = relapse; anything
+     * else early = early. Old "I used" / "It passed" taps are re-read the same way from the logs.
+     */
+    fun result(data: FirewatchData, craving: Craving, now: Long, tz: TimeZone = TimeZone.currentSystemDefault()): CravingResult {
+        val dose = data.doses.firstOrNull { !it.estimated && it.at >= craving.at && it.at - craving.at <= WINDOW_MS }
+        if (dose == null) {
+            return when {
+                craving.outcome == CravingOutcome.USED -> CravingResult.EARLY
+                craving.outcome == CravingOutcome.RODE_OUT || now - craving.at >= WINDOW_MS -> CravingResult.RODE_OUT
+                else -> CravingResult.PENDING
+            }
         }
+        if (isRelapseDose(dose)) return CravingResult.RELAPSE
+        val onTime = com.baastiklabs.firewatch.core.engine.BatteryEngine.onTime(data, dose, tz) ?: return CravingResult.BASELINE
+        return if (onTime) CravingResult.WAITED else CravingResult.EARLY
     }
 
-    /** The most recent craving still in progress, if any. */
+    /**
+     * The older two-way view many figures use: beaten (rode out or waited) = RODE_OUT, a miss = USED,
+     * still going = OPEN.
+     */
+    fun effectiveOutcome(data: FirewatchData, craving: Craving, now: Long, tz: TimeZone = TimeZone.currentSystemDefault()): CravingOutcome =
+        when (val r = result(data, craving, now, tz)) {
+            CravingResult.PENDING -> CravingOutcome.OPEN
+            else -> if (r.win) CravingOutcome.RODE_OUT else CravingOutcome.USED
+        }
+
+    /** The most recent craving still inside its 45-minute window with nothing logged. */
     fun active(data: FirewatchData, now: Long): Craving? =
-        data.cravings.lastOrNull { Cravings.effectiveOutcome(it, data.doses, now) == CravingOutcome.OPEN }
+        data.cravings.lastOrNull { now - it.at < WINDOW_MS && result(data, it, now) == CravingResult.PENDING }
 }
 
 sealed interface BaselineStatus {

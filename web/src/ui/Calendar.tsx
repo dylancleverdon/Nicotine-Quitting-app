@@ -50,7 +50,7 @@ function DayView({ iso, back }: { iso: string; back: () => void }) {
       <div class="row"><button class="btn text" onClick={back}>‹ Back</button><h2>{dayTitle(iso)}</h2></div>
       <div class="list">
         {detail.doses.map((d) => <div class="item" onClick={() => confirm(`Delete ${d.name}?`) && S.remove(d.id)}><div>{d.name}<br /><span>{doseLine(d)}</span></div><b>{piecesLabel(d.pieces)}</b></div>)}
-        {detail.cravings.map((c) => <div class="item" onClick={() => confirm('Delete this craving?') && S.remove(c.id)}><div>Craving · {c.intensity} {c.name}<br /><span>{time(c.at)} · {c.outcome === 'RODE_OUT' ? 'rode it out' : c.outcome === 'USED' ? 'used' : 'in progress'}</span></div></div>)}
+        {detail.cravings.map((c) => <div class="item" onClick={() => confirm('Delete this craving?') && S.remove(c.id)}><div>Craving · {c.intensity} {c.name}<br /><span>{time(c.at)} · {c.result.toLowerCase()}</span></div></div>)}
         {!detail.doses.length && !detail.cravings.length && <div class="muted">Nothing logged this day.</div>}
       </div>
       {adding ? <div class="card soft"><b>Which product? (logged at noon)</b>

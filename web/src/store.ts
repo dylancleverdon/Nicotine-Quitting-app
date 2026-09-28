@@ -76,10 +76,8 @@ export async function startCraving(intensity: number) {
   await save('craving', c)
   return c
 }
-export async function finishCraving(c: any, outcome: 'RODE_OUT' | 'USED') {
-  const stored = records.value.get(c.id)?.data ?? c
-  await save('craving', { ...stored, outcome, endedAt: stored.endedAt ?? Date.now() })
-}
+/** "Hide next piece timer": one tap to see the time is one check. */
+export const logTimerCheck = (charging: boolean) => save('timercheck', { id: Core.newId(), at: Date.now(), charging })
 export const logSleep = (kind: 'WAKE' | 'SLEEP', at = Date.now()) => save('sleep', { id: Core.newId(), at, kind })
 export const setRelapse = (on: boolean) => save('mode', { id: Core.newId(), at: Date.now(), on, mode: 'relapse' })
 /** "Just starting gum": gum first on the home screen, then Relapse prevention mode on. */

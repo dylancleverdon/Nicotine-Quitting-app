@@ -77,6 +77,18 @@ test('back-dated start, logging and persistence', async ({ page }) => {
 
   // Export produces a Firewatch backup file.
   await page.getByRole('button', { name: 'Settings' }).click()
+  // Hide next piece timer: on, then the Log tab hides the time until a tap.
+  await page.getByText('Hide next piece timer', { exact: false }).click()
+  await page.getByRole('button', { name: 'Log' }).click()
+  await page.getByText('Tap to see your next piece time').click()
+  await expect(page.getByText('Tap to see your next piece time')).toHaveCount(0)
+  // A craving shows one quiet line, no buttons.
+  await page.getByRole('button', { name: 'Craving? Log it' }).click()
+  await page.locator('.level').nth(4).click()
+  await expect(page.locator('.craving-line')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'It passed' })).toHaveCount(0)
+  await page.screenshot({ path: 'test-results/craving-line.png', fullPage: true })
+  await page.getByRole('button', { name: 'Settings' }).click()
   const [download] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Export' }).click()])
   const text = await (await download.createReadStream()).toArray().then((c) => Buffer.concat(c).toString())
   const file = JSON.parse(text)

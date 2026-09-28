@@ -90,13 +90,28 @@ export function Insights() {
       {sec === 'Patterns' && <>
         <Card title="When it happens" sub="Hour of day across, Monday to Sunday down."><Heatmap grid={ins.heatmap} /></Card>
         <Card title="Wake to first piece" sub="Minutes from waking to the first dose. Longer is better."><Line values={snap.days.map((d) => d.wakeToFirstMin ?? 0)} color="var(--tertiary)" fmt={(v) => `${v}m`} x={dl(snap.days)} /></Card>
+        {(S.settings.value.hideTimer || snap.checks.length > 0) && (() => {
+          const ch = snap.checks
+          const perPiece = full.slice(-14).reduce((a, d) => a + d.pieces, 0)
+          const total14 = ch.slice(-14).reduce((a, d) => a + d.value, 0)
+          return <Card title="Checking" sub="Taps on the hidden next-piece timer. Checks while it's still refilling are the 'wanting it' signal; fewer over time is progress.">
+            {ch.length > 1 ? <Line values={ch.map((d) => d.value)} second={ch.map((d) => Number(d.extra))} color="var(--muted)" fmt={n} x={dateLabels(ch.map((d) => d.label))} />
+              : <div class="muted">Your first days of checks appear here.</div>}
+            <div class="muted">All checks (grey) and while refilling (teal), per day.</div>
+            <div class="stats"><Stat v={snap.checksToday} l="checks today" />{perPiece > 0 && <Stat v={(total14 / perPiece).toFixed(1)} l="checks per piece (2 weeks)" />}</div>
+          </Card>
+        })()}
         <Card title="Triggers">{ins.triggers.length ? ins.triggers.map((t) => <div class="row small"><span class="grow">{t.label}</span>{t.value}</div>) : <div class="muted">Hold a product to tag what was going on.</div>}</Card>
         <Card title="Comparisons">{ins.comparisons.map((c) => <div class="small">{c.label}: ≈ {pieces(c.value)} vs {pieces(Number(c.extra))}</div>)}</Card>
       </>}
       {sec === 'Going up' && <>
         <Card title="Clear hours" sub="Hours each day your level sat near zero while awake."><Line values={full.map((d) => d.clearHours)} color="var(--tertiary)" fmt={h} x={dl(full)} /></Card>
         <Card title="Wins"><div class="stats"><Stat v={`≈ ${pieces(ins.avoidedPieces)}`} l="pieces avoided" /><Stat v={`${ins.avoidedMg.toFixed(1)} mg`} l="nicotine avoided" />
-          <Stat v={ins.winRate != null ? `${Math.round(ins.winRate * 100)}%` : '–'} l="craving win rate" /><Stat v={ins.cravingMinutes != null ? `${Math.round(ins.cravingMinutes)} min` : '–'} l="typical craving" /></div></Card>
+          <Stat v={ins.winRate != null ? `${Math.round(ins.winRate * 100)}%` : '–'} l="craving win rate" /></div></Card>
+        <Card title="How cravings ended" sub="Last 2 weeks. Riding it out and waiting for the right time both count as wins. Worked out from your logs: a piece within 45 minutes is linked to the craving.">
+          {snap.cravingEndings.length ? <div class="stats">{snap.cravingEndings.map((e) => <Stat v={e.value} l={(e.extra === 'win' ? '✓ ' : '') + e.label.toLowerCase()} />)}</div>
+            : <div class="muted">Log cravings with "Craving? Log it" and this fills in.</div>}
+        </Card>
         <Card title="Money saved"><h2>{S.settings.value.currency}{ins.money.toFixed(2)}</h2>
           {S.settings.value.rewardCost > 0 && <><Meter value={ins.money / S.settings.value.rewardCost} /><div class="muted">Toward {S.settings.value.rewardName || 'your reward'}</div></>}</Card>
         {ins.overnight.length > 1 && <Card title="Overnight gap"><Line values={ins.overnight.map((m) => m / 60)} color="var(--tertiary)" fmt={h} /></Card>}

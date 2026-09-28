@@ -165,6 +165,24 @@ object BatteryEngine {
         return DayBattery(date, sim.stretch, sim.pull)
     }
 
+    /**
+     * Was [dose] on time? In Relapse prevention mode: at or after the scheduled time. Otherwise: the
+     * battery was full (and, for the day's first piece, any first-piece goal had passed). Null before
+     * there's a target to judge against (the baseline week).
+     */
+    fun onTime(data: FirewatchData, dose: Dose, tz: TimeZone): Boolean? {
+        val modeOn = data.modeChanges.lastOrNull { it.mode == "relapse" && it.at <= dose.at }?.on == true
+        if (modeOn) {
+            Relapse.nextAt(data, dose.at - 1, tz)?.let { return dose.at >= it - 5 * MIN }
+        }
+        val target = targetAt(data, dose.at) ?: return null
+        val (day, nextWake) = currentDay(data, dose.at, tz)
+        val earlier = dayDoses(data, day, nextWake).any { it.at < dose.at && it.id != dose.id && !it.estimated }
+        if (!earlier) morningGoal(data, day, tz)?.let { if (dose.at < it) return false }
+        val sim = simulate(data, day, nextWake, intervalFor(target), dose.at, dose.at, stopBefore = dose)
+        return sim.fullBeforeLast == true || sim.charge >= 1.0 - 1e-9
+    }
+
     /** True if [dose] was taken with a full battery and wasn't the day's first piece (the cheer). */
     fun waitedForFull(data: FirewatchData, dose: Dose, tz: TimeZone): Boolean {
         val target = targetAt(data, dose.at) ?: return false

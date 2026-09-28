@@ -145,6 +145,16 @@ data class Settings(
     val movingOnDismissedAt: Long = 0,
     /** The first-launch welcome tour has been seen. */
     val tourSeen: Boolean = false,
+    /** Opt-in "Hide next piece timer": the time shows only on a tap, and each tap is counted. */
+    val hideTimer: Boolean = false,
+)
+
+/** A tap to see the hidden next-piece time. [charging]: the battery wasn't full yet. */
+@Serializable
+data class TimerCheck(
+    val id: String,
+    val at: Long,
+    val charging: Boolean = false,
 )
 
 /**

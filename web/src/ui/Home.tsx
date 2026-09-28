@@ -15,6 +15,13 @@ export function Home({ toast, go }: { toast: (msg: string, undo?: () => void) =>
   const [checkIn, setCheckIn] = useState(false)
   const [celebrate, setCelebrate] = useState<any>(null)
   const [relapseSheet, setRelapseSheet] = useState(false)
+  const [revealUntil, setRevealUntil] = useState(0)
+  const hidden = !!settings.hideTimer && Date.now() > revealUntil
+  const reveal = (charging: boolean) => {
+    S.logTimerCheck(charging)
+    setRevealUntil(Date.now() + 30000)
+    setTimeout(() => setRevealUntil(0), 30500)
+  }
   const [fb, setFb] = useState<{ type: string; text: string; details: string; name: string } | null>(null)
   const rp = snap.relapse
   const press = useRef<number | null>(null)
@@ -50,7 +57,7 @@ export function Home({ toast, go }: { toast: (msg: string, undo?: () => void) =>
     <main>
       <div class="row between"><h1 class="brand">Firewatch<small>by Baastik Labs</small></h1><button class="btn text help-btn" aria-label="Help" onClick={() => go('help')}>?</button></div>
       {rp.on && <div class="card soft relapse-on"><b>Relapse prevention mode is on</b>
-        <div class="small">{rp.nextAt ? `Next scheduled piece at ${time(rp.nextAt)}` : ''}{rp.productName ? ` · ${rp.productName}` : ''}</div>
+        <div class="small">{rp.nextAt && !hidden ? `Next scheduled piece at ${time(rp.nextAt)}` : ''}{rp.productName ? ` · ${rp.productName}` : ''}</div>
         <div class="muted">Reminders are Android-only for now.</div></div>}
       <div class="card">
         {snap.revealed ? <>
@@ -60,7 +67,11 @@ export function Home({ toast, go }: { toast: (msg: string, undo?: () => void) =>
             {snap.target && snap.measured && snap.measured.pieces !== snap.target.pieces &&
               <div class="muted">Working at {snap.target.label}. Your last 7 days measure {snap.measured.label}.</div>}
           </>}
-          {battery && <div>
+          {battery && hidden && <div class="tap-reveal" onClick={() => reveal(battery.charge < 0.999)}>
+            <b>Tap to see your next piece time</b>
+            <Meter value={battery.charge} />
+          </div>}
+          {battery && !hidden && <div>
             <b>{rp.on && rp.nextAt ? `Next scheduled piece at ${time(rp.nextAt)}` : battery.state === 'CLEAR' ? 'Clear for one if you want it' : battery.state === 'CHARGING' ? `Next piece around ${battery.readyAt ? time(battery.readyAt) : 'later'}` :
               battery.state === 'FULL_AT_WAKE' ? 'Full when you wake up' : battery.state === 'MORNING_DELAY' ? `First piece goal: ${battery.readyAt ? time(battery.readyAt) : ''}` :
               battery.state === 'WIND_DOWN' ? 'Winding down for bed' : 'Sleeping hours · Fresh start when you wake up'}</b>
@@ -102,7 +113,7 @@ export function Home({ toast, go }: { toast: (msg: string, undo?: () => void) =>
       </div>}
       {snap.stepUp && snap.target && <div class="card accent">
         <h2>This rung is tough right now</h2>
-        <div class="small">Stepping up to {snap.stepUp.label} for a while is normal and keeps you on gum rather than something worse.</div>
+        <div class="small">{snap.stepUpWhy} Stepping up to {snap.stepUp.label} for a while is normal, and it keeps you on gum instead of something worse.</div>
         <div class="row"><button class="btn" onClick={() => moveTarget(snap.stepUp!.pieces, 'up')}>Step up</button>
           <button class="btn outline" onClick={() => S.updateSettings({ stepUpSnoozedAt: Date.now() })}>I'm OK</button></div>
       </div>}
@@ -122,20 +133,8 @@ export function Home({ toast, go }: { toast: (msg: string, undo?: () => void) =>
       {snap.swapTip && <div class="muted">{snap.swapTip}</div>}
       {settings.dailyCheckIn && !checkedIn && <button class="btn outline" onClick={() => setCheckIn(true)}>Daily check-in (3 taps)</button>}
 
-      {snap.activeCraving ? <div class="card soft">
-        <div class="row"><div class="dot" style={{ background: cravingColor(snap.activeCraving.intensity) }}>{snap.activeCraving.intensity}</div>
-          <div><b>Riding out a craving · {snap.activeCraving.name}</b><div class="muted">Started {duration(Date.now() - snap.activeCraving.at)} ago</div></div></div>
-        <div class="small">Most cravings pass within a few minutes. What's going on? (optional)</div>
-        <div class="row wrap">{TAGS.map((t) => {
-          const on = snap.activeCraving!.tags.includes(t)
-          return <button class={`chip ${on ? 'on' : ''}`} onClick={() => {
-            const c = S.records.value.get(snap.activeCraving!.id)!.data
-            S.save('craving', { ...c, tags: on ? c.tags.filter((x: string) => x !== t) : [...(c.tags ?? []), t] })
-          }}>{t}</button>
-        })}</div>
-        <div class="grid2"><button class="btn" onClick={() => S.finishCraving(snap.activeCraving!, 'RODE_OUT')}>It passed</button>
-          <button class="btn outline" onClick={() => S.finishCraving(snap.activeCraving!, 'USED')}>I used</button></div>
-      </div> : <div class="grid2">
+      {snap.activeCraving ? <div class="muted craving-line">Craving logged at {time(snap.activeCraving.at)}. You've got this.</div> : null}
+      {<div class="grid2">
         <button class="btn outline" style={{ height: 56 }} onClick={() => setCraving(true)}>Craving? Log it</button>
         <button class="btn outline" style={{ height: 56 }} onClick={() => setVape(true)}>Friend's vape</button>
       </div>}
@@ -185,7 +184,8 @@ export function Home({ toast, go }: { toast: (msg: string, undo?: () => void) =>
         <div class="muted">{Core.feedbackPrivacy()}</div>
         <div class="row"><button class="btn" disabled={!fb.text.trim()} onClick={async () => {
           const f = fb; setFb(null)
-          toast((await sendFeedback(f.type, f.text, f.details, f.name)) ? 'Thanks, sent!' : "No connection. Saved, and it'll send next time Firewatch opens.")
+          const err = await sendFeedback(f.type, f.text, f.details, f.name)
+          toast(err ? `${err}. Saved: send it later from Settings → Unsent suggestions.` : 'Thanks, sent!')
         }}>Send</button><button class="btn outline" onClick={() => setFb(null)}>Cancel</button></div>
       </div></div>}
       {relapseSheet && <div class="sheet-bg" onClick={() => setRelapseSheet(false)}><div class="sheet" onClick={(e) => e.stopPropagation()}>

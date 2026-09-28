@@ -96,7 +96,7 @@ fun InsightsScreen(data: FirewatchData, now: Long, watch: @Composable () -> Unit
                 "Receptors" -> item { ReceptorSection(data, now, tz) }
                 "Stretch & pull" -> item { StretchSection(ins) }
                 "Trends" -> item { TrendsSection(ins) }
-                "Patterns" -> item { PatternsSection(ins) }
+                "Patterns" -> item { PatternsSection(ins, data, tz) }
                 "Going up" -> item { GoingUpSection(ins, data) }
                 "Going down" -> item { GoingDownSection(ins, data, now) }
                 "Mix" -> item { MixSection(ins) }
@@ -330,8 +330,38 @@ private fun TrendsSection(ins: Insights) = Col {
 }
 
 @Composable
-private fun PatternsSection(ins: Insights) = Col {
+private fun PatternsSection(ins: Insights, data: FirewatchData, tz: TimeZone) = Col {
     ChartCard("When it happens", "Hour of day across, Monday to Sunday down. Brighter = more.") { Heatmap(ins.heatmap()) }
+    val endings = ins.cravingEndings()
+    ChartCard(
+        "How cravings ended",
+        "Last 2 weeks. Riding it out and waiting for the right time both count as wins. Worked out from your logs: a piece within 45 minutes is linked to the craving.",
+    ) {
+        if (endings.isEmpty()) Text("Log cravings with \"Craving? Log it\" and this fills in.", style = MaterialTheme.typography.bodySmall)
+        else {
+            val max = endings.values.max()
+            endings.entries.sortedBy { it.key.ordinal }.forEach { (r, n) ->
+                BarRow((if (r.win) "✓ " else "") + r.title, n.toFloat() / max, "$n")
+            }
+        }
+    }
+    if (data.settings.hideTimer || data.timerChecks.isNotEmpty()) {
+        val today = ins.today
+        val h = com.baastiklabs.firewatch.core.engine.Checks.history(data, today, tz, 42)
+        ChartCard("Checking", "Taps on the hidden next-piece timer. Checks while it's still refilling are the \"wanting it\" signal; fewer over time is progress.") {
+            if (h.size >= 2) {
+                TrendLine(h.map { it.total.toDouble() }, second = h.map { it.charging.toDouble() }, color = MaterialTheme.colorScheme.outline,
+                    secondColor = MaterialTheme.colorScheme.tertiary, yFmt = num, xLabels = kdates(h.map { it.date }))
+                Text("All checks (grey) and while refilling (teal), per day.", style = MaterialTheme.typography.bodySmall)
+            } else Text("Your first days of checks appear here.", style = MaterialTheme.typography.bodySmall)
+            val todayChecks = com.baastiklabs.firewatch.core.engine.Checks.day(data, com.baastiklabs.firewatch.core.engine.BatteryEngine.currentDay(data, System.currentTimeMillis(), tz).first.date, tz)
+            val pieces = ins.lastDays(14).sumOf { it.pieces }
+            Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+                Stat("${todayChecks.total}", "checks today")
+                if (pieces > 0) Stat(fmt1(h.takeLast(14).sumOf { it.total } / pieces), "checks per piece (2 weeks)")
+            }
+        }
+    }
     val ttf = ins.days.mapNotNull { it.wakeToFirstMin }
     if (ttf.size >= 2) {
         ChartCard("Wake to first piece", "Minutes from waking to the first dose. Longer is better.") {
@@ -372,7 +402,6 @@ private fun GoingUpSection(ins: Insights, data: FirewatchData) = Col {
         }
         Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
             Stat(ins.cravingWinRate()?.let { "${(it * 100).roundToInt()}%" } ?: "–", "craving win rate")
-            Stat(ins.averageCravingMinutes()?.let { "${it.roundToInt()} min" } ?: "–", "typical craving length")
         }
         if (!ins.baselineComplete) Text("Avoided figures start after your baseline week.", style = MaterialTheme.typography.bodySmall)
     }

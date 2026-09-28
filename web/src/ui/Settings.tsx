@@ -1,7 +1,8 @@
 import { useState } from 'preact/hooks'
 import { Core } from '../core'
 import * as S from '../store'
-import { minutesOfDay } from './format'
+import { minutesOfDay, time } from './format'
+import { deleteUnsent, sendNow, unsent } from '../feedback'
 
 const KINDS = ['GUM', 'POUCH', 'LOZENGE', 'PATCH', 'VAPE', 'CIGARETTE', 'OTHER']
 const DEFAULT_ABS: Record<string, number> = { GUM: 0.5, POUCH: 0.4, LOZENGE: 0.6, PATCH: 0.8, VAPE: 0.5, CIGARETTE: 0.1, OTHER: 0.5 }
@@ -13,6 +14,7 @@ export function Settings({ toast, go, updateInfo }: { toast: (m: string) => void
   const s = S.settings.value
   const snap = S.snapshot.value!
   const [editing, setEditing] = useState<any>(null)
+  const [pending, setPending] = useState(unsent())
   const exportNow = () => {
     const blob = new Blob([JSON.stringify(S.exportFile(), null, 2)], { type: 'application/json' })
     const a = document.createElement('a')
@@ -54,6 +56,7 @@ export function Settings({ toast, go, updateInfo }: { toast: (m: string) => void
       <div class="small">Time format</div>
       <div class="row wrap">{[['system', 'Device setting'], ['12h', '12-hour (AM/PM)'], ['24h', '24-hour']].map(([v, l]) =>
         <button class={`chip ${(s.timeFormat ?? 'system') === v ? 'on' : ''}`} onClick={() => S.updateSettings({ timeFormat: v })}>{l}</button>)}</div>
+      <label class="row small"><input type="checkbox" style={{ width: 'auto' }} checked={!!s.hideTimer} onChange={() => S.updateSettings({ hideTimer: !s.hideTimer })} /> Hide next piece timer: the time shows only when you tap, so Firewatch can learn how often you check</label>
       <label class="row small"><input type="checkbox" style={{ width: 'auto' }} checked={s.windDown} onChange={() => S.updateSettings({ windDown: !s.windDown })} /> Wind down: no "clear for one" in the last hour before bed</label>
       <label class="row small"><input type="checkbox" style={{ width: 'auto' }} checked={s.dailyCheckIn} onChange={() => S.updateSettings({ dailyCheckIn: !s.dailyCheckIn })} /> Daily check-in (cravings, mood, sleep)</label>
       {snap.baselineState !== 'complete' && <button class="btn outline" onClick={() => go('backfill')}>Back-date my baseline week</button>}
@@ -88,6 +91,15 @@ export function Settings({ toast, go, updateInfo }: { toast: (m: string) => void
       <div class="muted">Everything stays in this browser. Export now and then (to Files, iCloud Drive or email). The same file works in the Android app.</div>
       <div class="row"><button class="btn" onClick={exportNow}>Export</button>
         <label class="btn outline">Import<input type="file" accept="application/json,.json" style={{ display: 'none' }} onChange={(e) => { const f = (e.target as HTMLInputElement).files?.[0]; if (f) importFrom(f) }} /></label></div>
+
+      {pending.length > 0 && <>
+        <h3 class="label">Unsent suggestions ({pending.length})</h3>
+        <div class="list">{pending.map((u) => <div class="item" style={{ flexDirection: 'column', cursor: 'default' }}>
+          <div>{u.type}: {u.text.slice(0, 80)}</div><span class="muted">{new Date(u.at).toLocaleDateString()} {time(u.at)} · last try: {u.error}</span>
+          <div class="row"><button class="btn" onClick={async () => { const e = await sendNow(u.id); setPending(unsent()); toast(e ? `${e}. Still saved.` : 'Thanks, sent!') }}>Send now</button>
+            <button class="btn text" onClick={() => { deleteUnsent(u.id); setPending(unsent()) }}>Delete</button></div>
+        </div>)}</div>
+      </>}
 
       <h3 class="label">Help</h3>
       <div class="row wrap"><button class="btn outline" onClick={() => go('help')}>Help</button>

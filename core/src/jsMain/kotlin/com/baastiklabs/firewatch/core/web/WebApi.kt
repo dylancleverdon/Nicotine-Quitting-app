@@ -64,7 +64,7 @@ external object JsJodaTimeZoneModule
 @Serializable data class OutlooksDto(val forecast: ForecastDto, val receptors: ReceptorsDto?)
 @Serializable data class HelpDto(val tour: List<com.baastiklabs.firewatch.core.Help.Page>, val why: List<com.baastiklabs.firewatch.core.Help.Page>, val articles: List<com.baastiklabs.firewatch.core.Help.Article>)
 @Serializable data class DoseView(val id: String, val at: Double, val name: String, val pieces: Double, val mg: Double, val estimated: Boolean, val tags: List<String>, val kind: String)
-@Serializable data class CravingView(val id: String, val at: Double, val intensity: Int, val name: String, val outcome: String, val endedAt: Double?, val tags: List<String>)
+@Serializable data class CravingView(val id: String, val at: Double, val intensity: Int, val name: String, val outcome: String, val result: String = "", val endedAt: Double?, val tags: List<String>)
 @Serializable data class DayView(
     val date: String, val pieces: Double, val mg: Double, val doses: Int, val cravings: Int, val rodeOut: Int, val level: Int,
     val clearHours: Double, val quality: Double?, val estimated: Boolean, val hasRange: Boolean, val low: Double, val high: Double,
@@ -84,6 +84,14 @@ external object JsJodaTimeZoneModule
     val stepDown: RungDto?,
     val stepDownNote: String?,
     val stepUp: RungDto?,
+    /** Why the step-up offer is showing, in plain language. */
+    val stepUpWhy: String?,
+    val stepUpSameDay: Boolean,
+    /** How cravings ended over the last 14 days: [title, count]. */
+    val cravingEndings: List<NamedValue>,
+    /** "Hide next piece timer": per waking day for the last 42 days [date, total, charging]. */
+    val checks: List<NamedValue>,
+    val checksToday: Int,
     val headsUps: List<String>,
     val qualityScore: Double?,
     val qualityLabel: String?,
@@ -203,7 +211,8 @@ object FirewatchCore {
         val battery = target?.let { Progress.battery(d, if (it.pieces > 0) it.pieces else 1.0 / 3.0, now, tz, lastActivityMs.toLong()) }
         val stepDown = if (revealed) Progress.stepDownOffer(d, now, tz) else null
         val readiness = d.targetPieces?.let { Coach.readiness(d, it, now) }
-        val stepUp = if (revealed && stepDown == null) Coach.stepUpOffer(d, now, tz) else null
+        val stepUpFull = if (revealed && stepDown == null) Coach.stepUp(d, now, tz) else null
+        val stepUp = stepUpFull?.rung
         val todayDay = ins.days.lastOrNull()?.takeIf { it.date == today }
         val todayDoses = d.doses.filter { it.at.localDate(tz) == today }
         val todayCravings = d.cravings.filter { it.at.localDate(tz) == today }
@@ -214,7 +223,7 @@ object FirewatchCore {
 
         fun craving(c: com.baastiklabs.firewatch.core.model.Craving) = CravingView(
             c.id, c.at.toDouble(), c.intensity, CravingScale.level(c.intensity).name,
-            Cravings.effectiveOutcome(c, d.doses, now).name, c.endedAt?.toDouble(), c.tags,
+            Cravings.effectiveOutcome(d, c, now).name, Cravings.result(d, c, now, tz).title, c.endedAt?.toDouble(), c.tags,
         )
 
         val insights = InsightsDto(
@@ -255,11 +264,16 @@ object FirewatchCore {
             target = target?.dto(),
             battery = battery?.let { BatteryDto(it.charge, it.state.name, it.readyAt?.toDouble(), it.stretchMinutesToday, it.pullMinutesToday, com.baastiklabs.firewatch.core.engine.BatteryEngine.fitsNow(d, it)?.name) },
             stepDown = stepDown?.dto(),
-            stepDownNote = readiness?.takeIf { it.confident }?.let {
+            stepDownNote = listOfNotNull(readiness?.takeIf { it.confident }?.let {
                 if (it.ready) "From your cravings, the next rung should feel like about a ${it.predictedNext.toInt()} out of 10, and you ride out ${it.capacity}s."
                 else "Your cravings suggest the next rung may feel like a ${it.predictedNext.toInt()}, above the ${it.capacity} you usually ride out. Holding a bit longer is fine too."
-            },
+            }, com.baastiklabs.firewatch.core.engine.Checks.trendNote(d, today, tz)).joinToString(" ").ifBlank { null },
             stepUp = stepUp?.dto(),
+            stepUpWhy = stepUpFull?.why,
+            stepUpSameDay = stepUpFull?.sameDay ?: false,
+            cravingEndings = ins.cravingEndings().entries.sortedBy { it.key.ordinal }.map { NamedValue(it.key.title, it.value.toDouble(), if (it.key.win) "win" else "") },
+            checks = com.baastiklabs.firewatch.core.engine.Checks.history(d, today, tz, 42).map { NamedValue(it.date.toString(), it.total.toDouble(), it.charging.toString()) },
+            checksToday = com.baastiklabs.firewatch.core.engine.Checks.day(d, com.baastiklabs.firewatch.core.engine.BatteryEngine.currentDay(d, now, tz).first.date, tz).total,
             headsUps = Progress.headsUps(d, now, tz).map { it.message },
             qualityScore = Quality.of(todayDoses, ref),
             qualityLabel = Quality.of(todayDoses, ref)?.let { Quality.label(it) },
@@ -268,7 +282,7 @@ object FirewatchCore {
             todayPieces = todayDoses.sumOf { it.pieces(ref) },
             todayMg = todayDoses.sumOf { it.absorbedMg() },
             todayCravings = todayCravings.size,
-            todayRodeOut = todayCravings.count { Cravings.effectiveOutcome(it, d.doses, now) == com.baastiklabs.firewatch.core.model.CravingOutcome.RODE_OUT },
+            todayRodeOut = todayCravings.count { Cravings.effectiveOutcome(d, it, now) == com.baastiklabs.firewatch.core.model.CravingOutcome.RODE_OUT },
             lastDoseAt = d.doses.maxOfOrNull { it.at }?.toDouble(),
             todayDoses = todayDoses.sortedByDescending { it.at }.map { DoseView(it.id, it.at.toDouble(), it.productName, it.pieces(ref), it.absorbedMg(), it.estimated, it.tags, it.kind.name) },
             todayCravingList = todayCravings.map { craving(it) },
@@ -313,7 +327,7 @@ object FirewatchCore {
             .map { DoseView(it.id, it.at.toDouble(), it.productName, it.pieces(ref), it.absorbedMg(), it.estimated, it.tags, it.kind.name) }
         val cravings = d.cravings.filter { it.at.localDate(tz) == date }.map {
             CravingView(it.id, it.at.toDouble(), it.intensity, CravingScale.level(it.intensity).name,
-                Cravings.effectiveOutcome(it, d.doses, nowMs.toLong()).name, it.endedAt?.toDouble(), it.tags)
+                Cravings.effectiveOutcome(d, it, nowMs.toLong()).name, Cravings.result(d, it, nowMs.toLong(), tz).title, it.endedAt?.toDouble(), it.tags)
         }
         @Serializable data class DayDetail(val doses: List<DoseView>, val cravings: List<CravingView>)
         return FirewatchJson.encodeToString(DayDetail.serializer(), DayDetail(doses, cravings))

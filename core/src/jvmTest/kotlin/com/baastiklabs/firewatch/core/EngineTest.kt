@@ -471,4 +471,88 @@ class EngineTest {
         // Nothing logged: no guess.
         assertNull(RC.outlook(FirewatchData(products = DefaultProducts.all()), at(15, 12), tz))
     }
+
+    // ---- How cravings ended ----
+
+    private fun result(data: FirewatchData, c: Craving, now: Long) = Cravings.result(data, c, now, tz)
+
+    @Test
+    fun `cravings end as rode out, waited, early or relapse`() {
+        val c = Craving("c", at(10, 12), 7)
+        val base = withTarget(listOf(gum4.toDose("a", at(10, 8), 0)))  // 4 a day: 4 h gap, full again at 12:00
+        assertEquals(CravingResult.PENDING, result(base.copy(cravings = listOf(c)), c, at(10, 12, 20)))
+        assertEquals(CravingResult.RODE_OUT, result(base.copy(cravings = listOf(c)), c, at(10, 12, 50)))
+        // A piece after the battery was full: waited = a win.
+        val waited = base.copy(doses = base.doses + gum4.toDose("b", at(10, 12, 10), 0), cravings = listOf(c))
+        assertEquals(CravingResult.WAITED, result(waited, c, at(10, 13)))
+        assertTrue(Cravings.effectiveOutcome(waited, c, at(10, 13), tz) == com.baastiklabs.firewatch.core.model.CravingOutcome.RODE_OUT)
+        // Early gum and early pouch: early, not relapse.
+        val c2 = Craving("c2", at(10, 9), 7)
+        val zyn = product(DefaultProducts.ZYN_3MG)
+        assertEquals(CravingResult.EARLY, result(base.copy(doses = base.doses + gum4.toDose("e", at(10, 9, 5), 0)), c2, at(10, 10)))
+        assertEquals(CravingResult.EARLY, result(base.copy(doses = base.doses + zyn.toDose("z", at(10, 9, 5), 0)), c2, at(10, 10)))
+        // Cigarette: relapse, even with a full battery.
+        val cig = product(DefaultProducts.CIGARETTE)
+        assertEquals(CravingResult.RELAPSE, result(base.copy(doses = base.doses + cig.toDose("s", at(10, 12, 10), 0)), c, at(10, 13)))
+        // A dose more than 45 minutes later isn't linked.
+        assertEquals(CravingResult.RODE_OUT, result(base.copy(doses = base.doses + gum4.toDose("l", at(10, 12, 50), 0)), c, at(10, 13)))
+        // Old "I used" with no dose logged: early.
+        val old = c.copy(outcome = com.baastiklabs.firewatch.core.model.CravingOutcome.USED)
+        assertEquals(CravingResult.EARLY, result(base, old, at(10, 14)))
+        // Baseline week (no target): neither win nor miss label.
+        assertEquals(CravingResult.BASELINE, result(FirewatchData(products = DefaultProducts.all(), doses = listOf(gum4.toDose("x", at(10, 12, 5), 0))), c, at(10, 13)))
+    }
+
+    // ---- Step up ----
+
+    private val CO = com.baastiklabs.firewatch.core.engine.Coach
+
+    private fun stepData(doses: List<com.baastiklabs.firewatch.core.model.Dose> = emptyList(), cravings: List<Craving> = emptyList(), settings: com.baastiklabs.firewatch.core.model.Settings = com.baastiklabs.firewatch.core.model.Settings()) =
+        FirewatchData(products = DefaultProducts.all(), doses = doses, cravings = cravings, settings = settings,
+            rungChanges = listOf(RungChange("r", at(10, 8), 4.0, "down")))
+
+    @Test
+    fun `step up catches a rough day the same day`() {
+        // A calm day: nothing.
+        assertNull(CO.stepUp(stepData(listOf(gum4.toDose("a", at(10, 8), 0))), at(10, 12), tz))
+        // Pull reaches one full gap (4 h at 4 a day): pieces at 8, 9, 10 → early pieces.
+        val pulled = stepData(listOf(8, 9, 10, 11).map { gum4.toDose("p$it", at(10, it), 0) })
+        val s1 = CO.stepUp(pulled, at(10, 11, 30), tz)!!
+        assertTrue(s1.sameDay && s1.rung.pieces == 5.0, "$s1")
+        // Three strong cravings today.
+        val strong = stepData(cravings = listOf(9, 12, 15).map { Craving("s$it", at(10, it), 8) })
+        assertTrue(CO.stepUp(strong, at(10, 16), tz)!!.reasons.any { "strong cravings" in it })
+        // Two strong within two hours is enough.
+        assertNotNull(CO.stepUp(stepData(cravings = listOf(Craving("a", at(10, 9), 8), Craving("b", at(10, 10), 9))), at(10, 11), tz))
+        // Over today's target by more than a piece.
+        val over = stepData((0 until 6).map { gum4.toDose("o$it", at(10, 8) + it * 245 * 60_000L, 0) })
+        assertTrue(CO.stepUp(over, at(10, 22, 30), tz)!!.reasons.any { "over today's target" in it })
+        // A craving answered with a cigarette.
+        val cig = product(DefaultProducts.CIGARETTE)
+        val relapse = stepData(listOf(cig.toDose("c", at(10, 12, 5), 0)), listOf(Craving("k", at(10, 12), 6)))
+        assertTrue(CO.stepUp(relapse, at(10, 13), tz)!!.reasons.any { "cigarette or vape" in it })
+        // Timer checks: only with the setting on.
+        val checks = (0 until 7).map { com.baastiklabs.firewatch.core.model.TimerCheck("t$it", at(10, 9) + it * 10 * 60_000L, charging = true) }
+        val off = stepData(listOf(gum4.toDose("a", at(10, 8, 50), 0))).copy(timerChecks = checks)
+        assertNull(CO.stepUp(off, at(10, 11), tz))
+        val on = off.copy(settings = com.baastiklabs.firewatch.core.model.Settings(hideTimer = true))
+        assertTrue(CO.stepUp(on, at(10, 11), tz)!!.reasons.any { "checked the timer" in it })
+        // "I'm OK" hides a same-day offer until tomorrow.
+        val snoozed = strong.copy(settings = com.baastiklabs.firewatch.core.model.Settings(stepUpSnoozedAt = at(10, 16)))
+        assertNull(CO.stepUp(snoozed, at(10, 18), tz))
+    }
+
+    @Test
+    fun `multi-day step up needs two signals`() {
+        // 5 days each 1 piece over a 4-a-day target: one signal only (days over).
+        val doses = (5..9).flatMap { d -> (0 until 5).map { i -> gum4.toDose("d$d-$i", at(d, 8 + i * 3), 0) } }
+        val one = FirewatchData(products = DefaultProducts.all(), doses = doses,
+            rungChanges = listOf(RungChange("r", at(1, 8), 4.0, "start")))
+        assertNull(CO.stepUp(one, at(10, 7, 30), tz))
+        // Add a rise in strong cravings over those days: two signals.
+        val cr = (5..9).map { Craving("s$it", at(it, 10), 8) }
+        val two = one.copy(cravings = cr)
+        val s = CO.stepUp(two, at(10, 7, 30), tz)!!
+        assertTrue(!s.sameDay && s.reasons.size >= 2, "$s")
+    }
 }

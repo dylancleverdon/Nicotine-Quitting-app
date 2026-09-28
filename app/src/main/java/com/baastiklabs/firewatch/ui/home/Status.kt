@@ -1,5 +1,6 @@
 package com.baastiklabs.firewatch.ui.home
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -49,6 +50,8 @@ fun TierStatusCard(
     fitsNow: String? = null,
     nowDoses: List<com.baastiklabs.firewatch.core.model.Dose> = emptyList(),
     relapseNext: Long? = null,
+    timerHidden: Boolean = false,
+    onReveal: () -> Unit = {},
 ) {
     Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
@@ -75,7 +78,9 @@ fun TierStatusCard(
                     Text("Next rung down: ${next.label}", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
-            battery?.let { BatteryRow(it, now, fitsNow, relapseNext) }
+            battery?.let {
+                if (timerHidden) HiddenBatteryRow(it, onReveal) else BatteryRow(it, now, fitsNow, relapseNext)
+            }
             Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
                 Stat("≈ ${Fmt.pieces(today.pieces)}", "pieces today", big = true)
                 Stat("≈ ${Fmt.mg(today.absorbedMg)}", "absorbed today", big = true)
@@ -120,6 +125,18 @@ private fun BatteryRow(b: Battery, now: Long, fitsNow: String?, relapseNext: Lon
         Text(detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         fitsNow?.let { Text("A $it fits now", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
         if (relapseNext == null) StretchLine(b.stretchMinutesToday, b.pullMinutesToday)
+    }
+}
+
+/** "Hide next piece timer": the bar only, until a tap reveals the time (and counts a check). */
+@Composable
+private fun HiddenBatteryRow(b: Battery, onReveal: () -> Unit) {
+    Column(
+        Modifier.fillMaxWidth().clickable(onClick = onReveal).padding(vertical = 4.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Text("Tap to see your next piece time", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+        LinearProgressIndicator(progress = { b.charge.coerceIn(0.0, 1.0).toFloat() }, modifier = Modifier.fillMaxWidth())
     }
 }
 

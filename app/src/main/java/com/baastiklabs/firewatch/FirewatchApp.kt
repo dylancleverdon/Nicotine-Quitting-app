@@ -50,7 +50,6 @@ class FirewatchApp : Application() {
                 com.baastiklabs.firewatch.reminders.Reminders.sync(this@FirewatchApp, graph.repository.data.value.settings)
                 com.baastiklabs.firewatch.reminders.RelapseReminders.sync(this@FirewatchApp, graph.repository.data.value)
                 BackupStore.dailyIfDue(this@FirewatchApp, graph.repository)
-                com.baastiklabs.firewatch.data.FeedbackSender.flush(this@FirewatchApp)
             }
         }
     }

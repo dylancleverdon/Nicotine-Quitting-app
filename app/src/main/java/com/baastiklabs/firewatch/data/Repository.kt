@@ -7,6 +7,7 @@ import com.baastiklabs.firewatch.core.model.CravingOutcome
 import com.baastiklabs.firewatch.core.model.DefaultProducts
 import com.baastiklabs.firewatch.core.model.Dose
 import com.baastiklabs.firewatch.core.model.ModeChange
+import com.baastiklabs.firewatch.core.model.TimerCheck
 import com.baastiklabs.firewatch.core.model.Product
 import com.baastiklabs.firewatch.core.model.RungChange
 import com.baastiklabs.firewatch.core.model.Settings
@@ -41,6 +42,7 @@ class Repository(
     private val rungChanges = HashMap<String, RungChange>()
     private val checkIns = HashMap<String, CheckIn>()
     private val modeChanges = HashMap<String, ModeChange>()
+    private val timerChecks = HashMap<String, TimerCheck>()
     private var settings = Settings()
 
     private val _data = MutableStateFlow(FirewatchData())
@@ -125,6 +127,12 @@ class Repository(
     suspend fun setTarget(pieces: Double, reason: String) {
         val now = clock()
         mutate { t -> listOf(RecordCodec.rung(RungChange(Ids.newId(now), now, pieces, reason), null, t)) }
+    }
+
+    /** "Hide next piece timer": a tap to see the time. */
+    suspend fun logTimerCheck(charging: Boolean) {
+        val now = clock()
+        mutate { t -> listOf(RecordCodec.timerCheck(TimerCheck(Ids.newId(now), now, charging), null, t)) }
     }
 
     /** Switches Relapse prevention mode on or off (kept as history, so past days stay marked). */
@@ -214,6 +222,7 @@ class Repository(
             RecordTypes.RUNG -> put(rungChanges, env, RungChange.serializer())
             RecordTypes.CHECKIN -> put(checkIns, env, CheckIn.serializer())
             RecordTypes.MODE -> put(modeChanges, env, ModeChange.serializer())
+            RecordTypes.TIMER_CHECK -> put(timerChecks, env, TimerCheck.serializer())
             RecordTypes.SETTINGS -> settings =
                 (if (env.deleted) null else RecordCodec.decode(env.json, Settings.serializer())) ?: Settings()
             else -> Unit // A newer version's record type: kept in storage and backups, ignored here.
@@ -235,6 +244,7 @@ class Repository(
             rungChanges = rungChanges.values.sortedBy { it.at },
             checkIns = checkIns.values.sortedBy { it.at },
             modeChanges = modeChanges.values.sortedBy { it.at },
+            timerChecks = timerChecks.values.sortedBy { it.at },
         )
         onChange?.invoke()
     }

@@ -269,6 +269,34 @@ fun SettingsScreen(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
 
+        var unsent by remember { mutableStateOf(com.baastiklabs.firewatch.data.FeedbackSender.unsent(context)) }
+        if (unsent.isNotEmpty()) {
+            SectionTitle("Unsent suggestions (${unsent.size})")
+            unsent.forEach { u ->
+                Column(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text((if (u.type.isNotBlank()) "${u.type}: " else "") + u.text.take(80), style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        (if (u.at > 0) Fmt.dateTime(u.at) + " · " else "") + "last try: ${u.error}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(onClick = {
+                            scope.launch {
+                                val error = com.baastiklabs.firewatch.data.FeedbackSender.sendNow(context, u.id)
+                                unsent = com.baastiklabs.firewatch.data.FeedbackSender.unsent(context)
+                                snackbar.showSnackbar(error?.let { "$it. Still saved." } ?: "Thanks, sent!")
+                            }
+                        }) { Text("Send now") }
+                        TextButton(onClick = {
+                            com.baastiklabs.firewatch.data.FeedbackSender.delete(context, u.id)
+                            unsent = com.baastiklabs.firewatch.data.FeedbackSender.unsent(context)
+                        }) { Text("Delete") }
+                    }
+                }
+            }
+        }
+
         SectionTitle("Help")
         LabeledRow("Help", "›", Modifier.clickable(onClick = onOpenHelp).padding(vertical = 8.dp))
 

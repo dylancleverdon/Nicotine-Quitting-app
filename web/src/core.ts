@@ -15,7 +15,7 @@ export interface Outlooks {
 export interface HelpPage { title: string; body: string }
 export interface HelpArticle { id: string; section: string; title: string; body: string }
 export interface DoseView { id: string; at: number; name: string; pieces: number; mg: number; estimated: boolean; tags: string[]; kind: string }
-export interface CravingView { id: string; at: number; intensity: number; name: string; outcome: string; endedAt: number | null; tags: string[] }
+export interface CravingView { id: string; at: number; intensity: number; name: string; outcome: string; result: string; endedAt: number | null; tags: string[] }
 export interface DayView {
   date: string; pieces: number; mg: number; doses: number; cravings: number; rodeOut: number; level: number
   clearHours: number; quality: number | null; estimated: boolean; hasRange: boolean; low: number; high: number
@@ -36,7 +36,7 @@ export interface InsightsData {
 export interface Snapshot {
   today: string; baselineState: 'none' | 'progress' | 'complete'; baselineDay: number; baselineAverage: number | null
   revealed: boolean; measured: Rung | null; target: Rung | null; battery: Battery | null
-  stepDown: Rung | null; stepDownNote: string | null; stepUp: Rung | null; headsUps: string[]
+  stepDown: Rung | null; stepDownNote: string | null; stepUp: Rung | null; stepUpWhy: string | null; stepUpSameDay: boolean; cravingEndings: NamedValue[]; checks: NamedValue[]; checksToday: number; headsUps: string[]
   qualityScore: number | null; qualityLabel: string | null; swapTip: string | null; activeCraving: CravingView | null
   todayPieces: number; todayMg: number; todayCravings: number; todayRodeOut: number; lastDoseAt: number | null
   todayDoses: DoseView[]; todayCravingList: CravingView[]; wave: number[][]; wakeAt: number; sleepAt: number; typical: number[]

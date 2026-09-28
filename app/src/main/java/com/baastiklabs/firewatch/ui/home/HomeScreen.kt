@@ -110,7 +110,7 @@ fun HomeScreen(vm: FirewatchViewModel, data: FirewatchData, now: Long, snackbar:
     val battery = remember(data, minute) { target?.let { Progress.battery(data, if (it.pieces > 0) it.pieces else 1.0 / 3.0, now, tz, com.baastiklabs.firewatch.data.AppActivity.last(context)) } }
     val stepDown = remember(data, minute) { if (revealed) Progress.stepDownOffer(data, now, tz) else null }
     val readiness = remember(data, minute) { data.targetPieces?.let { Coach.readiness(data, it, now) } }
-    val stepUp = remember(data, minute) { if (revealed && stepDown == null) Coach.stepUpOffer(data, now, tz) else null }
+    val stepUpFull = remember(data, minute) { if (revealed && stepDown == null) Coach.stepUp(data, now, tz) else null }
     val headsUps = remember(data, minute) { Progress.headsUps(data, now, tz) }
     val wave = remember(data, minute) { Insights(data, tz, now).todayCurve(10) }
     val todayWake = remember(data, minute) { Waking.day(data, today, tz) }
@@ -120,6 +120,10 @@ fun HomeScreen(vm: FirewatchViewModel, data: FirewatchData, now: Long, snackbar:
     var celebrate by remember { mutableStateOf<com.baastiklabs.firewatch.core.engine.Rung?>(null) }
     var relapseDialog by remember { mutableStateOf(false) }
     var feedback by remember { mutableStateOf(false) }
+    // "Hide next piece timer": the time shows for 30 seconds after a tap, and each tap is counted.
+    var revealed30 by remember { mutableStateOf(false) }
+    androidx.compose.runtime.LaunchedEffect(revealed30) { if (revealed30) { kotlinx.coroutines.delay(30_000); revealed30 = false } }
+    val timerHidden = data.settings.hideTimer && !revealed30
     val relapse = com.baastiklabs.firewatch.core.engine.Relapse
     val relapseNext = remember(data, minute) { relapse.nextAt(data, now, tz) }
     val relapseProduct = remember(data) { relapse.product(data)?.name }
@@ -199,7 +203,7 @@ fun HomeScreen(vm: FirewatchViewModel, data: FirewatchData, now: Long, snackbar:
                 OutlinedButton(onClick = onHelp, contentPadding = PaddingValues(0.dp), modifier = Modifier.height(36.dp).padding(0.dp)) { Text("?", fontWeight = FontWeight.Bold) }
             }
         }
-        if (data.relapseOn) item { com.baastiklabs.firewatch.ui.relapse.RelapseIndicator(relapseNext, relapseProduct) }
+        if (data.relapseOn) item { com.baastiklabs.firewatch.ui.relapse.RelapseIndicator(if (timerHidden) null else relapseNext, relapseProduct) }
         item {
             if (revealed) {
                 TierStatusCard(
@@ -214,6 +218,11 @@ fun HomeScreen(vm: FirewatchViewModel, data: FirewatchData, now: Long, snackbar:
                     quality = quality,
                     nowDoses = data.doses,
                     relapseNext = if (data.relapseOn) relapseNext else null,
+                    timerHidden = timerHidden,
+                    onReveal = {
+                        revealed30 = true
+                        scope.launch { repo.logTimerCheck(charging = (battery?.charge ?: 1.0) < 0.999) }
+                    },
                     fitsNow = battery?.let { com.baastiklabs.firewatch.core.engine.BatteryEngine.fitsNow(data, it)?.name },
                 )
             } else {
@@ -237,10 +246,10 @@ fun HomeScreen(vm: FirewatchViewModel, data: FirewatchData, now: Long, snackbar:
                 val ready = readiness?.ready ?: true
                 OfferCard(
                     title = "Ready for ${stepDown.label}?",
-                    body = "You've held ${target.label} for ${data.settings.holdDays} days." + if (readiness?.confident == true) {
+                    body = "You've held ${target.label} for ${data.settings.holdDays} days." + (if (readiness?.confident == true) {
                         if (ready) " From your cravings, the next rung should feel like about a ${readiness.predictedNext.toInt()} out of 10, and you ride out ${readiness.capacity}s."
                         else " Heads-up: your cravings suggest the next rung may feel like a ${readiness.predictedNext.toInt()}, above the ${readiness.capacity} you usually ride out. Holding a bit longer is fine too."
-                    } else "",
+                    } else "") + (com.baastiklabs.firewatch.core.engine.Checks.trendNote(data, today, tz)?.let { " $it" } ?: ""),
                     primary = "Step down",
                     onPrimary = { moveTarget(stepDown.pieces, "down") },
                     secondary = "Not yet",
@@ -248,11 +257,12 @@ fun HomeScreen(vm: FirewatchViewModel, data: FirewatchData, now: Long, snackbar:
                 )
             }
         }
-        if (stepUp != null && target != null) {
+        if (stepUpFull != null && target != null) {
+            val stepUp = stepUpFull.rung
             item {
                 OfferCard(
                     title = "This rung is tough right now",
-                    body = "Your cravings have been beating you at ${target.label}. Stepping up to ${stepUp.label} for a while is normal and keeps you on gum rather than something worse. Come back down when it's ready.",
+                    body = "${stepUpFull.why} Stepping up to ${stepUp.label} for a while is normal, and it keeps you on gum instead of something worse. Come back down when it's ready.",
                     primary = "Step up",
                     onPrimary = { moveTarget(stepUp.pieces, "up") },
                     secondary = "I'm OK",
@@ -296,20 +306,17 @@ fun HomeScreen(vm: FirewatchViewModel, data: FirewatchData, now: Long, snackbar:
             }
         }
         item {
+          Column {
             if (activeCraving != null) {
-                ActiveCravingCard(
-                    craving = activeCraving,
-                    now = now,
-                    onPassed = { scope.launch { repo.finishCraving(activeCraving.id, CravingOutcome.RODE_OUT) } },
-                    onUsed = { scope.launch { repo.finishCraving(activeCraving.id, CravingOutcome.USED) } },
-                    onTag = { tag ->
-                        scope.launch {
-                            val tags = if (tag in activeCraving.tags) activeCraving.tags - tag else activeCraving.tags + tag
-                            repo.saveCraving(activeCraving.copy(tags = tags))
-                        }
-                    },
+                // No buttons: thinking about the app mid-craving can feed the craving.
+                Text(
+                    "Craving logged at ${Fmt.time(activeCraving.at)}. You've got this.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(bottom = 8.dp),
                 )
-            } else {
+            }
+            run {
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     OutlinedButton(
                         onClick = { cravingSheet = true },
@@ -327,6 +334,7 @@ fun HomeScreen(vm: FirewatchViewModel, data: FirewatchData, now: Long, snackbar:
                     }
                 }
             }
+          }
         }
         item {
             Column {
@@ -406,8 +414,8 @@ fun HomeScreen(vm: FirewatchViewModel, data: FirewatchData, now: Long, snackbar:
         com.baastiklabs.firewatch.ui.feedback.FeedbackDialog(onDismiss = { feedback = false }) { type, text, details, name ->
             feedback = false
             scope.launch {
-                val sent = com.baastiklabs.firewatch.data.FeedbackSender.send(context, type, text, details, name)
-                snackbar.showSnackbar(if (sent) "Thanks, sent!" else "No connection. Saved, and it'll send next time Firewatch opens.")
+                val error = com.baastiklabs.firewatch.data.FeedbackSender.send(context, type, text, details, name)
+                snackbar.showSnackbar(error?.let { "$it. Saved: send it later from Settings → Unsent suggestions." } ?: "Thanks, sent!")
             }
         }
     }
@@ -665,52 +673,6 @@ private fun StatusCard(
                 Stat("${today.doseCount}", if (today.doseCount == 1) "dose" else "doses")
                 Stat(lastDoseAt?.let { Fmt.duration(now - it) } ?: "–", "since last")
                 Stat("${today.cravingsRodeOut} of ${today.cravings}", "cravings ridden out")
-            }
-        }
-    }
-}
-
-@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
-@Composable
-private fun ActiveCravingCardTags(craving: Craving, onTag: (String) -> Unit) {
-    androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        DoseTags.forEach { tag ->
-            androidx.compose.material3.FilterChip(selected = tag in craving.tags, onClick = { onTag(tag) }, label = { Text(tag) })
-        }
-    }
-}
-
-@Composable
-private fun ActiveCravingCard(craving: Craving, now: Long, onPassed: () -> Unit, onUsed: () -> Unit, onTag: (String) -> Unit) {
-    val level = CravingScale.level(craving.intensity)
-    Card(
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
-        shape = RoundedCornerShape(20.dp),
-    ) {
-        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Surface(shape = RoundedCornerShape(50), color = cravingColor(craving.intensity)) {
-                    Text(
-                        "${craving.intensity}",
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = androidx.compose.ui.graphics.Color.White,
-                    )
-                }
-                Column {
-                    Text("Riding out a craving · ${level.name}", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-                    Text("Started ${Fmt.ago(craving.at, now)}", style = MaterialTheme.typography.bodySmall)
-                }
-            }
-            Text(
-                "Most cravings pass within a few minutes. Tap when it does. What's going on? (optional)",
-                style = MaterialTheme.typography.bodySmall,
-            )
-            ActiveCravingCardTags(craving, onTag)
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Button(onClick = onPassed, modifier = Modifier.weight(1f)) { Text("It passed") }
-                OutlinedButton(onClick = onUsed, modifier = Modifier.weight(1f)) { Text("I used") }
             }
         }
     }

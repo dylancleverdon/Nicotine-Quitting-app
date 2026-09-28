@@ -159,10 +159,12 @@ class CoreTest {
     @Test
     fun `open cravings auto resolve`() {
         val c = Craving("c", at = 0, intensity = 5)
-        assertEquals(CravingOutcome.OPEN, Cravings.effectiveOutcome(c, emptyList(), now = 10 * 60_000L))
-        assertEquals(CravingOutcome.RODE_OUT, Cravings.effectiveOutcome(c, emptyList(), now = Cravings.AUTO_CLOSE_MS))
+        val empty = FirewatchData()
+        assertEquals(CravingOutcome.OPEN, Cravings.effectiveOutcome(empty, c, now = 10 * 60_000L))
+        assertEquals(CravingOutcome.RODE_OUT, Cravings.effectiveOutcome(empty, c, now = Cravings.WINDOW_MS))
+        // A dose during the baseline (no target yet) isn't a win.
         val dose = Dose("d", "p", at = 5 * 60_000L)
-        assertEquals(CravingOutcome.USED, Cravings.effectiveOutcome(c, listOf(dose), now = 10 * 60_000L))
+        assertEquals(CravingOutcome.USED, Cravings.effectiveOutcome(FirewatchData(doses = listOf(dose)), c, now = 10 * 60_000L))
     }
 
     @Test

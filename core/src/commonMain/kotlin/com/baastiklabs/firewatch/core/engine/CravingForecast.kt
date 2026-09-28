@@ -69,6 +69,8 @@ object CravingForecast {
     private const val PRIOR_PER_HOUR = 1.0 / 6.0
     private const val PRIOR_WEIGHT = 10.0
     private const val PRIOR_BETA = 0.8
+    /** One timer check while refilling counts as this much of a logged craving. */
+    private const val CHECK_WEIGHT = 0.3
 
     fun outlook(data: FirewatchData, now: Long, tz: TimeZone): CravingOutlook {
         val doses = data.doses.sortedBy { it.at }
@@ -147,6 +149,18 @@ object CravingForecast {
         val strengthW = DoubleArray(SLOTS)
         var totalW = 0.0
         var totalStrength = 0.0
+        // Timer checks while refilling ("Hide next piece timer") count as a weak "wanting" signal.
+        val checks = data.timerChecks.filter { it.charging && it.at in from until now }
+            .filter { excludeDay == null || Instant.fromEpochMilliseconds(it.at).toLocalDateTime(tz).date != excludeDay }
+        checks.forEach { c ->
+            val s = slotOf(c.at, tz)
+            val w = CHECK_WEIGHT * weight(c.at)
+            for (k in 0 until SLOTS) {
+                val g = circularGap(s, k)
+                if (g > 4 * sigma) continue
+                own[k] += w * norm * exp(-0.5 * (g / sigma) * (g / sigma))
+            }
+        }
         cravings.forEach { c ->
             val s = slotOf(c.at, tz)
             val w = weight(c.at)
