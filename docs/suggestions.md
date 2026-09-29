@@ -67,3 +67,4 @@ Ideas raised while reviewing the app, not sent through the form.
 | 2026-09-29 | Nicotine volatility: one-hour swing overlay on the wave, daily volatility chart | Done (0.11.0) | `proposals/coaching-tips-and-fixes.md` §7 |
 | 2026-09-29 | Rethink stretch and pull (e.g. live net, net in pieces) | Declined | Kept as they are for now. |
 | 2026-09-29 | Late nights: stop refills after bedtime for stretch and pull | Declined | Tiers already count per waking hour. |
+| 2026-09-29 | Step-down progress ("1 of 3 days held") in Insights → Forecasts | Done | 0.12.0 |

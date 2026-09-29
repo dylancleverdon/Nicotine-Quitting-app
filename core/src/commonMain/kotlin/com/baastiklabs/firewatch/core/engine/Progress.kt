@@ -39,6 +39,11 @@ data class Battery(
 
 data class HeadsUp(val message: String)
 
+/** Full days in a row held at or under the target, toward the next step-down offer. */
+data class StepDownProgress(val held: Int, val needed: Int, val next: Rung) {
+    val ready: Boolean get() = held >= needed
+}
+
 object Progress {
     private const val MIN = 60_000L
     const val ROLLING_DAYS = 7
@@ -84,17 +89,29 @@ object Progress {
         if (Control.isEarly(data)) return null
         // A practice day (or its "How was it?" follow-up) stands in for the offer.
         if (Control.practicingToday(data, now, tz) || Control.practiceFollowUp(data, now, tz) != null) return null
-        val since = data.rungChanges.lastOrNull()?.at ?: return null
-        val hold = data.settings.holdDays
         if (now - data.settings.stepDownSnoozedAt < 24 * 60 * MIN) return null
-        val today = now.localDate(tz)
+        val progress = stepDownProgress(data, now, tz) ?: return null
+        return if (progress.ready) progress.next else null
+    }
+
+    /**
+     * How close the next step-down offer is: full days in a row (ending yesterday, after the last
+     * rung change) at or under the target, out of the hold period. Uses the same test as
+     * [stepDownOffer], so "3 of 3" and the offer always agree.
+     */
+    fun stepDownProgress(data: FirewatchData, now: Long, tz: TimeZone): StepDownProgress? {
+        val target = data.targetPieces ?: return null
+        if (target <= 0) return null
+        val since = data.rungChanges.lastOrNull()?.at ?: return null
+        val hold = data.settings.holdDays.coerceAtLeast(1)
         val sinceDate = since.localDate(tz)
-        val lastFull = today.minus(1, DateTimeUnit.DAY)
-        val firstCounted = lastFull.minus(hold - 1, DateTimeUnit.DAY)
-        if (firstCounted <= sinceDate) return null
-        val ok = generateSequence(firstCounted) { it.plus(1, DateTimeUnit.DAY) }.takeWhile { it <= lastFull }
-            .all { pace(data, it, tz).scaled <= target + 0.25 }
-        return if (ok) Ladder.nextDown(target) else null
+        var day = now.localDate(tz).minus(1, DateTimeUnit.DAY)
+        var held = 0
+        while (held < hold && day > sinceDate && pace(data, day, tz).scaled <= target + 0.25) {
+            held++
+            day = day.minus(1, DateTimeUnit.DAY)
+        }
+        return StepDownProgress(held, hold, Ladder.nextDown(target))
     }
 
     fun headsUps(data: FirewatchData, now: Long, tz: TimeZone): List<HeadsUp> {

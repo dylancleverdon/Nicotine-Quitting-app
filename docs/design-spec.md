@@ -101,7 +101,9 @@ as an estimate.
   at or under the rung; Relapse prevention mode: no cigarette or vape; empty days count only at
   Clear Air or when the app was in use). The total only ever goes up; milestones at 7/30/60/90/180/365.
   A celebration, never a gate.
-- **Step down (taper, optional):** offered after the hold period (Settings) at or under the rung;
+- **Step down (taper, optional):** offered after the hold period (Settings): that many full days in
+  a row at or under the rung since the last change ("Next step down" in Insights → Forecasts shows
+  "1 of 3 days held");
   never a button; always with "Stay here". **Try it for a day:** that waking day runs at the next
   rung's pace (battery, gap, preview); nothing else changes; next morning "Step down / Stay here".
 

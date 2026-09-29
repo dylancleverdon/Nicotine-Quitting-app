@@ -2,6 +2,9 @@
 
 Newest first. Each release is a "## <version>" heading; the app shows these notes in "What's new".
 
+## 0.12.0 · 2026-09-29
+- New in Insights → Forecasts: **Next step down** shows how many days in a row you've held your level, out of your hold period (e.g. "1 of 3 days held"). When it's full, the step down is offered on the Log tab.
+
 ## 0.11.0 · 2026-09-29
 - Fixed: changing the time of a dose you already logged now shows straight away (it was saved, but only appeared later). New quick choices when logging: 2 and 3 hours ago.
 - Gum is now estimated the way it's really used, chew and park, so it arrives more slowly and gently in your nicotine wave. Your pieces, net and steady days don't change.

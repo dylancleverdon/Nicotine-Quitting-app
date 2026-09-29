@@ -631,6 +631,28 @@ private fun MixSection(ins: Insights) = Col {
 
 @Composable
 private fun ForecastSection(ins: Insights, data: FirewatchData, now: Long) = Col {
+    val stepDown = remember(data, now / 3_600_000) {
+        if (com.baastiklabs.firewatch.core.engine.Control.isEarly(data)) null
+        else com.baastiklabs.firewatch.core.engine.Progress.stepDownProgress(data, now, TimeZone.currentSystemDefault())
+    }
+    if (stepDown != null) {
+        ChartCard(
+            "Next step down",
+            "Full days in a row at or under your level, since your last change. Today counts once it's over. Staying where you are is a win too.",
+        ) {
+            val offered = stepDown.ready &&
+                com.baastiklabs.firewatch.core.engine.Progress.stepDownOffer(data, now, TimeZone.currentSystemDefault()) != null
+            Text(
+                if (offered) "${stepDown.needed} of ${stepDown.needed} days held: ${stepDown.next.label} is offered on the Log tab"
+                else "${stepDown.held} of ${stepDown.needed} days held",
+                style = MaterialTheme.typography.titleMedium,
+            )
+            LinearProgressIndicator(
+                progress = { (stepDown.held.toFloat() / stepDown.needed).coerceIn(0f, 1f) },
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+    }
     val plan = remember(data, now / 3_600_000) { com.baastiklabs.firewatch.core.engine.Control.taperPlan(data, now, TimeZone.currentSystemDefault()) }
     if (plan != null && plan.steps.isNotEmpty()) {
         ChartCard(

@@ -261,6 +261,26 @@ class EngineTest {
     }
 
     @Test
+    fun `step down progress counts held days and matches the offer`() {
+        val doses = (1..20).flatMap { d -> (0 until 3).map { i -> gum4.toDose("d$d-$i", at(d, 9 + i * 4), 0) } }
+        val rung = listOf(RungChange("r", at(5, 8), 3.0, "start"))
+        val data = FirewatchData(products = DefaultProducts.all(), doses = doses, rungChanges = rung)
+        // Days 6 and 7 count (the change day doesn't); today (the 8th) isn't finished.
+        val early = Progress.stepDownProgress(data, at(8, 10), tz)!!
+        assertEquals(2, early.held)
+        assertEquals(7, early.needed)
+        assertTrue(!early.ready)
+        val ready = Progress.stepDownProgress(data, at(15, 10), tz)!!
+        assertEquals(7, ready.held)
+        assertTrue(ready.ready)
+        assertEquals(2.0, ready.next.pieces)
+        // A heavier day starts the count again from the day after it.
+        val heavy = data.copy(doses = doses + (0 until 2).map { gum4.toDose("x$it", at(13, 20 + it), 0) })
+        assertEquals(1, Progress.stepDownProgress(heavy, at(15, 10), tz)!!.held)
+        assertNull(Progress.stepDownOffer(heavy, at(15, 10), tz))
+    }
+
+    @Test
     fun `coach learns capacity from ride-outs`() {
         val cravings = (1..12).map { i ->
             val level = if (i % 2 == 0) 4 else 7
