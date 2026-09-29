@@ -37,12 +37,16 @@ Status: **proposed, not built.** Dated 29 Sep 2026. Written against Android 0.10
 
 ---
 
-## 1. Fix: changing a dose's time doesn't always save
-**What happens.** Editing a logged dose (tap it → Change time → Save) can lose the change.
+## 1. Fix: an edited dose time shows up late
+**What happens.** Editing a logged dose (tap it → Change time → Save) is saved, but the list and
+figures don't update straight away. The new time appears later, e.g. after the next log or when the
+app is reopened (confirmed by D on 29 Sep).
 
-**Likely cause.** The edit sheet closes itself *before* saving, and the save runs on the sheet's
-own background task. Closing the sheet cancels that task, so the write can be dropped part-way
-(`app/.../ui/home/HomeScreen.kt`, `EditDoseSheet`: `onDone()` then `scope.launch`).
+**Cause.** The edit sheet closes itself *before* saving, and the save runs on the sheet's own
+background task (`app/.../ui/home/HomeScreen.kt`, `EditDoseSheet`: `onDone()` then `scope.launch`).
+Closing the sheet cancels that task: the write to storage usually finishes, but the step that
+refreshes the screen is cut off. In the worst case the write itself could be dropped. Delete has the
+same pattern, so the "Dose deleted · Undo" message can be lost too.
 
 **Fix.**
 - Run every save on a task that outlives the screen (the app's view model).
