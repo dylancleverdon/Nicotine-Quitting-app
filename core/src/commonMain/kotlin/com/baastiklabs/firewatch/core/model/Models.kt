@@ -151,6 +151,8 @@ data class Settings(
     val welcomeBackDismissedAt: Long = 0,
     /** Show the "✓ N steady days" line on the home card. */
     val showSteadyDays: Boolean = true,
+    /** Hide the "+38m pull" / "+1h stretch" line on each product button (separate from hideTimer). */
+    val hideDosePreview: Boolean = false,
     /** The highest steady-days milestone already celebrated (7, 30, 60, 90, 180, 365). */
     val steadyMilestoneSeen: Int = 0,
     /** Opt-in: range choices and a date stepper on multi-day charts. */

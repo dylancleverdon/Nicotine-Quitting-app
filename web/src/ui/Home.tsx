@@ -174,7 +174,7 @@ export function Home({ toast, go, backfill }: { toast: (msg: string, undo?: () =
         {S.homeProducts.value.map((p) => (
           <button class="product" onPointerDown={() => down(p)} onPointerUp={() => up(p)} onPointerLeave={() => press.current && clearTimeout(press.current)} onContextMenu={(e) => e.preventDefault()}>
             <b>{p.name}</b>
-            {snap.previews[p.id] != null && Math.abs(snap.previews[p.id]) >= 1 && <span class="preview">{snap.previews[p.id] > 0 ? `+${duration(snap.previews[p.id] * 60000)} stretch` : `+${duration(-snap.previews[p.id] * 60000)} pull`}</span>}
+            {!settings.hideDosePreview && snap.previews[p.id] != null && Math.abs(snap.previews[p.id]) >= 1 && <span class="preview">{snap.previews[p.id] > 0 ? `+${duration(snap.previews[p.id] * 60000)} stretch` : `+${duration(-snap.previews[p.id] * 60000)} pull`}</span>}
             <span>{piecesLabel(Core.piecesOf(p, S.json()))}</span>
           </button>
         ))}

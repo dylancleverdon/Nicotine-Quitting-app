@@ -139,7 +139,7 @@ fun HomeScreen(
     val practiceFollowUp = remember(data, minute) { com.baastiklabs.firewatch.core.engine.Control.practiceFollowUp(data, now, tz) }
     val previews = remember(data, minute) {
         val t = target?.pieces
-        if (t == null) emptyMap()
+        if (t == null || data.settings.hideDosePreview) emptyMap()
         else data.homeProducts.mapNotNull { p ->
             com.baastiklabs.firewatch.core.engine.BatteryEngine.preview(data, p, if (t > 0) t else 1.0 / 3.0, now, tz, com.baastiklabs.firewatch.data.AppActivity.last(context))?.let { p.id to it }
         }.toMap()

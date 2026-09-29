@@ -78,7 +78,7 @@ as an estimate.
   ahead of or behind the rung's pace whatever the product (a Zyn 6 mg every 3h 50m nets 0 at
   Bonfire; two gum 2 mg = one gum 4 mg). Negative net is grey, never red. Paused in Relapse
   prevention mode. The full-battery cheer stays.
-- **Dose preview** under each product between the name and the pieces (shown even with "Hide next piece timer"). Neutral wording only.
+- **Dose preview** under each product between the name and the pieces (shown even with "Hide next piece timer"; its own toggle "Hide stretch and pull on doses"). Neutral wording only.
 - **Hide next piece timer** (opt-in): "Tap to see your next piece time"; each tap is a counted
   check, a "wanting it" signal used in Insights and the offers.
 - The maths jumps from dose to dose (fast); tests check it matches a minute-by-minute version.
@@ -144,7 +144,7 @@ missed day.
 ## 13. Settings
 
 Plan (step back up a rung, hold period, first-piece goal, time format, Hide next piece timer, wind
-down note, show steady days, detailed charts, daily check-in), Relapse prevention mode, optional reminders, money, data (export,
+down note, show steady days, hide stretch and pull on doses, detailed charts, daily check-in), Relapse prevention mode, optional reminders, money, data (export,
 import, automatic backups off the phone), products and the reference piece (change "from today on", or back-dated with a warning), sleep schedule,
 unsent suggestions, Help, About, updates.
 

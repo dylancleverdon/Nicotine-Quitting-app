@@ -2,6 +2,9 @@ import { expect, test } from '@playwright/test'
 
 // Onboarding with a back-dated week -> starting tier offered -> log a dose -> reload keeps it -> export.
 test('back-dated start, logging and persistence', async ({ page }) => {
+  // Midday, so "today" is the waking day that started this morning (after midnight it's still yesterday).
+  const noon = new Date(); noon.setHours(13, 0, 0, 0)
+  await page.clock.install({ time: noon })
   await page.goto('./')
   // Welcome tour first (skippable).
   await expect(page.getByText('Take control of your nicotine')).toBeVisible()

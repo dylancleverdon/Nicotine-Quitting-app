@@ -1,5 +1,8 @@
 # Firewatch web changelog
 
+## 0.8.2 · 2026-09-29
+- New setting: "Hide stretch and pull on doses" (Settings → Your plan) hides the stretch/pull line on the product buttons. It's separate from hiding the next-piece timer.
+
 ## 0.8.1 · 2026-09-28
 - Each product button now shows how much logging it now adds to stretch or pull, right under its name. It shows even when the next-piece timer is hidden.
 
