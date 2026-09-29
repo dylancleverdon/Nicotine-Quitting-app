@@ -27,7 +27,7 @@ Statuses: **Undecided** · **Planned** (in a proposal, not built) · **Done** (r
 | 2026-09-29 | Idea | Yesterday in review in Insights, with delivery and timing analysis and tips | Planned | §8: facts for everyone; tips only with Coaching tips on. |
 | 2026-09-29 | Idea | Suggest a gum before the timer when mostly using pouches, and explain why | Planned | §10 (Coaching tips) |
 | 2026-09-29 | Idea | More guidance on dropping pouches without being preachy | Declined | Dropped along with pouch → gum swaps. |
-| 2026-09-29 | Idea | How do pouches and faster absorption affect receptors and healing? | Planned | §12 (Help) and §7 ("How each product hits" chart); receptor model unchanged. |
+| 2026-09-29 | Idea | How do pouches and faster absorption affect receptors and healing? | Planned | §12 (Help) and §7 (nicotine volatility); receptor model unchanged. |
 | 2026-09-29 | Idea | A mode that gives quitting guidance, so nobody gets unwanted guidance | Planned | §9: Coaching tips, off by default. |
 | 2026-09-29 | Bug | Taper speed said "that's OK, it happens": a positive spin on a miss | Planned | §2: plus one Settings line; a test bans spin phrases. |
 | 2026-09-29 | Bug | Time changes don't save when entering a gum from a few hours ago | Planned | §1: the edit sheet cancels its own save; plus 2h/3h quick chips. |
@@ -63,6 +63,7 @@ Ideas raised while reviewing the app, not sent through the form.
 | 2026-09-28 | Scrub any chart; view earlier days on day charts (no overlay); opt-in Detailed charts | Done | 0.10.0 |
 | 2026-09-28 | Taper forecast from day one | Done | 0.10.0 |
 | 2026-09-29 | Gum delivered as chew-and-park (slower, stepped release) | Planned | `proposals/coaching-tips-and-fixes.md` §6 |
-| 2026-09-29 | "How each product hits" chart; wave coloured by delivery speed | Planned | §7 |
+| 2026-09-29 | "How each product hits" chart; wave coloured by delivery speed | Declined | Replaced by nicotine volatility. |
+| 2026-09-29 | Nicotine volatility: one-hour swing overlay on the wave, daily volatility chart | Planned | `proposals/coaching-tips-and-fixes.md` §7 |
 | 2026-09-29 | Rethink stretch and pull (e.g. live net, net in pieces) | Declined | Kept as they are for now. |
 | 2026-09-29 | Late nights: stop refills after bedtime for stretch and pull | Declined | Tiers already count per waking hour. |

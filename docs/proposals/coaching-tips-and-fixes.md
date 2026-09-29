@@ -1,6 +1,6 @@
-# Proposed update: fixes, delivery speed, Yesterday in review and opt-in Coaching tips
+# Proposed update: fixes, nicotine volatility, Yesterday in review and opt-in Coaching tips
 
-Status: **proposed, not built.** Written against Android 0.10.2. Covers the suggestions received
+Status: **proposed, not built.** Dated 29 Sep 2026. Written against Android 0.10.2. Covers the suggestions received
 28–29 Sep and the decisions made on them (see `docs/suggestions.md`).
 
 ## Summary
@@ -14,10 +14,10 @@ Status: **proposed, not built.** Written against Android 0.10.2. Covers the sugg
 4. "What counts as a steady day?" answered where the count is shown.
 5. Morning stretch made visible (it already counts).
 
-**Delivery speed**
+**Delivery and volatility**
 
 6. Gum delivered the way it's really used: chew and park.
-7. A "How each product hits" chart, and the day's wave coloured by delivery speed.
+7. Nicotine volatility: a running overlay on the blood-level wave and a daily volatility chart.
 
 **Insights**
 
@@ -115,7 +115,7 @@ so it arrives more slowly and more gently than a pouch.
   - "≈ mg in your system now"
   - the double-up check (a gum stays "still peaking" for longer)
   - the craving forecast
-  - the new chart in §7
+  - nicotine volatility (§7)
 - **Stored:**
   - Gum products get the chew-and-park profile.
   - Past gum doses are drawn with it too, unless the product's speed was changed by hand.
@@ -124,25 +124,41 @@ so it arrives more slowly and more gently than a pouch.
 - **Editable:** as with every product estimate, the speed can still be changed in Settings →
   Products.
 
-## 7. Charting delivery speed
-**"How each product hits"** (Insights → Going down, next to spike share):
-- One curve per product on your home screen, starting from the moment you take it, over 2 hours.
-  Across the bottom is time; up the side is ≈ mg in your system.
-- A vape shoots up in minutes and falls fast (the spike). Gum rises in a gentle, stepped hill that
-  peaks late. A Zyn 6 mg rises smoothly to a taller hill.
-- The chart shows **speed** (how steep) and **strength** (how tall) at once.
-- A one-line caption that states facts only: "Steeper means a quicker hit. Taller means more
-  nicotine."
-- Scrubbable, like every chart.
+## 7. Nicotine volatility
+**What it measures.** How high, how low and how fast you swing between nicotine highs and lows,
+as a **one-hour swing**:
 
-**Colour the day's wave by delivery speed** (Insights → Today, and the home card's wave):
-- The area under the wave is tinted by what's contributing: bright for fast (vapes, cigarettes),
-  soft for slow (gum, pouches, patches).
-- A small legend: "Bright = fast delivery".
+> At any moment: the highest minus the lowest estimated nicotine level over the past hour, in mg.
+
+- **Fast spikes** (a vape) give a big swing.
+- **Big doses** give a bigger swing than small ones.
+- **Slow, steady delivery** (chew-and-park gum, evenly spaced small pieces) gives a small swing,
+  even at the same overall level.
+- **Clear hours** are near zero.
+- Labelled as an estimate, like every figure.
+
+**Both charts are in Insights → Today, with the blood-level wave:**
+
+**1. Running overlay on the wave**
+- A thin line in a second colour over the wave, showing the one-hour swing through the day.
+- Its own scale on the right-hand side, labelled "Volatility (mg)".
+- A "Show volatility" toggle on the chart, on by default.
+- Scrub to read the level and the volatility at the same moment.
+- Follows the day stepper, so yesterday and earlier days work too.
+
+**2. Daily volatility, directly under the wave**
+- One bar per day: that day's average one-hour swing across the waking day (e.g. "≈ 0.6 mg"),
+  with a 7-day average line.
+- The last 30 days; longer ranges with "Detailed charts" on.
+- Scrubbable. Caption, facts only: "Lower means steadier nicotine through the day."
+
+**Tone.** Neutral like the rest of Insights: no red, no flags on higher days, and no new Log tab
+win.
 
 ## 8. Yesterday in review
 A card at the top of Insights, for yesterday's waking day, shown to everyone:
 - pieces and net
+- volatility (e.g. "≈ 0.6 mg")
 - delivery mix (e.g. "70% pouches, 30% gum")
 - longest gap between pieces
 - doses stacked while the last one was still peaking
@@ -190,7 +206,7 @@ Plain facts, no lecture:
   easy to keep a pouch in for a long time or reach for another without noticing.
 - **Discreet and flavoured:** usable anywhere, any time, so the habit fits more of the day.
 - **Speed:** a pouch arrives faster and more smoothly than gum's stepped release, but far slower
-  than a vape. The chart in §7 shows the difference.
+  than a vape. Nicotine volatility (§7) shows the difference day to day.
 
 ## 12. Help: delivery speed and receptors
 - The receptor healing estimate uses how much nicotine is in your body on average over 24 hours.
@@ -198,7 +214,7 @@ Plain facts, no lecture:
 - Faster delivery mostly strengthens the **habit**: a quick hit feels rewarding sooner, so the
   brain learns the routine faster. The estimate doesn't try to put a number on that, because there
   isn't a reliable way to.
-- Where speed shows up in Firewatch: "How each product hits", the coloured wave and spike share.
+- Where speed shows up in Firewatch: nicotine volatility (§7) and spike share.
 - The receptor model itself is **not** changed.
 
 ---
@@ -208,6 +224,9 @@ Plain facts, no lecture:
 - Late-night change (stopping refills after bedtime for stretch and pull): not needed.
 - Guidance cards for moving from pouches to gum, and pouch → gum swap suggestions: dropped.
 - Symptom reporting: declined earlier.
+- "How each product hits" chart and colouring the wave by delivery speed: replaced by nicotine
+  volatility.
+- A Log tab win for low volatility.
 
 ## Data
 - New settings, each with a default:
@@ -217,7 +236,8 @@ Plain facts, no lecture:
 - New speed-profile value for gum (chew-and-park); older versions fall back to the existing
   profile.
 - No schema change. Follows `docs/data-format.md`.
-- Update `docs/design-spec.md` (§4, §6, §7, §11, §13, §14) and `core/.../Help.kt`.
+- Update `docs/design-spec.md` (§4, §6, §7, §11, §13, §14) and `core/.../Help.kt` (including
+  "What is volatility?").
 
 ## Tests to add
 - Editing a dose's time and closing the sheet stores the new time.
@@ -228,6 +248,10 @@ Plain facts, no lecture:
   - absorbs the same total,
   - quick and half durations shorten the release.
 - Pieces, net and tiers are unchanged by the gum profile.
+- Volatility:
+  - near zero when clear,
+  - higher for a vape than for gum of the same absorbed amount,
+  - daily figure = average one-hour swing over the waking day.
 - The bridging tip appears only when its rules are met.
 - Yesterday in review with Coaching tips off shows no tips.
 
@@ -236,8 +260,8 @@ Plain facts, no lecture:
   2 and 3 hours ago.
 - Gum is now estimated the way it's really used, chew and park, so it arrives more slowly and
   gently in your nicotine wave.
-- New in Insights: "Yesterday in review", and "How each product hits", a chart comparing how fast
-  and how strong each product is. The day's wave is now coloured by delivery speed.
+- New in Insights: "Yesterday in review", and **nicotine volatility**: how much your nicotine level
+  swings up and down, shown over the blood-level wave and as one number per day.
 - Your morning stretch now shows until your first piece.
 - Taper speed now reads plainly.
 - New in Settings: **Coaching tips**, practical tips from your own logs, off unless you turn it on.
