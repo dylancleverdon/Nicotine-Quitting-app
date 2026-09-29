@@ -55,7 +55,7 @@ data class DoseDraft(
     val tags: List<String> = emptyList(),
 )
 
-private val offsets = listOf(0 to "Now", 5 to "5 min ago", 10 to "10 min ago", 20 to "20 min ago", 30 to "30 min ago", 60 to "1 hour ago")
+private val offsets = listOf(0 to "Now", 5 to "5 min ago", 10 to "10 min ago", 20 to "20 min ago", 30 to "30 min ago", 60 to "1 hour ago", 120 to "2 hours ago", 180 to "3 hours ago")
 private val amounts = listOf(0.5 to "½", 1.0 to "1", 1.5 to "1½", 2.0 to "2")
 
 /**

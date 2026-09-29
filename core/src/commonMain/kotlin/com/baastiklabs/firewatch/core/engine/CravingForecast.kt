@@ -245,7 +245,7 @@ object CravingForecast {
         var i = lo
         while (i < doses.size && doses[i].at <= t) {
             val d = doses[i]
-            sum += Kinetics.contribution(d.absorbedMg(), d.speed, (t - d.at) / 60_000.0)
+            sum += Kinetics.contribution(d, (t - d.at) / 60_000.0)
             i++
         }
         return sum

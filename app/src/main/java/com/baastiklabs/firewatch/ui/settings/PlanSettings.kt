@@ -49,7 +49,7 @@ fun PlanSettings(vm: FirewatchViewModel, data: FirewatchData) {
                 Text("Step back up a rung (${Ladder.nextUp(target).label})")
             }
             Text(
-                "Stepping back up after a rough stretch is normal, not failure. Step-downs are offered on the home screen when you're ready; the target never changes on its own.",
+                "Stepping up makes your level more accurate. Step-downs are offered when you're ready; the target never changes on its own.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -102,6 +102,7 @@ fun PlanSettings(vm: FirewatchViewModel, data: FirewatchData) {
         ) { v -> update { it.copy(hideTimer = v) } }
         ToggleRow("Wind down before bed", "A bedtime note in the last hour before bed", s.windDown) { v -> update { it.copy(windDown = v) } }
         ToggleRow("Show steady days", "\"✓ N steady days\" on the home card", s.showSteadyDays) { v -> update { it.copy(showSteadyDays = v) } }
+        ToggleRow("Coaching tips", "Practical tips based on your own logs. Off means Firewatch just measures.", s.coachingTips) { v -> update { it.copy(coachingTips = v) } }
         ToggleRow("Hide stretch and pull on doses", "The \"+38m pull\" line on each product button", s.hideDosePreview) { v -> update { it.copy(hideDosePreview = v) } }
         ToggleRow("Detailed charts", "Range choices and earlier/later on Insights charts", s.detailedCharts) { v -> update { it.copy(detailedCharts = v) } }
         ToggleRow("Daily check-in", "Three quick taps: craving strength, mood and sleep", s.dailyCheckIn) { v -> update { it.copy(dailyCheckIn = v) } }

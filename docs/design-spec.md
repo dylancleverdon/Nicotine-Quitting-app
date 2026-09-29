@@ -1,6 +1,6 @@
 # Firewatch by Baastik Labs: design spec
 
-Baastik Labs · living spec, updated 28 Sep 2026 (Android 0.10 / web 0.8)
+Baastik Labs · living spec, updated 28 Sep 2026 (Android 0.11 / web 0.9)
 
 This describes what Firewatch does today and how it should feel. Read `docs/vision.md` first: the
 vision and principles there decide every trade-off here. The original 1.0 spec is kept in
@@ -37,7 +37,8 @@ the updater wins.
 
 Everything is counted in **pieces**: what one 4 mg nicotine gum delivers (≈ 2 mg absorbed). Each
 product has a label strength, an absorption estimate (editable) and a speed profile (spike, build,
-flat). Nicotine's ~2-hour half-life gives each dose a rise-and-fade curve, which powers the
+flat). Gum is modelled as chew and park (released in bursts over the chewing time, absorbed slowly through
+the cheek: later and lower than a pouch, same total). Nicotine's ~2-hour half-life gives each dose a rise-and-fade curve, which powers the
 blood-level graph and "≈ X mg in your system now". Unknown doses (a friend's vape) are logged as a
 range. Log-time tweaks: amount, how long it stayed in, acidic drink (gum). Every figure is labelled
 as an estimate.
@@ -56,11 +57,15 @@ as an estimate.
 
 - **Status card:** tier and pieces a day; the battery (see 7); pieces and mg today; doses, time
   since last, cravings ridden out, quality; today's nicotine curve with "≈ X mg in your system now".
-- **Wins, only ever positive:** "✓ 23 steady days" (hideable), "✓ Held Bonfire for 12 days", "✓ About 20% lighter than when you
+- **Morning stretch** ("Morning stretch: 1h 20m") until the first piece; a one-time "This is your
+  net" card in the first days.
+- **Wins, only ever positive:** "✓ 23 steady days" (hideable; tap for what counts), "✓ Held Bonfire for 12 days", "✓ About 20% lighter than when you
   started" (only when true), "✓ 30 days off cigarettes and vapes", "Journey to Clear Air: 40%".
 - **Offers:** starting point; step down ("…or stay here, that's fine too", with **Try it for a day**
   and **Stay here**); "How was Campfire pace?" after a practice day; steady-days milestones;
-  step up (with the reason); Relapse prevention mode suggestion; "Welcome back".
+  step up (with the reason); Relapse prevention mode suggestion; "Welcome back". With Coaching
+  tips on, at most one tip ("Bridge with gum" when pouches are most of your use and the battery is
+  at least half full), dismissable for 2 weeks.
 - **Quick logging:** one tap per product (hold for time, amount and more), each with a quiet
   dose preview ("+38m pull", "+1h 36m stretch": what logging it now does to net); "Craving? Log it";
   "Friend's vape"; Good morning / Good night; today's list; Relapse prevention mode button;
@@ -118,7 +123,9 @@ pause on mode days.
 
 ## 11. Insights
 
-Today (wave, dose strip), Cravings ahead, Receptors (estimated healing, following the plan vs
+Yesterday in review (facts only: pieces, net, volatility, mix, longest gap, stacked doses, morning
+stretch; up to two tips with Coaching tips on), Today (wave with optional volatility line, off by
+default; daily nicotine volatility = average one-hour swing; dose strip), Cravings ahead, Receptors (estimated healing, following the plan vs
 staying), Stretch & pull, Trends, Patterns (heatmap, how cravings ended, checking, triggers),
 Going up (holding steady, clear hours, wins, money), Going down (quality, dose size, spike share,
 background level), Mix, Forecasts (Journey to Clear Air, arrival dates), Milestones (records,
@@ -144,7 +151,7 @@ missed day.
 ## 13. Settings
 
 Plan (step back up a rung, hold period, first-piece goal, time format, Hide next piece timer, wind
-down note, show steady days, hide stretch and pull on doses, detailed charts, daily check-in), Relapse prevention mode, optional reminders, money, data (export,
+down note, show steady days, Coaching tips (off), hide stretch and pull on doses, detailed charts, daily check-in), Relapse prevention mode, optional reminders, money, data (export,
 import, automatic backups off the phone), products and the reference piece (change "from today on", or back-dated with a warning), sleep schedule,
 unsent suggestions, Help, About, updates.
 

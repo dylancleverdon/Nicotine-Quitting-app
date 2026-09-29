@@ -30,6 +30,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -144,6 +145,13 @@ fun HomeScreen(
             com.baastiklabs.firewatch.core.engine.BatteryEngine.preview(data, p, if (t > 0) t else 1.0 / 3.0, now, tz, com.baastiklabs.firewatch.data.AppActivity.last(context))?.let { p.id to it }
         }.toMap()
     }
+    val morningStretch = remember(data, minute) {
+        if (target == null || data.relapseOn) null else com.baastiklabs.firewatch.core.engine.BatteryEngine.morningStretch(data, now, tz)
+    }
+    val tip = remember(data, minute) {
+        com.baastiklabs.firewatch.core.engine.Coaching.bridgeTip(data, target?.pieces?.let { if (it > 0) it else 1.0 / 3.0 }, now, tz, com.baastiklabs.firewatch.data.AppActivity.last(context))
+    }
+    var steadyInfo by remember { mutableStateOf(false) }
     val welcomeBack = remember(data, minute) { com.baastiklabs.firewatch.core.engine.Control.welcomeBackDays(data, now, tz) }
     val headsUps = remember(data, minute) { Progress.headsUps(data, now, tz) }
     val wave = remember(data, minute) { Insights(data, tz, now).todayCurve(10) }
@@ -262,9 +270,53 @@ fun HomeScreen(
                 StatusCard(todaySummary, baseline, summaries, lastDoseAt, now, onBackfill)
             }
         }
+        if (showTier && battery != null && !data.relapseOn) {
+            morningStretch?.takeIf { it >= 1 }?.let { m ->
+                item {
+                    Text(
+                        "Morning stretch: ${Fmt.duration((m * 60_000).toLong())}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.tertiary,
+                    )
+                }
+            }
+            if (!data.settings.netExplained) item {
+                OfferCard(
+                    title = "Your net",
+                    body = com.baastiklabs.firewatch.core.Help.NET_EXPLAINER,
+                    primary = "Got it",
+                    onPrimary = { scope.launch { repo.updateSettings { it.copy(netExplained = true) } } },
+                    secondary = "Learn more",
+                    onSecondary = onHelp,
+                )
+            }
+        }
+        tip?.let { t ->
+            item {
+                Column {
+                    Text("💡 ${t.text}", style = MaterialTheme.typography.bodyMedium)
+                    TextButton(onClick = {
+                        scope.launch { repo.updateSettings { it.copy(tipDismissedAt = it.tipDismissedAt + (t.id to repo.now())) } }
+                    }) { Text("Hide for 2 weeks") }
+                }
+            }
+        }
         if (showTier) {
+            if (data.settings.showSteadyDays && steadyDays > 0) item {
+                Column(Modifier.clickable { steadyInfo = !steadyInfo }) {
+                    Text(
+                        "✓ $steadyDays steady ${if (steadyDays == 1) "day" else "days"} ⓘ",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.tertiary,
+                    )
+                    if (steadyInfo) Text(
+                        com.baastiklabs.firewatch.core.Help.STEADY_EXPLAINER,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
             val wins = listOfNotNull(
-                if (data.settings.showSteadyDays && steadyDays > 0) "✓ $steadyDays steady ${if (steadyDays == 1) "day" else "days"}" else null,
                 if (heldDays > 0 && target != null && !early) "✓ Held ${target.label} for $heldDays ${if (heldDays == 1) "day" else "days"}" else null,
                 lighter?.let { "✓ About ${(it * 100).toInt()}% lighter than when you started" },
                 daysOff?.takeIf { it > 0 }?.let { "✓ $it days off cigarettes and vapes" },
@@ -559,7 +611,7 @@ fun HomeScreen(
     }
 
     editing?.let { dose ->
-        EditDoseSheet(vm, dose, data.referenceMg, snackbar, onDone = { editing = null })
+        EditDoseSheet(vm, dose, data.referenceMg, snackbar, scope, onDone = { editing = null })
     }
 
     fun logVape(v: VapeLog, name: String, savedId: String?) {
@@ -686,9 +738,10 @@ fun EditDoseSheet(
     dose: Dose,
     referenceMg: Double,
     snackbar: SnackbarHostState,
+    // The screen's scope, not the sheet's: the sheet leaves as it saves, which would cancel it.
+    scope: kotlinx.coroutines.CoroutineScope,
     onDone: () -> Unit,
 ) {
-    val scope = rememberCoroutineScope()
     DoseSheet(
         title = dose.productName.ifBlank { "Dose" },
         kind = dose.kind,

@@ -81,3 +81,6 @@ textarea { resize: vertical; }
 .scrub-line { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--text); opacity: 0.6; pointer-events: none; }
 .scrub-label { position: absolute; top: -2px; background: var(--surface3); color: var(--text); font-size: 11px; padding: 2px 6px; border-radius: 6px; white-space: nowrap; pointer-events: none; }
 .day-stepper { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+
+.tip { color: var(--text); opacity: 0.9; margin-top: 4px; }
+.tappable { cursor: pointer; }

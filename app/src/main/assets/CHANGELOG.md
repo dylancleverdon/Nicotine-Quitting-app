@@ -2,6 +2,16 @@
 
 Newest first. Each release is a "## <version>" heading; the app shows these notes in "What's new".
 
+## 0.11.0 · 2026-09-29
+- Fixed: changing the time of a dose you already logged now shows straight away (it was saved, but only appeared later). New quick choices when logging: 2 and 3 hours ago.
+- Gum is now estimated the way it's really used, chew and park, so it arrives more slowly and gently in your nicotine wave. Your pieces, net and steady days don't change.
+- New in Insights: "Yesterday in review", and **nicotine volatility**: how much your nicotine level swings up and down, as one number per day. Tick "Show volatility" to see it over the blood-level wave.
+- Your morning stretch now shows until your first piece.
+- Tap your steady days to see what counts as a steady day.
+- Taper speed now reads plainly.
+- New in Settings → Your plan: **Coaching tips**, practical tips from your own logs, off unless you turn it on.
+- Help: why pouches can be harder to cut down than gum, how delivery speed relates to your receptors, and what volatility means.
+
 ## 0.10.2 · 2026-09-29
 - New setting: "Hide stretch and pull on doses" (Settings → Your plan) hides the stretch/pull line on the product buttons. It's separate from hiding the next-piece timer.
 

@@ -30,6 +30,10 @@ test('back-dated start, logging and persistence', async ({ page }) => {
   await expect(page.getByText(/Stretch .* · Pull .* · Net/)).toBeVisible()
   // Dose preview under the product buttons.
   await expect(page.locator('.product .preview').first()).toBeVisible()
+  // One-time net explainer.
+  await expect(page.getByText('This is your net')).toBeVisible()
+  await page.getByRole('button', { name: 'Got it' }).click()
+  await expect(page.getByText('This is your net')).toHaveCount(0)
 
   // One tap logs a dose.
   await page.locator('.product', { hasText: 'Nicotine gum 4 mg' }).click()
@@ -64,6 +68,12 @@ test('back-dated start, logging and persistence', async ({ page }) => {
   // Insights and calendar render.
   await page.getByRole('button', { name: 'Insights' }).click()
   await expect(page.getByText('Blood-level wave')).toBeVisible()
+  await expect(page.getByText('Yesterday in review')).toBeVisible()
+  await expect(page.getByText('Nicotine volatility')).toBeVisible()
+  // The volatility line over the wave is off until turned on.
+  await expect(page.getByText('Volatility (mg), right scale')).toHaveCount(0)
+  await page.getByText('Show volatility').click()
+  await expect(page.getByText('Volatility (mg), right scale')).toBeVisible()
   await page.screenshot({ path: 'test-results/today.png', fullPage: true })
   // Day charts: step back to yesterday (no overlay).
   await page.locator('.day-stepper button').first().click()

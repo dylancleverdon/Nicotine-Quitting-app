@@ -53,6 +53,8 @@ Every feature has to follow these.
 9. **Harm reduction without lectures.** Any product can be tracked, cigarettes included; the
    quality score reflects the method. Switching from cigarettes or vapes to gum or pouches is a
    big deal and worth celebrating. A relapse means cigarettes or vapes, not gum or pouches.
+   Practical tips about delivery (like bridging with gum) only appear for people who switch on
+   Coaching tips: opting in is permission to coach a bit.
 10. **Back-dating without times by default.** People rarely remember exact times. Rough counts per
     day are spread across the waking day; an exact time is optional.
 

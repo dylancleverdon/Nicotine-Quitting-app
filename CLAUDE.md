@@ -25,6 +25,8 @@ non-technical: Claude Code builds, releases and maintains everything.
   `release-apk.yml` publishes `apk-v<version>` and refreshes the rolling `apk-latest` release
   (`firewatch.apk` = first-install link, `update.json` = what the app polls).
 - A push to `apk` without a version bump publishes nothing.
+- Before every release, read any new or changed app wording through for spin, judgement or negative
+  comparisons (the test only catches known phrases).
 - The web app (`web/`, Vite + Preact PWA) releases from the `webapp` branch via `release-web.yml`
   to GitHub Pages (https://dylancleverdon.github.io/Nicotine-Quitting-app/). Bump `web/package.json`
   version and `web/CHANGELOG.md` per web release. It uses the same record/backup format as Android.
@@ -65,7 +67,10 @@ non-technical: Claude Code builds, releases and maintains everything.
 - A tool, not a nag: the **only** notifications are in the opt-in Relapse prevention mode
   (`core/.../engine/Relapse.kt`, `app/.../reminders/RelapseReminders.kt`). Keep that exception, add no others.
 - A relapse means cigarettes or vapes (including a friend's), never gum or pouches. Any product can be
-  tracked; delivery method shows in the quality score with no extra coaching.
+  tracked; delivery method shows in the quality score with no extra coaching, except in opt-in
+  Coaching tips (off by default; `core/.../engine/Coaching.kt`): opting in is the licence to coach a bit.
+- Never spin a miss: `WordingTest` bans known spin phrases in all app text; also read new wording
+  through before every release.
 - Private: nothing shareable. Easy to come back: after a gap, "Welcome back" offers back-dating.
 - Back-dating defaults to no times (rough counts spread across the waking day); exact time optional.
 - Tiny learning curve: advanced features are opt-in and live in Settings. No red screens, no streaks

@@ -103,7 +103,7 @@ object Progress {
         if (recent.size >= 2) {
             val last = recent.last()
             val prev = recent[recent.size - 2]
-            if (last.at - prev.at < Kinetics.peakMinutes(prev.speed) * MIN) {
+            if (last.at - prev.at < Kinetics.peakMinutes(prev) * MIN) {
                 out += HeadsUp("Double-up: the last dose went in while the one before was still peaking.")
             }
         }

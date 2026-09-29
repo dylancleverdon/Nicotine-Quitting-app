@@ -246,7 +246,7 @@ object Quality {
         return sorted.mapIndexed { i, d ->
             val prev = sorted.getOrNull(i - 1)
             val stacked = prev != null && !d.estimated && !prev.estimated &&
-                d.at - prev.at < Kinetics.peakMinutes(prev.speed) * 60_000L
+                d.at - prev.at < Kinetics.peakMinutes(prev) * 60_000L
             d.pieces(referenceMg) * doseScore(d, referenceMg, stacked)
         }.sum() / total
     }

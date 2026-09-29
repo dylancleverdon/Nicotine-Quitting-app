@@ -65,7 +65,7 @@ export function Frame({ ticks, fmt, height, xt, children, indent, readout }: { t
 const Grid = ({ ticks, y }: { ticks?: number[]; y: (v: number) => number }) =>
   <>{ticks?.slice(1).map((t) => <line x1={0} x2={W} y1={y(t)} y2={y(t)} stroke="var(--line)" stroke-width={1} opacity={0.6} vector-effect="non-scaling-stroke" />)}</>
 
-export function Wave({ points, typical = [], shade = [], now, height = 140, axes = true }: { points: number[][]; typical?: number[][]; shade?: number[][]; now?: number; height?: number; axes?: boolean }) {
+export function Wave({ points, typical = [], shade = [], now, height = 140, axes = true, overlay }: { points: number[][]; typical?: number[][]; shade?: number[][]; now?: number; height?: number; axes?: boolean; overlay?: number[][] }) {
   if (points.length < 2) return null
   const t0 = points[0][0], t1 = points[points.length - 1][0]
   const ticks = axes ? niceTicks(Math.max(0.5, ...points.map((p) => p[1]), ...typical.map((p) => p[1])), 3) : undefined
@@ -73,19 +73,26 @@ export function Wave({ points, typical = [], shade = [], now, height = 140, axes
   const x = (t: number) => ((t - t0) / Math.max(1, t1 - t0)) * W
   const y = (v: number) => height - (v / max) * height
   const line = points.map((p, i) => `${i ? 'L' : 'M'}${x(p[0]).toFixed(1)},${y(p[1]).toFixed(1)}`).join('')
-  return (
+  // Volatility overlay: its own scale (right), read in the scrub label and the legend.
+  const oTicks = overlay && overlay.length > 1 ? niceTicks(Math.max(0.2, ...overlay.map((p) => p[1])), 3) : undefined
+  const oMax = oTicks ? oTicks[oTicks.length - 1] : 1
+  const oLine = overlay && overlay.length > 1 ? overlay.map((p, i) => `${i ? 'L' : 'M'}${x(p[0]).toFixed(1)},${(height - (p[1] / oMax) * height).toFixed(1)}`).join('') : ''
+  const near = (arr: number[][], t: number) => arr.reduce((a, b) => (Math.abs(b[0] - t) < Math.abs(a[0] - t) ? b : a))
+  return (<>
     <Frame ticks={ticks} fmt={(v) => `${v} mg`} height={height} xt={timeTicks(t0, t1, axes ? 5 : 4)}
-      readout={(p) => { const t = t0 + p * (t1 - t0); const pt = points.reduce((a, b) => (Math.abs(b[0] - t) < Math.abs(a[0] - t) ? b : a)); return `${time(pt[0])} · ≈ ${pt[1].toFixed(1)} mg` }}>
+      readout={(p) => { const t = t0 + p * (t1 - t0); const pt = near(points, t); return `${time(pt[0])} · ≈ ${pt[1].toFixed(1)} mg${oLine ? ` · volatility ≈ ${near(overlay!, t)[1].toFixed(1)} mg` : ''}` }}>
     <svg viewBox={`0 0 ${W} ${height}`} width="100%" height={height} preserveAspectRatio="none">
       <Grid ticks={ticks} y={y} />
       {shade.map(([a, b]) => b > a && <rect x={x(Math.max(a, t0))} y={0} width={Math.max(0, x(Math.min(b, t1)) - x(Math.max(a, t0)))} height={height} fill="var(--line)" opacity={0.35} />)}
       {typical.length > 1 && <path d={typical.map((p, i) => `${i ? 'L' : 'M'}${x(p[0])},${y(p[1])}`).join('')} fill="none" stroke="var(--muted)" stroke-dasharray="6 5" opacity={0.6} />}
       <path d={`${line}L${W},${height}L0,${height}Z`} fill="var(--primary)" opacity={0.25} />
       <path d={line} fill="none" stroke="var(--primary)" stroke-width={2.5} />
+      {oLine && <path d={oLine} fill="none" stroke="var(--tertiary)" stroke-width={1.5} />}
       {now && now >= t0 && now <= t1 && <line x1={x(now)} x2={x(now)} y1={0} y2={height} stroke="var(--muted)" />}
     </svg>
     </Frame>
-  )
+    {oLine && <div class="small muted" style={{ textAlign: 'right' }}><span style={{ color: 'var(--tertiary)' }}>━</span> Volatility (mg), right scale 0–{oMax}</div>}
+  </>)
 }
 
 export function Bars({ values, line, highs, faded, height = 140, fmt, x }: { values: number[]; line?: number[]; highs?: (number | null)[]; faded?: boolean[]; height?: number; fmt?: (v: number) => string; x?: string[] }) {

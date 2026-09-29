@@ -138,7 +138,7 @@ fun FirewatchRoot(vm: FirewatchViewModel) {
                 route == "backfill" -> com.baastiklabs.firewatch.ui.onboarding.BackfillScreen(
                     vm, data, onDone = { route = "home" }, onCancel = { route = "home" },
                 )
-                route == "insights" -> com.baastiklabs.firewatch.ui.insights.InsightsScreen(data, now) {
+                route == "insights" -> com.baastiklabs.firewatch.ui.insights.InsightsScreen(data, now, onSettings = { f -> scope.launch { vm.repository.updateSettings(f) } }) {
                     com.baastiklabs.firewatch.health.WatchOverlayCard(vm, data)
                 }
                 route == "calendar" -> CalendarScreen(data, now, onOpenDay = { route = "day/$it" })

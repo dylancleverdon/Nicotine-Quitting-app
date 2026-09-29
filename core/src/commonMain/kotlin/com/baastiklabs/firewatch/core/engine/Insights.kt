@@ -55,6 +55,11 @@ data class DayStat(
     /** 48 half-hour cells: true = nicotine in the system. */
     val barcode: List<Boolean>,
     val kindPieces: Map<ProductKind, Double>,
+    /** Average one-hour swing (mg) across the waking day: nicotine volatility. */
+    val volatility: Double = 0.0,
+    /** Longest gap between two timed doses (minutes), and the dose that started it. */
+    val longestGapMin: Double? = null,
+    val longestGapStart: Dose? = null,
 )
 
 data class Badge(val title: String, val detail: String, val earnedOn: LocalDate)
@@ -85,6 +90,9 @@ class Insights(private val data: FirewatchData, private val tz: TimeZone, privat
 
     fun lastDays(n: Int): List<DayStat> = fullDays.takeLast(n)
 
+    /** One waking day on its own (cheaper than [days] when only one is needed). */
+    fun dayStat(date: LocalDate): DayStat = day(date)
+
     private fun day(date: LocalDate): DayStat {
         val w = Waking.day(data, date, tz)
         val nextWake = Waking.day(data, date.plus(1, DateTimeUnit.DAY), tz).wakeAt
@@ -109,8 +117,15 @@ class Insights(private val data: FirewatchData, private val tz: TimeZone, privat
         }
         val sorted = doses.sortedBy { it.at }
         val timedToday = sorted.filter { !it.estimated }
-        val doubleUps = timedToday.zipWithNext().count { (a, b) -> b.at - a.at < Kinetics.peakMinutes(a.speed) * MIN }
+        val doubleUps = timedToday.zipWithNext().count { (a, b) -> b.at - a.at < Kinetics.peakMinutes(a) * MIN }
         val prices = data.productsById
+        val volatility = run {
+            val end = minOf(w.sleepAt, now)
+            if (end <= w.wakeAt) 0.0
+            else Kinetics.swing(Kinetics.curve(data.doses.filter { it.at in (w.wakeAt - 13 * 60 * MIN)..end }, w.wakeAt - 60 * MIN, end, 5))
+                .filter { it.first >= w.wakeAt }.map { it.second }.average()
+        }
+        val gap = timedToday.zipWithNext().maxByOrNull { (a, b) -> b.at - a.at }
         return DayStat(
             date = date,
             wakeAt = w.wakeAt,
@@ -136,6 +151,9 @@ class Insights(private val data: FirewatchData, private val tz: TimeZone, privat
             costSpent = doses.sumOf { (prices[it.productId]?.unitPrice ?: 0.0) * it.multiplier },
             barcode = barcode,
             kindPieces = doses.groupBy { it.kind }.mapValues { (_, v) -> v.sumOf { data.piecesOf(it) } },
+            volatility = volatility,
+            longestGapMin = gap?.let { (a, b) -> (b.at - a.at) / 60_000.0 },
+            longestGapStart = gap?.first,
         )
     }
 
@@ -153,6 +171,17 @@ class Insights(private val data: FirewatchData, private val tz: TimeZone, privat
         val w = Waking.day(data, date, tz)
         return Kinetics.curve(data.doses, w.wakeAt - 2 * 60 * MIN, w.sleepAt + 60 * MIN, stepMin)
     }
+
+    /** Nicotine volatility along a day's wave: the one-hour swing at each point (mg). */
+    fun volatilityCurve(date: LocalDate, stepMin: Int = 5): List<Pair<Long, Double>> {
+        val curve = dayCurve(date, stepMin)
+        if (curve.isEmpty()) return curve
+        val lead = Kinetics.curve(data.doses, curve.first().first - 60 * MIN, curve.first().first - stepMin * MIN, stepMin)
+        return Kinetics.swing(lead + curve).drop(lead.size)
+    }
+
+    /** Daily volatility: each full day's average one-hour swing (mg). */
+    fun dailyVolatility(): List<Pair<LocalDate, Double>> = fullDays.map { it.date to it.volatility }
 
     fun todayCurve(stepMin: Int = 5): List<Pair<Long, Double>> {
         val w = Waking.day(data, today, tz)
@@ -319,6 +348,17 @@ class Insights(private val data: FirewatchData, private val tz: TimeZone, privat
         if (sxx <= 0) return null
         val slope = pts.sumOf { (it.first - mx) * (it.second - my) } / sxx
         return (1 - exp(slope * 7)) * 100
+    }
+
+    /** Taper speed in plain words: a win when lighter, neutral otherwise (no spin). */
+    fun taperSpeedText(): String? {
+        val p = taperPercentPerWeek() ?: return null
+        val r = kotlin.math.round(kotlin.math.abs(p)).toInt()
+        return when {
+            r < 1 -> "About level (last 4 weeks)"
+            p > 0 -> "About $r% lighter each week (last 4 weeks)"
+            else -> "About $r% more each week (last 4 weeks)"
+        }
     }
 
     /** When D reaches each tier (and Clear Air) at the current pace. */

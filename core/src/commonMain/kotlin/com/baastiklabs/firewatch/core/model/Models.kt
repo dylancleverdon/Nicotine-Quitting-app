@@ -23,6 +23,12 @@ enum class SpeedProfile {
 
     /** Slow and flat (patches). */
     FLAT,
+
+    /**
+     * Chew and park (gum): released in small bursts over the chewing time and absorbed slowly
+     * through the cheek, so it peaks later and lower than a pouch. Older versions read it as BUILD.
+     */
+    CHEW,
 }
 
 @Serializable
@@ -153,6 +159,14 @@ data class Settings(
     val showSteadyDays: Boolean = true,
     /** Hide the "+38m pull" / "+1h stretch" line on each product button (separate from hideTimer). */
     val hideDosePreview: Boolean = false,
+    /** Opt-in Coaching tips (Yesterday in review tips, "Bridge with gum"). Off = just measures. */
+    val coachingTips: Boolean = false,
+    /** Tip id → when it was dismissed (hidden for 2 weeks). */
+    val tipDismissedAt: Map<String, Long> = emptyMap(),
+    /** The one-time "This is your net" card has been seen. */
+    val netExplained: Boolean = false,
+    /** Volatility line over the blood-level wave (Insights → Today). */
+    val showVolatility: Boolean = false,
     /** The highest steady-days milestone already celebrated (7, 30, 60, 90, 180, 365). */
     val steadyMilestoneSeen: Int = 0,
     /** Opt-in: range choices and a date stepper on multi-day charts. */
@@ -229,8 +243,8 @@ object DefaultProducts {
     fun all(): List<Product> = listOf(
         Product(ZYN_3MG, "Zyn 3 mg", ProductKind.POUCH, 3.0, defaultAbsorption(ProductKind.POUCH), SpeedProfile.BUILD, onHome = true, order = 0),
         Product(ZYN_6MG, "Zyn 6 mg", ProductKind.POUCH, 6.0, defaultAbsorption(ProductKind.POUCH), SpeedProfile.BUILD, onHome = true, order = 1),
-        Product(GUM_2MG, "Nicotine gum 2 mg", ProductKind.GUM, 2.0, defaultAbsorption(ProductKind.GUM), SpeedProfile.BUILD, onHome = true, order = 2),
-        Product(GUM_4MG, "Nicotine gum 4 mg", ProductKind.GUM, 4.0, defaultAbsorption(ProductKind.GUM), SpeedProfile.BUILD, onHome = true, order = 3),
+        Product(GUM_2MG, "Nicotine gum 2 mg", ProductKind.GUM, 2.0, defaultAbsorption(ProductKind.GUM), SpeedProfile.CHEW, onHome = true, order = 2),
+        Product(GUM_4MG, "Nicotine gum 4 mg", ProductKind.GUM, 4.0, defaultAbsorption(ProductKind.GUM), SpeedProfile.CHEW, onHome = true, order = 3),
         cigarette(),
     )
 
@@ -256,6 +270,7 @@ object DefaultProducts {
     fun defaultSpeed(kind: ProductKind): SpeedProfile = when (kind) {
         ProductKind.VAPE, ProductKind.CIGARETTE -> SpeedProfile.SPIKE
         ProductKind.PATCH -> SpeedProfile.FLAT
+        ProductKind.GUM -> SpeedProfile.CHEW
         else -> SpeedProfile.BUILD
     }
 

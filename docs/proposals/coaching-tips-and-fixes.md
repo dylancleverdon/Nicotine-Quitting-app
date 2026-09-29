@@ -1,6 +1,6 @@
 # Proposed update: fixes, nicotine volatility, Yesterday in review and opt-in Coaching tips
 
-Status: **proposed, not built.** Dated 29 Sep 2026. Written against Android 0.10.2. Covers the suggestions received
+Status: **built in Android 0.11.0 / web 0.9.0** (volatility line off by default; Bridge with gum kept, opt-in). Dated 29 Sep 2026. Written against Android 0.10.2. Covers the suggestions received
 28–29 Sep and the decisions made on them (see `docs/suggestions.md`).
 
 ## Summary

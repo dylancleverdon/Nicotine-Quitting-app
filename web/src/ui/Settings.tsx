@@ -6,7 +6,7 @@ import { deleteUnsent, sendNow, unsent } from '../feedback'
 
 const KINDS = ['GUM', 'POUCH', 'LOZENGE', 'PATCH', 'VAPE', 'CIGARETTE', 'OTHER']
 const DEFAULT_ABS: Record<string, number> = { GUM: 0.5, POUCH: 0.4, LOZENGE: 0.6, PATCH: 0.8, VAPE: 0.5, CIGARETTE: 0.1, OTHER: 0.5 }
-const SPEED: Record<string, string> = { VAPE: 'SPIKE', CIGARETTE: 'SPIKE', PATCH: 'FLAT' }
+const SPEED: Record<string, string> = { VAPE: 'SPIKE', CIGARETTE: 'SPIKE', PATCH: 'FLAT', GUM: 'CHEW' }
 const toMin = (v: string) => { const [h, m] = v.split(':').map(Number); return h * 60 + m }
 const toTime = (m: number) => `${String(Math.floor(m / 60) % 24).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`
 
@@ -65,6 +65,8 @@ export function Settings({ toast, go, updateInfo }: { toast: (m: string) => void
       <div class="row wrap">{[['system', 'Device setting'], ['12h', '12-hour (AM/PM)'], ['24h', '24-hour']].map(([v, l]) =>
         <button class={`chip ${(s.timeFormat ?? 'system') === v ? 'on' : ''}`} onClick={() => S.updateSettings({ timeFormat: v })}>{l}</button>)}</div>
       <label class="row small"><input type="checkbox" style={{ width: 'auto' }} checked={s.showSteadyDays ?? true} onChange={() => S.updateSettings({ showSteadyDays: !(s.showSteadyDays ?? true) })} /> Show steady days on the home card</label>
+      <label class="row small"><input type="checkbox" style={{ width: 'auto' }} checked={!!s.coachingTips} onChange={() => S.updateSettings({ coachingTips: !s.coachingTips })} /> Coaching tips</label>
+      <div class="small muted">Practical tips based on your own logs. Off means Firewatch just measures.</div>
       <label class="row small"><input type="checkbox" style={{ width: 'auto' }} checked={!!s.hideDosePreview} onChange={() => S.updateSettings({ hideDosePreview: !s.hideDosePreview })} /> Hide stretch and pull on doses</label>
       <label class="row small"><input type="checkbox" style={{ width: 'auto' }} checked={!!s.detailedCharts} onChange={() => S.updateSettings({ detailedCharts: !s.detailedCharts })} /> Detailed charts: range choices and earlier/later on Insights charts</label>
       <label class="row small"><input type="checkbox" style={{ width: 'auto' }} checked={!!s.hideTimer} onChange={() => S.updateSettings({ hideTimer: !s.hideTimer })} /> Hide next piece timer: the time shows only when you tap, so Firewatch can learn how often you check</label>

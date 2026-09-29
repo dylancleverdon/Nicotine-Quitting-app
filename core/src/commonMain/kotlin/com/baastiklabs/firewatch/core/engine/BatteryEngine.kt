@@ -207,6 +207,19 @@ object BatteryEngine {
         return Battery(charge, state, readyAt, sim.stretch, interval, sim.pull, closeToBed)
     }
 
+    /**
+     * Morning stretch: the battery is full at wake-up, so every minute before the first piece is
+     * stretch. Minutes since waking until the first piece; null once a piece is logged, after
+     * bedtime or on a Relapse prevention mode day.
+     */
+    fun morningStretch(data: FirewatchData, now: Long, tz: TimeZone): Double? {
+        val (day, nextWake) = currentDay(data, now, tz)
+        if (now >= day.sleepAt || now < day.wakeAt) return null
+        if (Relapse.isModeDay(data, day.date, tz)) return null
+        if (dayDoses(data, day, nextWake).any { it.at <= now }) return null
+        return (now - day.wakeAt) / MIN.toDouble()
+    }
+
     /** When the first piece is allowed, from the morning-delay goal (clock time or minutes after waking). */
     fun morningGoal(data: FirewatchData, day: WakingDay, tz: TimeZone): Long? {
         val s = data.settings

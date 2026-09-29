@@ -171,7 +171,7 @@ private fun ProductDialog(
         mutableStateOf(((initial?.absorption ?: DefaultProducts.defaultAbsorption(kind)) * 100).roundToInt().toString())
     }
     var absorptionEdited by remember { mutableStateOf(initial != null) }
-    var speed by remember { mutableStateOf(initial?.speed ?: DefaultProducts.defaultSpeed(kind)) }
+    var speed by remember { mutableStateOf(initial?.speed?.let { if (kind == ProductKind.GUM && it == SpeedProfile.BUILD) SpeedProfile.CHEW else it } ?: DefaultProducts.defaultSpeed(kind)) }
     var priceText by remember { mutableStateOf(initial?.unitPrice?.takeIf { it > 0 }?.toString() ?: "") }
     var packText by remember { mutableStateOf(initial?.unitsPerPack?.takeIf { it > 0 }?.toString() ?: "") }
 
@@ -223,6 +223,7 @@ private fun ProductDialog(
                     listOf(
                         SpeedProfile.SPIKE to "Spike in minutes",
                         SpeedProfile.BUILD to "Builds over ~30 min",
+                        SpeedProfile.CHEW to "Chew and park",
                         SpeedProfile.FLAT to "Slow and flat",
                     ).forEach { (s, label) ->
                         FilterChip(selected = speed == s, onClick = { speed = s }, label = { Text(label) })

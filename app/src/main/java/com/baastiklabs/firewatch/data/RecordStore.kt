@@ -11,7 +11,13 @@ import com.baastiklabs.firewatch.core.records.RecordEnvelope
  * forever). That is what lets any version, including a rollback, open data written by any
  * other version. New features add record types or JSON fields, never columns.
  */
-class RecordStore(context: Context) : SQLiteOpenHelper(context, DB_NAME, null, 1) {
+/** What [Repository] needs from storage (lets tests use a fake in place of SQLite). */
+interface RecordSource {
+    fun all(): List<RecordEnvelope>
+    fun putAll(records: Collection<RecordEnvelope>)
+}
+
+class RecordStore(context: Context) : SQLiteOpenHelper(context, DB_NAME, null, 1), RecordSource {
 
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL(
@@ -32,7 +38,7 @@ class RecordStore(context: Context) : SQLiteOpenHelper(context, DB_NAME, null, 1
     // Never throw or drop data on a downgrade.
     override fun onDowngrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) = Unit
 
-    fun all(): List<RecordEnvelope> {
+    override fun all(): List<RecordEnvelope> {
         val result = ArrayList<RecordEnvelope>()
         readableDatabase.query("records", COLUMNS, null, null, null, null, null).use { c ->
             while (c.moveToNext()) {
@@ -49,7 +55,7 @@ class RecordStore(context: Context) : SQLiteOpenHelper(context, DB_NAME, null, 1
         return result
     }
 
-    fun putAll(records: Collection<RecordEnvelope>) {
+    override fun putAll(records: Collection<RecordEnvelope>) {
         if (records.isEmpty()) return
         val db = writableDatabase
         db.beginTransaction()

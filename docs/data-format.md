@@ -19,6 +19,8 @@ That schema is frozen at version 1.
 
 Dose field `estimated: true` marks back-dated rough entries (no real time): counted in totals and the tier, left out of timing stats.
 
+Speed profile `CHEW` (chew and park, gum) was added in 0.11.0; older versions read it as the default `BUILD`. Gum doses stored as `BUILD` are drawn as `CHEW`. Settings fields added in 0.11.0: `coachingTips` (false), `tipDismissedAt` (tip id → ms), `netExplained` (false), `showVolatility` (false).
+
 Settings fields `morningDelayClock` (minutes after midnight, -1 = off) and `timeFormat` (system/12h/24h) were added in 0.4.0.
 
 ## Compatibility rules (so updates and rollbacks never lose data)

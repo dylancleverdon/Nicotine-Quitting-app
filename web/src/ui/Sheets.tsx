@@ -10,7 +10,7 @@ export function Sheet({ onClose, children }: { onClose: () => void; children: an
   )
 }
 
-const OFFSETS: [number, string][] = [[0, 'Now'], [5, '5 min ago'], [10, '10 min ago'], [20, '20 min ago'], [30, '30 min ago'], [60, '1 hour ago']]
+const OFFSETS: [number, string][] = [[0, 'Now'], [5, '5 min ago'], [10, '10 min ago'], [20, '20 min ago'], [30, '30 min ago'], [60, '1 hour ago'], [120, '2 hours ago'], [180, '3 hours ago']]
 const AMOUNTS: [number, string][] = [[0.5, '½'], [1, '1'], [1.5, '1½'], [2, '2']]
 const ORAL = ['GUM', 'POUCH', 'LOZENGE']
 

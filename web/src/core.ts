@@ -16,17 +16,18 @@ export interface HelpPage { title: string; body: string }
 export interface HelpArticle { id: string; section: string; title: string; body: string }
 export interface DoseView { id: string; at: number; name: string; pieces: number; mg: number; estimated: boolean; tags: string[]; kind: string }
 export interface CravingView { id: string; at: number; intensity: number; name: string; outcome: string; result: string; endedAt: number | null; tags: string[] }
+export interface Review { date: string; pieces: number; netMin: number | null; volatility: number; mix: NamedValue[]; longestGapMin: number | null; stacked: number; morningStretchMin: number | null; tips: string[] }
 export interface DayView {
   date: string; pieces: number; mg: number; doses: number; cravings: number; rodeOut: number; level: number
   clearHours: number; quality: number | null; estimated: boolean; hasRange: boolean; low: number; high: number
   awakeHours: number; mouthMin: number; wakeToFirstMin: number | null; spikeMg: number; labelMg: number
-  borrowedPieces: number; barcode: boolean[]; doubleUps: number
+  borrowedPieces: number; barcode: boolean[]; doubleUps: number; volatility: number
 }
 export interface NamedValue { label: string; value: number; extra: string }
 export interface Recap { key: string; title: string; pieces: number; drop: number | null; longestGapMin: number; trigger: string | null; rungs: string[]; cravings: number }
 export interface InsightsData {
   avoidedPieces: number; avoidedMg: number; money: number; winRate: number | null; cravingMinutes: number | null
-  heaviness: number | null; taperPct: number | null; journey: number | null; arrivals: NamedValue[]
+  heaviness: number | null; taperPct: number | null; taperText: string | null; journey: number | null; arrivals: NamedValue[]
   longestGapMin: number; lightestDay: string | null; lightestPieces: number | null; stretchMin: number; daysAtRung: number
   badges: NamedValue[]; cards: string[]; pouches: number; pouchMetres: number; chewHours: number; cigarettes: number
   clearAirLast: number | null; clearAirSteps: NamedValue[]; heatmap: number[][]; triggers: NamedValue[]; beaten: NamedValue[]
@@ -37,6 +38,7 @@ export interface Snapshot {
   today: string; baselineState: 'none' | 'progress' | 'complete'; baselineDay: number; baselineAverage: number | null
   revealed: boolean; measured: Rung | null; target: Rung | null; battery: Battery | null
   stepDown: Rung | null; stepDownNote: string | null; stepUp: Rung | null; stepUpWhy: string | null; stepUpSameDay: boolean; cravingEndings: NamedValue[]; checks: NamedValue[]; checksToday: number; early: boolean; earlyUpdate: number | null; heldDays: number; held: string[][]; lighterThanStart: number | null; daysOffSmokeAndVape: number | null; welcomeBack: string[] | null; previews: Record<string, number>; steadyDays: number; wakingToday: string; steadyMilestone: number | null; practicing: boolean; practiceFollowUp: Rung | null; taperSteps: NamedValue[]; taperBasis: string | null; headsUps: string[]
+  morningStretch: number | null; tip: NamedValue | null; yesterday: Review | null; steadyExplainer: string; netExplainer: string
   qualityScore: number | null; qualityLabel: string | null; swapTip: string | null; activeCraving: CravingView | null
   todayPieces: number; todayMg: number; todayCravings: number; todayRodeOut: number; lastDoseAt: number | null
   todayDoses: DoseView[]; todayCravingList: CravingView[]; wave: number[][]; wakeAt: number; sleepAt: number; typical: number[]
@@ -56,7 +58,7 @@ export const Core = {
   newId: (): string => core.newId(Date.now()),
   compute: (records: string): Snapshot => JSON.parse(core.compute(records, Date.now(), lastActivity())),
   waitedForFull: (records: string, doseId: string): boolean => core.waitedForFull(records, doseId),
-  day: (records: string, iso: string): { doses: DoseView[]; cravings: CravingView[]; wave: number[][]; wakeAt: number; sleepAt: number } => JSON.parse(core.day(records, iso, Date.now())),
+  day: (records: string, iso: string): { doses: DoseView[]; cravings: CravingView[]; wave: number[][]; volatility: number[][]; wakeAt: number; sleepAt: number } => JSON.parse(core.day(records, iso, Date.now())),
   piecesOf: (product: any, records: string): number => core.absorbedPieces(JSON.stringify(product), records),
   doseFor: (product: any, at: number, opts: { multiplier?: number; duration?: string; acidic?: boolean; tags?: string[] } = {}): any =>
     JSON.parse(core.doseFor(JSON.stringify(product), core.newId(Date.now()), at, Date.now(), opts.multiplier ?? 1, opts.duration ?? 'FULL', opts.acidic ?? false, (opts.tags ?? []).join(','))),

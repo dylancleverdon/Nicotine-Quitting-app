@@ -723,4 +723,125 @@ class EngineTest {
         val env = com.baastiklabs.firewatch.core.records.RecordCodec.refChange(fromToday.refChanges.first(), null, 1L)
         assertEquals(1, FirewatchData.fromRecords(listOf(env)).refChanges.size)
     }
+
+    // ---- 0.11: chew and park, volatility, morning stretch, Yesterday in review, Coaching tips ----
+
+    private val pouch6 = DefaultProducts.all().first { it.id == DefaultProducts.ZYN_6MG }
+    private fun vapeDose(id: String, t: Long, mg: Double) =
+        com.baastiklabs.firewatch.core.model.Dose(id, "v", t, kind = ProductKind.VAPE, speed = SpeedProfile.SPIKE, labelMg = mg, absorption = 1.0)
+
+    @Test
+    fun `chew and park gum peaks later and lower than a pouch and absorbs the same total`() {
+        val gum = gum4.toDose("g", at(10, 9), 0)
+        assertEquals(SpeedProfile.CHEW, Kinetics.speedOf(gum))
+        // Old gum logs (BUILD) are drawn as chew and park too.
+        assertEquals(SpeedProfile.CHEW, Kinetics.speedOf(gum.copy(speed = SpeedProfile.BUILD)))
+        val mg = gum.absorbedMg()
+        val chewPeak = Kinetics.peakMinutes(gum)
+        val pouchPeak = Kinetics.peakMinutes(SpeedProfile.BUILD)
+        assertTrue(chewPeak in 45.0..65.0 && chewPeak > pouchPeak, "chew=$chewPeak pouch=$pouchPeak")
+        val chewTop = Kinetics.contribution(mg, SpeedProfile.CHEW, chewPeak, 30.0)
+        val pouchTop = Kinetics.contribution(mg, SpeedProfile.BUILD, pouchPeak)
+        assertTrue(chewTop < pouchTop, "chew=$chewTop pouch=$pouchTop")
+        // Same total: the area under both curves matches.
+        fun area(f: (Double) -> Double) = (0 until 48 * 60).sumOf { f(it.toDouble()) }
+        val a1 = area { Kinetics.contribution(mg, SpeedProfile.CHEW, it, 30.0) }
+        val a2 = area { Kinetics.contribution(mg, SpeedProfile.BUILD, it) }
+        assertTrue(kotlin.math.abs(a1 / a2 - 1) < 0.01, "$a1 vs $a2")
+        // Quick and half chews release sooner.
+        val quick = Kinetics.peakMinutes(gum.copy(duration = com.baastiklabs.firewatch.core.model.Duration.QUICK))
+        val half = Kinetics.peakMinutes(gum.copy(duration = com.baastiklabs.firewatch.core.model.Duration.HALF))
+        assertTrue(quick < half && half < chewPeak, "quick=$quick half=$half full=$chewPeak")
+    }
+
+    @Test
+    fun `the gum profile leaves pieces net and tiers unchanged`() {
+        val chew = listOf(gum4.toDose("a", at(10, 9), 0), gum4.toDose("b", at(10, 11), 0))
+        val build = chew.map { it.copy(speed = SpeedProfile.BUILD) }
+        val a = pullFor(*chew.toTypedArray()); val b = pullFor(*build.toTypedArray())
+        assertEquals(a.netMin, b.netMin, 1e-9)
+        val da = withTarget(chew); val db = withTarget(build)
+        assertEquals(chew.sumOf { da.piecesOf(it) }, build.sumOf { db.piecesOf(it) }, 1e-9)
+        assertEquals(Progress.pace(da, d10, tz).pieces, Progress.pace(db, d10, tz).pieces, 1e-9)
+    }
+
+    @Test
+    fun `volatility is near zero when clear and higher for a vape than gum`() {
+        val clear = withTarget(emptyList())
+        assertEquals(0.0, Insights(clear, tz, at(10, 20)).dayStat(d10).volatility, 1e-9)
+        val gum = gum4.toDose("g", at(10, 12), 0)
+        val vape = vapeDose("v", at(10, 12), gum.absorbedMg())
+        val vg = Insights(withTarget(listOf(gum)), tz, at(10, 22)).dayStat(d10).volatility
+        val vv = Insights(withTarget(listOf(vape)), tz, at(10, 22)).dayStat(d10).volatility
+        assertTrue(vv > vg && vg > 0, "vape=$vv gum=$vg")
+        // Daily figure = average one-hour swing over the waking day.
+        val data = withTarget(listOf(vape))
+        val ins = Insights(data, tz, at(11, 12))
+        val w = com.baastiklabs.firewatch.core.engine.Waking.day(data, d10, tz)
+        val curve = Kinetics.curve(data.doses, w.wakeAt - 3_600_000L, w.sleepAt, 5)
+        val avg = Kinetics.swing(curve).filter { it.first >= w.wakeAt }.map { it.second }.average()
+        assertEquals(avg, ins.dayStat(d10).volatility, 1e-9)
+        // The running curve for the stepper covers the same day.
+        assertTrue(ins.volatilityCurve(d10).maxOf { it.second } > 0)
+    }
+
+    @Test
+    fun `morning stretch runs from wake-up to the first piece`() {
+        val data = withTarget(emptyList())
+        assertEquals(120.0, BE.morningStretch(data, at(10, 9), tz)!!, 0.01)
+        val withDose = withTarget(listOf(gum4.toDose("a", at(10, 8, 30), 0)))
+        assertNull(BE.morningStretch(withDose, at(10, 9), tz))
+        assertNull(BE.morningStretch(data, at(10, 23, 30), tz))
+    }
+
+    private fun pouchWeek(settings: com.baastiklabs.firewatch.core.model.Settings, extra: List<com.baastiklabs.firewatch.core.model.Dose> = emptyList()) =
+        withTarget((3..9).flatMap { d -> (0 until 4).map { i -> pouch6.toDose("p$d-$i", at(d, 8) + i * 240 * 60_000L, 0) } } + extra, 5.0, settings)
+
+    @Test
+    fun `bridge with gum only shows when its rules are met`() {
+        val on = com.baastiklabs.firewatch.core.model.Settings(coachingTips = true)
+        val C = com.baastiklabs.firewatch.core.engine.Coaching
+        // Mostly pouches, gum 2 mg on the home screen, battery full at 9:00 on the 10th.
+        val tip = C.bridgeTip(pouchWeek(on), 5.0, at(10, 9), tz)
+        assertNotNull(tip)
+        assertTrue(tip.text.contains("gum 2 mg"), tip.text)
+        // Off by default.
+        assertNull(C.bridgeTip(pouchWeek(com.baastiklabs.firewatch.core.model.Settings()), 5.0, at(10, 9), tz))
+        // Battery under half full: a pouch just taken.
+        assertNull(C.bridgeTip(pouchWeek(on, listOf(pouch6.toDose("x", at(10, 8, 50), 0))), 5.0, at(10, 9), tz))
+        // Not during a craving.
+        val craving = pouchWeek(on).let { it.copy(cravings = listOf(Craving("c", at(10, 8, 50), 6))) }
+        assertNull(C.bridgeTip(craving, 5.0, at(10, 9), tz))
+        // Dismissed for 2 weeks.
+        val dismissed = pouchWeek(on.copy(tipDismissedAt = mapOf(C.BRIDGE to at(9, 9))))
+        assertNull(C.bridgeTip(dismissed, 5.0, at(10, 9), tz))
+        val expired = pouchWeek(on.copy(tipDismissedAt = mapOf(C.BRIDGE to at(10, 9) - 15 * 24 * 3_600_000L)))
+        assertNotNull(C.bridgeTip(expired, 5.0, at(10, 9), tz))
+        // Mostly gum: no tip.
+        val gumWeek = withTarget((3..9).flatMap { d -> (0 until 4).map { i -> gum4.toDose("g$d-$i", at(d, 8) + i * 240 * 60_000L, 0) } }, 5.0, on)
+        assertNull(C.bridgeTip(gumWeek, 5.0, at(10, 9), tz))
+    }
+
+    @Test
+    fun `yesterday in review shows facts and tips only with coaching on`() {
+        val C = com.baastiklabs.firewatch.core.engine.Coaching
+        val doses = listOf(gum4.toDose("a", at(9, 9), 0), pouch6.toDose("b", at(9, 14), 0), pouch6.toDose("c", at(9, 14, 20), 0), pouch6.toDose("d", at(9, 16, 30), 0), pouch6.toDose("e", at(9, 16, 50), 0))
+        val off = C.yesterday(withTarget(doses, 5.0), at(10, 12), tz)!!
+        assertEquals(kotlinx.datetime.LocalDate(2026, 9, 9), off.date)
+        assertTrue(off.tips.isEmpty())
+        assertEquals(300.0, off.longestGapMin!!, 0.01)
+        assertEquals(120.0, off.morningStretchMin!!, 0.01)
+        assertTrue(off.stacked >= 2 && off.volatility > 0)
+        assertEquals(ProductKind.POUCH, off.mix.first().first)
+        val on = C.yesterday(withTarget(doses, 5.0, com.baastiklabs.firewatch.core.model.Settings(coachingTips = true)), at(10, 12), tz)!!
+        assertTrue(on.tips.isNotEmpty() && on.tips.size <= 2, "${on.tips}")
+        assertTrue(on.tips.contains("Your longest gap started with gum."), "${on.tips}")
+    }
+
+    @Test
+    fun `taper speed reads plainly`() {
+        val data = withTarget((1..28).flatMap { d -> (0 until (4 + d / 7)).map { i -> gum4.toDose("t$d-$i", at(d, 8) + i * 60 * 60_000L, 0) } })
+        val text = Insights(data, tz, at(29, 12)).taperSpeedText()!!
+        assertTrue(text.startsWith("About") && text.contains("more each week"), text)
+    }
 }

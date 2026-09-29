@@ -19,6 +19,7 @@ import com.baastiklabs.firewatch.core.records.RecordCodec
 import com.baastiklabs.firewatch.core.records.RecordEnvelope
 import com.baastiklabs.firewatch.core.records.RecordTypes
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -31,7 +32,7 @@ import kotlinx.coroutines.withContext
  * writes through to [RecordStore]. Deletes are tombstones, so nothing is ever hard-deleted.
  */
 class Repository(
-    private val store: RecordStore,
+    private val store: RecordSource,
     private val clock: () -> Long = System::currentTimeMillis,
 ) {
     private val mutex = Mutex()
@@ -183,7 +184,7 @@ class Repository(
     // --- Import ---
 
     /** Writes already-merged records (see core Backups.mergeIncoming). */
-    suspend fun putRecords(incoming: List<RecordEnvelope>) {
+    suspend fun putRecords(incoming: List<RecordEnvelope>) = withContext(NonCancellable) {
         ensureLoaded()
         mutex.withLock {
             writeLocked(incoming)
@@ -212,7 +213,9 @@ class Repository(
         }
     }
 
-    private suspend fun mutate(build: (now: Long) -> List<RecordEnvelope>) {
+    // NonCancellable: a sheet that closes as it saves cancels its caller; the write and the
+    // screen refresh must still finish (edited doses used to appear only later).
+    private suspend fun mutate(build: (now: Long) -> List<RecordEnvelope>) = withContext(NonCancellable) {
         ensureLoaded()
         mutex.withLock {
             writeLocked(build(clock()))

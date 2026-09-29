@@ -69,7 +69,11 @@ external object JsJodaTimeZoneModule
     val date: String, val pieces: Double, val mg: Double, val doses: Int, val cravings: Int, val rodeOut: Int, val level: Int,
     val clearHours: Double, val quality: Double?, val estimated: Boolean, val hasRange: Boolean, val low: Double, val high: Double,
     val awakeHours: Double, val mouthMin: Double, val wakeToFirstMin: Double?, val spikeMg: Double, val labelMg: Double,
-    val borrowedPieces: Double, val barcode: List<Boolean>, val doubleUps: Int,
+    val borrowedPieces: Double, val barcode: List<Boolean>, val doubleUps: Int, val volatility: Double = 0.0,
+)
+@Serializable data class ReviewDto(
+    val date: String, val pieces: Double, val netMin: Double?, val volatility: Double, val mix: List<NamedValue>,
+    val longestGapMin: Double?, val stacked: Int, val morningStretchMin: Double?, val tips: List<String>,
 )
 @Serializable data class NamedValue(val label: String, val value: Double, val extra: String = "")
 @Serializable data class Snapshot(
@@ -142,10 +146,17 @@ external object JsJodaTimeZoneModule
     val relapse: RelapseDto,
     /** Estimated nicotine in the body right now, mg (the home graph's value at "now"). */
     val nowMg: Double,
+    /** Minutes of morning stretch so far (no piece yet today), or null. */
+    val morningStretch: Double?,
+    /** Coaching tip for the Log tab (id, text), or null. */
+    val tip: NamedValue?,
+    val yesterday: ReviewDto?,
+    val steadyExplainer: String,
+    val netExplainer: String,
 )
 @Serializable data class InsightsDto(
     val avoidedPieces: Double, val avoidedMg: Double, val money: Double, val winRate: Double?, val cravingMinutes: Double?,
-    val heaviness: Double?, val taperPct: Double?, val journey: Double?, val arrivals: List<NamedValue>,
+    val heaviness: Double?, val taperPct: Double?, val taperText: String?, val journey: Double?, val arrivals: List<NamedValue>,
     val longestGapMin: Double, val lightestDay: String?, val lightestPieces: Double?, val stretchMin: Double, val daysAtRung: Int,
     val badges: List<NamedValue>, val cards: List<String>, val pouches: Double, val pouchMetres: Double, val chewHours: Double, val cigarettes: Double,
     val clearAirLast: Double?, val clearAirSteps: List<NamedValue>, val heatmap: List<List<Double>>, val triggers: List<NamedValue>,
@@ -258,7 +269,7 @@ object FirewatchCore {
         val insights = InsightsDto(
             avoidedPieces = ins.piecesAvoided(), avoidedMg = ins.mgAvoided(), money = ins.moneySaved(),
             winRate = ins.cravingWinRate(), cravingMinutes = ins.averageCravingMinutes(), heaviness = ins.heaviness(),
-            taperPct = ins.taperPercentPerWeek(), journey = ins.journey(),
+            taperPct = ins.taperPercentPerWeek(), taperText = ins.taperSpeedText(), journey = ins.journey(),
             arrivals = ins.arrivals().map { NamedValue(it.rung.tier.title, 0.0, it.date?.toString() ?: "") },
             longestGapMin = rec.longestGapMin, lightestDay = rec.lightestDay?.date?.toString(), lightestPieces = rec.lightestDay?.pieces,
             stretchMin = rec.totalStretchMin, daysAtRung = rec.daysAtCurrentRung,
@@ -306,6 +317,14 @@ object FirewatchCore {
                 com.baastiklabs.firewatch.core.engine.BatteryEngine.preview(d, p, if (target.pieces > 0) target.pieces else 1.0 / 3.0, now, tz, lastActivityMs.toLong())?.let { p.id to it }
             }.toMap() else emptyMap(),
             steadyDays = steady,
+            morningStretch = com.baastiklabs.firewatch.core.engine.BatteryEngine.morningStretch(d, now, tz)?.takeIf { target != null },
+            tip = com.baastiklabs.firewatch.core.engine.Coaching.bridgeTip(d, target?.pieces?.let { if (it > 0) it else 1.0 / 3.0 }, now, tz, lastActivityMs.toLong())?.let { NamedValue(it.id, 0.0, it.text) },
+            yesterday = com.baastiklabs.firewatch.core.engine.Coaching.yesterday(d, now, tz)?.let { r ->
+                ReviewDto(r.date.toString(), r.pieces, r.netMin, r.volatility, r.mix.map { NamedValue(com.baastiklabs.firewatch.core.engine.Coaching.kindName(it.first), it.second) },
+                    r.longestGapMin, r.stacked, r.morningStretchMin, r.tips)
+            },
+            steadyExplainer = com.baastiklabs.firewatch.core.Help.STEADY_EXPLAINER,
+            netExplainer = com.baastiklabs.firewatch.core.Help.NET_EXPLAINER,
             wakingToday = wakingToday.toString(),
             steadyMilestone = ctl.newSteadyMilestone(d, steady),
             practicing = ctl.practicingToday(d, now, tz),
@@ -340,7 +359,7 @@ object FirewatchCore {
                 DayView(
                     s.date.toString(), s.pieces, s.absorbedMg, s.doses.size, s.cravings, s.rodeOut, CalendarScale.level(s.pieces),
                     s.clearHours, s.quality, s.doses.any { it.estimated }, s.hasRange, s.lowPieces, s.highPieces, s.awakeHours,
-                    s.mouthMinutes, s.wakeToFirstMin, s.spikeMg, s.labelMg, s.borrowedPieces, s.barcode, s.doubleUps,
+                    s.mouthMinutes, s.wakeToFirstMin, s.spikeMg, s.labelMg, s.borrowedPieces, s.barcode, s.doubleUps, s.volatility,
                 )
             },
             sevenDayAverage = ins.days.indices.map { ins.sevenDayAverage(it) },
@@ -376,9 +395,11 @@ object FirewatchCore {
                 Cravings.effectiveOutcome(d, it, nowMs.toLong()).name, Cravings.result(d, it, nowMs.toLong(), tz).title, it.endedAt?.toDouble(), it.tags)
         }
         val w = Waking.day(d, date, tz)
-        val wave = Insights(d, tz, nowMs.toLong()).dayCurve(date, 10).map { listOf(it.first.toDouble(), it.second) }
-        @Serializable data class DayDetail(val doses: List<DoseView>, val cravings: List<CravingView>, val wave: List<List<Double>>, val wakeAt: Double, val sleepAt: Double)
-        return FirewatchJson.encodeToString(DayDetail.serializer(), DayDetail(doses, cravings, wave, w.wakeAt.toDouble(), w.sleepAt.toDouble()))
+        val dayIns = Insights(d, tz, nowMs.toLong())
+        val wave = dayIns.dayCurve(date, 10).map { listOf(it.first.toDouble(), it.second) }
+        val vol = dayIns.volatilityCurve(date, 10).map { listOf(it.first.toDouble(), it.second) }
+        @Serializable data class DayDetail(val doses: List<DoseView>, val cravings: List<CravingView>, val wave: List<List<Double>>, val volatility: List<List<Double>>, val wakeAt: Double, val sleepAt: Double)
+        return FirewatchJson.encodeToString(DayDetail.serializer(), DayDetail(doses, cravings, wave, vol, w.wakeAt.toDouble(), w.sleepAt.toDouble()))
     }
 
     /** The cheer: was this dose taken with a full battery (and not the day's first)? */

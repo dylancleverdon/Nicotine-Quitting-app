@@ -67,7 +67,12 @@ import kotlin.math.roundToInt
 private val sections = listOf("Today", "Cravings ahead", "Receptors", "Stretch & pull", "Trends", "Patterns", "Going up", "Going down", "Mix", "Forecasts", "Milestones", "Ladder")
 
 @Composable
-fun InsightsScreen(data: FirewatchData, now: Long, watch: @Composable () -> Unit) {
+fun InsightsScreen(
+    data: FirewatchData,
+    now: Long,
+    onSettings: (transform: (com.baastiklabs.firewatch.core.model.Settings) -> com.baastiklabs.firewatch.core.model.Settings) -> Unit,
+    watch: @Composable () -> Unit,
+) {
     val tz = TimeZone.currentSystemDefault()
     val minute = now / 60_000 / 5
     val ins = remember(data, minute) { Insights(data, tz, now) }
@@ -111,7 +116,7 @@ fun InsightsScreen(data: FirewatchData, now: Long, watch: @Composable () -> Unit
         androidx.compose.runtime.CompositionLocalProvider(LocalWindow provides (if (detailed) range to endOff else 42 to 0)) {
         LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             when (section) {
-                "Today" -> item { TodaySection(ins, data, now) }
+                "Today" -> item { TodaySection(ins, data, now, onSettings) }
                 "Cravings ahead" -> item { CravingsAheadSection(data, now, tz) }
                 "Receptors" -> item { ReceptorSection(data, now, tz) }
                 "Stretch & pull" -> item { StretchSection(ins) }
@@ -166,7 +171,13 @@ private fun dates(ds: List<com.baastiklabs.firewatch.core.engine.DayStat>) = ds.
 private fun kdates(ds: List<kotlinx.datetime.LocalDate>) = ds.map { Fmt.dayMonth(it) }
 
 @Composable
-private fun TodaySection(ins: Insights, data: FirewatchData, now: Long) = Col {
+private fun TodaySection(
+    ins: Insights,
+    data: FirewatchData,
+    now: Long,
+    onSettings: (transform: (com.baastiklabs.firewatch.core.model.Settings) -> com.baastiklabs.firewatch.core.model.Settings) -> Unit,
+) = Col {
+    YesterdayCard(data, now)
     // Day charts: choose which day to view (no overlay, no comparison).
     var back by rememberSaveable { mutableStateOf(0) }
     val today = ins.days.last().date
@@ -197,7 +208,27 @@ private fun TodaySection(ins: Insights, data: FirewatchData, now: Long) = Col {
             typical = typical,
             shaded = listOf(curve.first().first to w.wakeAt, w.sleepAt to curve.last().first),
             now = if (back == 0) now else null,
+            overlay = if (data.settings.showVolatility) remember(ins, date) { ins.volatilityCurve(date) } else emptyList(),
         )
+        Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+            androidx.compose.material3.Checkbox(
+                checked = data.settings.showVolatility,
+                onCheckedChange = { v -> onSettings { it.copy(showVolatility = v) } },
+            )
+            Text("Show volatility", style = MaterialTheme.typography.bodySmall)
+        }
+    }
+    val vol = ins.fullDays.win()
+    if (vol.isNotEmpty()) {
+        ChartCard("Nicotine volatility", "Each day's average one-hour swing, with a 7-day average line. Lower means steadier nicotine through the day.") {
+            val vs = vol.map { it.volatility }
+            BarChart(
+                vs.map { Bar(it) },
+                line = vs.indices.map { i -> vs.subList(maxOf(0, i - 6), i + 1).average() },
+                yFmt = { "${fmtNum(it)} mg" },
+                xLabels = dates(vol),
+            )
+        }
     }
     ChartCard("Dose strip", "That day's doses across 24 hours, sized by amount and coloured by type.") {
         DoseStrip(w.doses.map { d ->
@@ -211,6 +242,28 @@ private fun TodaySection(ins: Insights, data: FirewatchData, now: Long) = Col {
             Stat(fmt1(w.clearHours) + " h", "clear hours")
             Stat("${w.doses.size}", if (w.doses.size == 1) "dose" else "doses")
         }
+    }
+}
+
+/** Yesterday's waking day in facts only; up to two tips with Coaching tips on. */
+@Composable
+private fun YesterdayCard(data: FirewatchData, now: Long) {
+    val tz = TimeZone.currentSystemDefault()
+    val r = remember(data, now / 600_000) { com.baastiklabs.firewatch.core.engine.Coaching.yesterday(data, now, tz) } ?: return
+    ChartCard("Yesterday in review", "Facts only · every figure is an estimate") {
+        Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+            Stat("≈ ${Fmt.pieces(r.pieces)}", "pieces")
+            r.netMin?.let { Stat(Fmt.signedMinutes(it), "net") }
+            Stat("≈ ${fmt1(r.volatility)} mg", "volatility")
+        }
+        val lines = listOfNotNull(
+            r.mix.takeIf { it.isNotEmpty() }?.joinToString(", ", prefix = "Mix: ") { "${(it.second * 100).roundToInt()}% ${com.baastiklabs.firewatch.core.engine.Coaching.kindName(it.first)}" },
+            r.longestGapMin?.let { "Longest gap between pieces: ${Fmt.duration((it * 60_000).toLong())}" },
+            "Doses stacked while the last one was still peaking: ${r.stacked}",
+            r.morningStretchMin?.let { "Morning stretch: ${Fmt.duration((it * 60_000).toLong())}" },
+        )
+        lines.forEach { Text(it, style = MaterialTheme.typography.bodySmall) }
+        r.tips.forEach { Text("💡 $it", style = MaterialTheme.typography.bodyMedium) }
     }
 }
 
@@ -600,7 +653,7 @@ private fun ForecastSection(ins: Insights, data: FirewatchData, now: Long) = Col
         }
     }
     ChartCard("Taper speed", "Average drop per week over the last 4 weeks.") {
-        Text(ins.taperPercentPerWeek()?.let { if (it >= 0) "${fmt1(it)}% lighter each week" else "${fmt1(-it)}% heavier each week lately; that's OK, it happens" } ?: "Needs a week or two more data.",
+        Text(ins.taperSpeedText() ?: "Needs a week or two more data.",
             style = MaterialTheme.typography.titleMedium)
     }
     ChartCard("Arrival dates", "At your current pace, when you'd reach each tier. They get closer as you go.") {

@@ -55,6 +55,9 @@ object Fmt {
 
     fun minutesOfDay(minutes: Int): String = time(LocalTime.of((minutes / 60) % 24, minutes % 60))
 
+    /** "+1h 25m" / "−45m" from minutes. */
+    fun signedMinutes(min: Double): String = (if (min >= 0) "+" else "−") + duration((kotlin.math.abs(min) * 60_000).toLong())
+
     fun duration(ms: Long): String {
         val totalMinutes = (ms / 60_000).coerceAtLeast(0)
         val days = totalMinutes / (60 * 24)

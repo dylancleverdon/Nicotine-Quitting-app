@@ -9,6 +9,7 @@ import { TAGS, cravingColor, duration, isoToday, mg, pieces, piecesLabel, signed
 export function Home({ toast, go, backfill }: { toast: (msg: string, undo?: () => void) => void; go: (r: string) => void; backfill?: (days: string[]) => void }) {
   const snap = S.snapshot.value!
   const settings = S.settings.value
+  const [steadyInfo, setSteadyInfo] = useState(false)
   const [options, setOptions] = useState<any>(null)
   const [craving, setCraving] = useState(false)
   const [vape, setVape] = useState<any>(false)
@@ -84,6 +85,12 @@ export function Home({ toast, go, backfill }: { toast: (msg: string, undo?: () =
             {battery.closeToBed && <div class="small muted">Close to bedtime: nicotine can make it harder to fall asleep.</div>}
             {!rp.on && <div class="small stretch" style={{ color: battery.stretchMin - battery.pullMin >= 0 ? 'var(--tertiary)' : 'var(--muted)' }}>
               Stretch {duration(battery.stretchMin * 60000)} · Pull {duration(battery.pullMin * 60000)} · Net {signedDuration(battery.stretchMin - battery.pullMin)}</div>}
+            {!rp.on && snap.morningStretch != null && snap.morningStretch >= 1 && <div class="small muted">Morning stretch: {duration(snap.morningStretch * 60000)}</div>}
+            {!rp.on && !settings.netExplained && <div class="card accent small">
+              <div>{snap.netExplainer}</div>
+              <div class="row"><button class="btn text" onClick={() => S.updateSettings({ netExplained: true })}>Got it</button><button class="btn text" onClick={() => go('help')}>Learn more</button></div>
+            </div>}
+            {snap.tip && <div class="small tip">💡 {snap.tip.extra} <button class="btn text" onClick={() => S.updateSettings({ tipDismissedAt: { ...(settings.tipDismissedAt ?? {}), [snap.tip!.label]: Date.now() } })}>Hide for 2 weeks</button></div>}
           </div>}
         </> : <>
           <div class="label">{snap.baselineState === 'progress' ? `Baseline week · day ${snap.baselineDay} of 7` : 'Baseline week'}</div>
@@ -102,7 +109,7 @@ export function Home({ toast, go, backfill }: { toast: (msg: string, undo?: () =
           {snap.qualityLabel && <div class="stat small"><b>{snap.qualityLabel.split(' · ')[0].split(' ')[0]} {Math.round(snap.qualityScore!)}</b><span>quality</span></div>}
         </div>
         {(((settings.showSteadyDays ?? true) && snap.steadyDays > 0) || snap.heldDays > 0 || snap.lighterThanStart != null || (snap.daysOffSmokeAndVape ?? 0) > 0 || snap.insights.journey != null) && <div class="wins small">
-          {(settings.showSteadyDays ?? true) && snap.steadyDays > 0 && <div>✓ {snap.steadyDays} steady {snap.steadyDays === 1 ? 'day' : 'days'}</div>}
+          {(settings.showSteadyDays ?? true) && snap.steadyDays > 0 && <div class="tappable" onClick={() => setSteadyInfo(!steadyInfo)}>✓ {snap.steadyDays} steady {snap.steadyDays === 1 ? 'day' : 'days'} <span class="muted">ⓘ</span>{steadyInfo && <div class="muted">{snap.steadyExplainer}</div>}</div>}
           {snap.heldDays > 0 && snap.target && <div>✓ Held {snap.target.label} for {snap.heldDays} {snap.heldDays === 1 ? 'day' : 'days'}</div>}
           {snap.lighterThanStart != null && <div>✓ About {Math.round(snap.lighterThanStart * 100)}% lighter than when you started</div>}
           {(snap.daysOffSmokeAndVape ?? 0) > 0 && <div>✓ {snap.daysOffSmokeAndVape} days off cigarettes and vapes</div>}
