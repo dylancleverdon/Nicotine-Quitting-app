@@ -59,6 +59,7 @@ import com.baastiklabs.firewatch.ui.charts.StackedBars
 import com.baastiklabs.firewatch.ui.charts.TrendLine
 import com.baastiklabs.firewatch.ui.charts.WaveChart
 import com.baastiklabs.firewatch.ui.charts.kindColor
+import com.baastiklabs.firewatch.ui.charts.fmtNum
 import com.baastiklabs.firewatch.ui.toLocalDateTime
 import kotlinx.datetime.TimeZone
 import java.util.Locale

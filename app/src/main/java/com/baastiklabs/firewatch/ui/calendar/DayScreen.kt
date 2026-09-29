@@ -166,7 +166,7 @@ fun DayScreen(
     }
 
     editingDose?.let { dose ->
-        EditDoseSheet(vm, dose, data.referenceMg, snackbar, onDone = { editingDose = null })
+        EditDoseSheet(vm, dose, data.referenceMg, snackbar, scope, onDone = { editingDose = null })
     }
 
     if (pickingProduct) {
