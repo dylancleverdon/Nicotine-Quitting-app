@@ -16,10 +16,21 @@ Statuses: **Undecided** · **Planned** (in a proposal, not built) · **Done** (r
 |---|---|---|---|---|
 | 2026-09-27 | Idea | "hey testing" | Declined | Test entry. |
 | 2026-09-27 | Idea | Report symptoms you think are nicotine related (headaches, restless legs, mood) to inform receptor healing or other insights | Declined | Would make an estimate look more precise than it is. |
-| 2026-09-28 | Idea | Scrub along graphs to see the value at any point | Planned | `proposals/steady-days-and-dose-preview.md` §6 |
-| 2026-09-28 | Idea | Choose which dates a graph shows, e.g. yesterday's wave against the dotted line | Planned | §7: "Show yesterday" on day charts; full date control only in opt-in "Detailed charts". |
-| 2026-09-28 | Idea | Taper speed and arrival dates should show a default from the step-down settings right away, then adjust to real data | Planned | §8 |
-| 2026-09-28 | Idea | Show how a dose affects net (e.g. a Zyn needs 38m of extra stretch); careful not to encourage stronger products | Planned | §2: neutral "Would add ≈ 38m pull / ≈ 1h 36m stretch" under each product. |
+| 2026-09-28 | Idea | Scrub along graphs to see the value at any point | Done | 0.10.0 |
+| 2026-09-28 | Idea | Choose which dates a graph shows, e.g. yesterday's wave against the dotted line | Done | 0.10.0: step back to earlier days; ranges in opt-in "Detailed charts". |
+| 2026-09-28 | Idea | Taper speed and arrival dates should show a default from the step-down settings right away, then adjust to real data | Done | 0.10.0 |
+| 2026-09-28 | Idea | Show how a dose affects net (e.g. a Zyn needs 38m of extra stretch); careful not to encourage stronger products | Done | 0.10.0; 0.10.2 adds a switch to hide it. |
+| 2026-09-28 | Idea | Highlight and explain stretch, pull and net for new users; spacing and net are the two core tools | Planned | `proposals/coaching-tips-and-fixes.md` §3 |
+| 2026-09-28 | Idea | Why are Zyns more addictive than gum? | Planned | §10 (Help article) |
+| 2026-09-28 | Idea | Stretch for delaying the first piece in the morning; balance pieces taken after bedtime | Planned | §5: morning already counts, now shown; late pieces stop getting free refills. |
+| 2026-09-29 | Idea | What counts as steady? | Planned | §4 |
+| 2026-09-29 | Idea | Yesterday in review in Insights, with delivery and timing analysis and tips | Planned | §7: facts for everyone; tips only with Coaching tips on. |
+| 2026-09-29 | Idea | Suggest a gum before the timer when mostly using pouches, and explain why | Planned | §8 (Coaching tips) |
+| 2026-09-29 | Idea | More guidance on dropping pouches without being preachy | Planned | §9 (Coaching tips) |
+| 2026-09-29 | Idea | How do pouches and faster absorption affect receptors and healing? | Planned | §11 (Help); receptor model unchanged. |
+| 2026-09-29 | Idea | A mode that gives quitting guidance, so nobody gets unwanted guidance | Planned | §6: Coaching tips, off by default. |
+| 2026-09-29 | Bug | Taper speed said "that's OK, it happens": a positive spin on a miss | Planned | §2, plus a test that bans spin phrases. |
+| 2026-09-29 | Bug | Time changes don't save when entering a gum from a few hours ago | Planned | §1: the edit sheet cancels its own save; plus 2h/3h quick chips. |
 
 ## From design reviews
 
@@ -45,7 +56,7 @@ Ideas raised while reviewing the app, not sent through the form.
 | 2026-09-28 | Absorption check-in per product | Declined | Estimates stay fixed per product. |
 | 2026-09-28 | Steady days total with milestones | Done | 0.10.0 |
 | 2026-09-28 | Trigger plans | Declined | |
-| 2026-09-28 | Product swap suggestions in step-down offers | Declined | |
+| 2026-09-28 | Product swap suggestions in step-down offers | Declined | Revisited as opt-in only: `proposals/coaching-tips-and-fixes.md` §9. |
 | 2026-09-28 | Practice day before a step down | Done | 0.10.0 |
 | 2026-09-28 | App lock (PIN / fingerprint) | Declined | |
 | 2026-09-28 | Battery as a plain timer; dose size in stretch and pull; dose preview (replaces "fits now") | Done | 0.10.0 |
