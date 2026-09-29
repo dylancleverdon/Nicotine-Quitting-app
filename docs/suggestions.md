@@ -21,15 +21,15 @@ Statuses: **Undecided** · **Planned** (in a proposal, not built) · **Done** (r
 | 2026-09-28 | Idea | Taper speed and arrival dates should show a default from the step-down settings right away, then adjust to real data | Done | 0.10.0 |
 | 2026-09-28 | Idea | Show how a dose affects net (e.g. a Zyn needs 38m of extra stretch); careful not to encourage stronger products | Done | 0.10.0; 0.10.2 adds a switch to hide it. |
 | 2026-09-28 | Idea | Highlight and explain stretch, pull and net for new users; spacing and net are the two core tools | Planned | `proposals/coaching-tips-and-fixes.md` §3 |
-| 2026-09-28 | Idea | Why are Zyns more addictive than gum? | Planned | §10 (Help article) |
-| 2026-09-28 | Idea | Stretch for delaying the first piece in the morning; balance pieces taken after bedtime | Planned | §5: morning already counts, now shown; late pieces stop getting free refills. |
+| 2026-09-28 | Idea | Why are Zyns more addictive than gum? | Planned | §11 (Help article) |
+| 2026-09-28 | Idea | Stretch for delaying the first piece in the morning; balance pieces taken after bedtime | Planned | §5: morning already counts, now shown. Late nights unchanged (tiers already count per waking hour). |
 | 2026-09-29 | Idea | What counts as steady? | Planned | §4 |
-| 2026-09-29 | Idea | Yesterday in review in Insights, with delivery and timing analysis and tips | Planned | §7: facts for everyone; tips only with Coaching tips on. |
-| 2026-09-29 | Idea | Suggest a gum before the timer when mostly using pouches, and explain why | Planned | §8 (Coaching tips) |
-| 2026-09-29 | Idea | More guidance on dropping pouches without being preachy | Planned | §9 (Coaching tips) |
-| 2026-09-29 | Idea | How do pouches and faster absorption affect receptors and healing? | Planned | §11 (Help); receptor model unchanged. |
-| 2026-09-29 | Idea | A mode that gives quitting guidance, so nobody gets unwanted guidance | Planned | §6: Coaching tips, off by default. |
-| 2026-09-29 | Bug | Taper speed said "that's OK, it happens": a positive spin on a miss | Planned | §2, plus a test that bans spin phrases. |
+| 2026-09-29 | Idea | Yesterday in review in Insights, with delivery and timing analysis and tips | Planned | §8: facts for everyone; tips only with Coaching tips on. |
+| 2026-09-29 | Idea | Suggest a gum before the timer when mostly using pouches, and explain why | Planned | §10 (Coaching tips) |
+| 2026-09-29 | Idea | More guidance on dropping pouches without being preachy | Declined | Dropped along with pouch → gum swaps. |
+| 2026-09-29 | Idea | How do pouches and faster absorption affect receptors and healing? | Planned | §12 (Help) and §7 ("How each product hits" chart); receptor model unchanged. |
+| 2026-09-29 | Idea | A mode that gives quitting guidance, so nobody gets unwanted guidance | Planned | §9: Coaching tips, off by default. |
+| 2026-09-29 | Bug | Taper speed said "that's OK, it happens": a positive spin on a miss | Planned | §2: plus one Settings line; a test bans spin phrases. |
 | 2026-09-29 | Bug | Time changes don't save when entering a gum from a few hours ago | Planned | §1: the edit sheet cancels its own save; plus 2h/3h quick chips. |
 
 ## From design reviews
@@ -56,9 +56,13 @@ Ideas raised while reviewing the app, not sent through the form.
 | 2026-09-28 | Absorption check-in per product | Declined | Estimates stay fixed per product. |
 | 2026-09-28 | Steady days total with milestones | Done | 0.10.0 |
 | 2026-09-28 | Trigger plans | Declined | |
-| 2026-09-28 | Product swap suggestions in step-down offers | Declined | Revisited as opt-in only: `proposals/coaching-tips-and-fixes.md` §9. |
+| 2026-09-28 | Product swap suggestions in step-down offers | Declined | Also declined as an opt-in tip (2026-09-29). |
 | 2026-09-28 | Practice day before a step down | Done | 0.10.0 |
 | 2026-09-28 | App lock (PIN / fingerprint) | Declined | |
 | 2026-09-28 | Battery as a plain timer; dose size in stretch and pull; dose preview (replaces "fits now") | Done | 0.10.0 |
 | 2026-09-28 | Scrub any chart; view earlier days on day charts (no overlay); opt-in Detailed charts | Done | 0.10.0 |
 | 2026-09-28 | Taper forecast from day one | Done | 0.10.0 |
+| 2026-09-29 | Gum delivered as chew-and-park (slower, stepped release) | Planned | `proposals/coaching-tips-and-fixes.md` §6 |
+| 2026-09-29 | "How each product hits" chart; wave coloured by delivery speed | Planned | §7 |
+| 2026-09-29 | Rethink stretch and pull (e.g. live net, net in pieces) | Declined | Kept as they are for now. |
+| 2026-09-29 | Late nights: stop refills after bedtime for stretch and pull | Declined | Tiers already count per waking hour. |
