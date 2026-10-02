@@ -18,6 +18,7 @@ import com.baastiklabs.firewatch.core.engine.Coach
 import com.baastiklabs.firewatch.core.engine.FriendVape
 import com.baastiklabs.firewatch.core.engine.Insights
 import com.baastiklabs.firewatch.core.engine.Ladder
+import kotlinx.datetime.plus
 import com.baastiklabs.firewatch.core.engine.Progress
 import com.baastiklabs.firewatch.core.engine.Quality
 import com.baastiklabs.firewatch.core.engine.Rung
@@ -70,7 +71,20 @@ external object JsJodaTimeZoneModule
     val clearHours: Double, val quality: Double?, val estimated: Boolean, val hasRange: Boolean, val low: Double, val high: Double,
     val awakeHours: Double, val mouthMin: Double, val wakeToFirstMin: Double?, val spikeMg: Double, val labelMg: Double,
     val borrowedPieces: Double, val barcode: List<Boolean>, val doubleUps: Int, val volatility: Double = 0.0,
+    /** Pieces by delivery method (product mix). */
+    val kinds: Map<String, Double> = emptyMap(),
 )
+@Serializable data class PracticeDto(
+    /** On right now: pieces, label, tier, untilBedtime; with practice net for the run and which day of it. */
+    val active: RungDto?, val untilBedtime: Boolean, val netMin: Double?, val day: Int,
+    /** Rungs that can be practiced now. */
+    val allowed: List<RungDto>,
+    val lighterOffer: RungDto?, val lighterTitle: String?, val lighterBody: String?,
+    val workFrom: RungDto?, val workFromHours: Int, val workFromNet: Double,
+    val lastSessionId: String?, val followUpId: String?,
+    val explainer: String, val stopNote: String, val relapseNote: String,
+)
+@Serializable data class StepProgressDto(val held: Int, val needed: Int, val next: RungDto, val offered: Boolean)
 @Serializable data class ReviewDto(
     val date: String, val pieces: Double, val netMin: Double?, val volatility: Double, val mix: List<NamedValue>,
     val longestGapMin: Double?, val stacked: Int, val morningStretchMin: Double?, val tips: List<String>,
@@ -153,6 +167,25 @@ external object JsJodaTimeZoneModule
     val yesterday: ReviewDto?,
     val steadyExplainer: String,
     val netExplainer: String,
+    val practice: PracticeDto,
+    /** ISO date → logged / clear / unknown / ghost, from the first day to today. */
+    val dayStates: Map<String, String>,
+    /** ISO date → up / down (level changes, ▲ ▼ on the calendar). */
+    val levelMarks: Map<String, String>,
+    /** Level history, newest first: [text, 0, kind]. */
+    val history: List<NamedValue>,
+    /** Last 30 full days: [ISO date, 0, state]. */
+    val recentStates: List<NamedValue>,
+    val known7: Int,
+    /** Days held at the current level in total (never resets). */
+    val heldTotal: Int,
+    val stepProgress: StepProgressDto?,
+    val doubleUpsWeekly: List<NamedValue>,
+    /** Average baseline day vs average day now (48 half-hours each), when there's enough data. */
+    val thenCurve: List<Double>,
+    val nowCurve: List<Double>,
+    val unknownNote: String,
+    val holdShortNote: String,
 )
 @Serializable data class InsightsDto(
     val avoidedPieces: Double, val avoidedMg: Double, val money: Double, val winRate: Double?, val cravingMinutes: Double?,
@@ -323,11 +356,49 @@ object FirewatchCore {
                 ReviewDto(r.date.toString(), r.pieces, r.netMin, r.volatility, r.mix.map { NamedValue(com.baastiklabs.firewatch.core.engine.Coaching.kindName(it.first), it.second) },
                     r.longestGapMin, r.stacked, r.morningStretchMin, r.tips)
             },
+            practice = run {
+                val P = com.baastiklabs.firewatch.core.engine.Practice
+                val st = P.status(d, now, tz)
+                val lo = if (revealed) P.lighterOffer(d, now, tz) else null
+                val wf = if (revealed) P.workFromOffer(d, now, tz) else null
+                PracticeDto(
+                    active = st?.rung?.dto(), untilBedtime = st?.session?.untilBedtime ?: d.settings.practiceUntilBedtime,
+                    netMin = st?.netMin, day = st?.day ?: 0,
+                    allowed = P.allowedRungs(d, now, tz).map { it.dto() },
+                    lighterOffer = lo?.dto(),
+                    lighterTitle = lo?.let { com.baastiklabs.firewatch.core.Help.lighterOfferTitle(it.label) },
+                    lighterBody = lo?.let { m -> target?.let { com.baastiklabs.firewatch.core.Help.lighterOfferBody(it.label, m.tier.title) } },
+                    workFrom = wf?.rung?.dto(), workFromHours = ((wf?.coveredMin ?: 0.0) / 60).toInt(), workFromNet = wf?.netMin ?: 0.0,
+                    lastSessionId = d.practices.lastOrNull()?.id, followUpId = P.followUp(d, now, tz)?.id,
+                    explainer = com.baastiklabs.firewatch.core.Help.PRACTICE_EXPLAINER,
+                    stopNote = com.baastiklabs.firewatch.core.Help.PRACTICE_STOP_NOTE,
+                    relapseNote = com.baastiklabs.firewatch.core.Help.PRACTICE_RELAPSE_NOTE,
+                )
+            },
+            dayStates = run {
+                val start = com.baastiklabs.firewatch.core.Days.startDate(d, tz)
+                if (start == null) emptyMap() else generateSequence(start) { it.plus(1, kotlinx.datetime.DateTimeUnit.DAY) }.takeWhile { it <= today }
+                    .associate { it.toString() to com.baastiklabs.firewatch.core.Days.state(d, it, tz, now).name.lowercase() }
+            },
+            levelMarks = com.baastiklabs.firewatch.core.engine.Practice.levelMarks(d, tz),
+            history = com.baastiklabs.firewatch.core.engine.Practice.history(d, now, tz) { "${it.dayOfMonth} ${it.month.name.take(3).lowercase().replaceFirstChar { c -> c.uppercase() }}" }
+                .map { NamedValue(it.text, 0.0, it.kind) },
+            recentStates = Progress.recentStates(d, now, tz, 30).map { NamedValue(it.first.toString(), 0.0, it.second.name.lowercase()) },
+            known7 = Progress.knownDays(d, today, tz),
+            heldTotal = target?.let { ctl.heldByRung(d, now, tz)[it.pieces]?.first } ?: 0,
+            stepProgress = if (ctl.isEarly(d)) null else Progress.stepDownProgress(d, now, tz)?.let {
+                StepProgressDto(it.held, it.needed, it.next.dto(), it.ready && Progress.stepDownOffer(d, now, tz) != null)
+            },
+            doubleUpsWeekly = ins.doubleUpsPerWeek().map { NamedValue(it.first.toString(), it.second.toDouble()) },
+            thenCurve = if (ins.baselineComplete && ins.fullDays.size > ins.baselineDays.size + 3) ins.typicalCurve(ins.baselineDays) else emptyList(),
+            nowCurve = if (ins.baselineComplete && ins.fullDays.size > ins.baselineDays.size + 3) ins.typicalCurve(ins.lastDays(7)) else emptyList(),
+            unknownNote = com.baastiklabs.firewatch.core.Help.UNKNOWN_DAYS_NOTE,
+            holdShortNote = com.baastiklabs.firewatch.core.Help.HOLD_SHORT_NOTE,
             steadyExplainer = com.baastiklabs.firewatch.core.Help.STEADY_EXPLAINER,
             netExplainer = com.baastiklabs.firewatch.core.Help.NET_EXPLAINER,
             wakingToday = wakingToday.toString(),
             steadyMilestone = ctl.newSteadyMilestone(d, steady),
-            practicing = ctl.practicingToday(d, now, tz),
+            practicing = com.baastiklabs.firewatch.core.engine.Practice.active(d, now, tz) != null,
             practiceFollowUp = ctl.practiceFollowUp(d, now, tz)?.dto(),
             taperSteps = plan?.steps?.map { NamedValue(it.rung.label, 0.0, it.date.toString()) } ?: emptyList(),
             taperBasis = plan?.basis,
@@ -342,7 +413,7 @@ object FirewatchCore {
             headsUps = Progress.headsUps(d, now, tz).map { it.message },
             qualityScore = Quality.of(todayDoses, ref),
             qualityLabel = Quality.of(todayDoses, ref)?.let { Quality.label(it) },
-            swapTip = Quality.swapTip(todayDoses, ref),
+            swapTip = com.baastiklabs.firewatch.core.engine.Coaching.swapTip(d, todayDoses),
             activeCraving = Cravings.active(d, now)?.let { craving(it) },
             todayPieces = todayDoses.sumOf { d.piecesOf(it) },
             todayMg = todayDoses.sumOf { it.absorbedMg() },
@@ -360,6 +431,7 @@ object FirewatchCore {
                     s.date.toString(), s.pieces, s.absorbedMg, s.doses.size, s.cravings, s.rodeOut, CalendarScale.level(s.pieces),
                     s.clearHours, s.quality, s.doses.any { it.estimated }, s.hasRange, s.lowPieces, s.highPieces, s.awakeHours,
                     s.mouthMinutes, s.wakeToFirstMin, s.spikeMg, s.labelMg, s.borrowedPieces, s.barcode, s.doubleUps, s.volatility,
+                    s.kindPieces.mapKeys { it.key.name },
                 )
             },
             sevenDayAverage = ins.days.indices.map { ins.sevenDayAverage(it) },
@@ -398,8 +470,22 @@ object FirewatchCore {
         val dayIns = Insights(d, tz, nowMs.toLong())
         val wave = dayIns.dayCurve(date, 10).map { listOf(it.first.toDouble(), it.second) }
         val vol = dayIns.volatilityCurve(date, 10).map { listOf(it.first.toDouble(), it.second) }
-        @Serializable data class DayDetail(val doses: List<DoseView>, val cravings: List<CravingView>, val wave: List<List<Double>>, val volatility: List<List<Double>>, val wakeAt: Double, val sleepAt: Double)
-        return FirewatchJson.encodeToString(DayDetail.serializer(), DayDetail(doses, cravings, wave, vol, w.wakeAt.toDouble(), w.sleepAt.toDouble()))
+        val next = Waking.day(d, date.plus(1, kotlinx.datetime.DateTimeUnit.DAY), tz).wakeAt
+        val sleeps = d.sleepEvents.filter { it.at in w.wakeAt - 6 * 3_600_000L until next }
+            .map { NamedValue(if (it.kind == com.baastiklabs.firewatch.core.model.SleepKind.WAKE) "Woke up" else "Went to sleep", it.at.toDouble(), it.id) }
+        val levels = d.rungChanges.withIndex().filter { (i, rc) -> i > 0 && com.baastiklabs.firewatch.core.Days.wakingDate(d, rc.at, tz) == date }.map { (i, rc) ->
+            val from = Ladder.rung(d.rungChanges[i - 1].pieces); val to = Ladder.rung(rc.pieces)
+            if (from.tier == to.tier) "${from.tier.title} ${Ladder.piecesText(from.pieces)} → ${Ladder.piecesText(to.pieces)}"
+            else "${from.tier.title} ${Ladder.piecesText(from.pieces)} → ${to.label}"
+        }
+        val state = com.baastiklabs.firewatch.core.Days.state(d, date, tz, nowMs.toLong()).name.lowercase()
+        @Serializable data class DayDetail(
+            val doses: List<DoseView>, val cravings: List<CravingView>, val wave: List<List<Double>>, val volatility: List<List<Double>>,
+            val wakeAt: Double, val sleepAt: Double, val sleeps: List<NamedValue>, val levels: List<String>, val state: String,
+            val pieces: Double, val mg: Double,
+        )
+        return FirewatchJson.encodeToString(DayDetail.serializer(), DayDetail(doses, cravings, wave, vol, w.wakeAt.toDouble(), w.sleepAt.toDouble(),
+            sleeps, levels, state, doses.sumOf { it.pieces }, doses.sumOf { it.mg }))
     }
 
     /** The cheer: was this dose taken with a full battery (and not the day's first)? */

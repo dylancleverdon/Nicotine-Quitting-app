@@ -71,9 +71,9 @@ test('back-dated start, logging and persistence', async ({ page }) => {
   await expect(page.getByText('Yesterday in review')).toBeVisible()
   await expect(page.getByText('Nicotine volatility')).toBeVisible()
   // The volatility line over the wave is off until turned on.
-  await expect(page.getByText('Volatility (mg), right scale')).toHaveCount(0)
+  await expect(page.getByText('Volatility (mg/h), right scale')).toHaveCount(0)
   await page.getByText('Show volatility').click()
-  await expect(page.getByText('Volatility (mg), right scale')).toBeVisible()
+  await expect(page.getByText('Volatility (mg/h), right scale')).toBeVisible()
   await page.screenshot({ path: 'test-results/today.png', fullPage: true })
   // Day charts: step back to yesterday (no overlay).
   await page.locator('.day-stepper button').first().click()
@@ -91,8 +91,30 @@ test('back-dated start, logging and persistence', async ({ page }) => {
   await page.screenshot({ path: 'test-results/receptors.png', fullPage: true })
   await page.getByRole('button', { name: 'Stretch & pull' }).click()
   await expect(page.getByText('Stretch & pull').last()).toBeVisible()
+  await page.getByRole('button', { name: 'Ladder', exact: true }).click()
+  await expect(page.getByText('Level history')).toBeVisible()
+  await expect(page.getByText(/Flicker 3 · started/)).toBeVisible()
   await page.getByRole('button', { name: 'Calendar' }).click()
   await expect(page.getByText('A dot marks your baseline week', { exact: false })).toBeVisible()
+  await expect(page.getByText('This month')).toBeVisible()
+
+  // Practice pace from Settings: never changes the level; "Back to my pace" ends it.
+  await page.getByRole('button', { name: 'Settings' }).click()
+  await expect(page.getByRole('heading', { name: 'Practice pace' })).toBeVisible()
+  // Off while Relapse prevention mode is on (turned on earlier in this test).
+  await expect(page.getByText(/Practice pace is off while Relapse prevention mode is on/)).toBeVisible()
+  await page.getByRole('checkbox', { name: /^Relapse prevention mode/ }).click()
+  await page.getByRole('button', { name: 'Start', exact: true }).click()
+  await page.getByRole('button', { name: 'Log' }).click()
+  await expect(page.getByText(/Practice pace · Embers/)).toBeVisible()
+  await expect(page.locator('.tier')).toHaveText('Flicker')
+  await page.getByRole('button', { name: 'What is practice pace?' }).click()
+  await expect(page.getByText(/Stop any time in Settings/)).toBeVisible()
+  await page.screenshot({ path: 'test-results/practice.png', fullPage: true })
+  await page.getByRole('button', { name: 'Settings' }).click()
+  await page.getByRole('button', { name: 'Back to my pace' }).click()
+  await page.getByRole('button', { name: 'Log' }).click()
+  await expect(page.getByText(/Practice pace · /)).toHaveCount(0)
 
   // Export produces a Firewatch backup file.
   await page.getByRole('button', { name: 'Settings' }).click()

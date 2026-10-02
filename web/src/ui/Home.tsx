@@ -3,13 +3,17 @@ import { Core } from '../core'
 import { savedName, sendFeedback } from '../feedback'
 import * as S from '../store'
 import { Meter, Wave } from './Charts'
-import { CheckInSheet, CravingSheet, DoseSheet, VapeSheet, doseLine } from './Sheets'
-import { TAGS, cravingColor, duration, isoToday, mg, pieces, piecesLabel, signedDuration, time } from './format'
+import { CheckInSheet, CravingSheet, DoseSheet, EditDoseSheet, PracticeDurationSheet, VapeSheet, doseLine } from './Sheets'
+import { TAGS, cravingColor, duration, isoToday, mg, minutesOfDay, pieces, piecesLabel, signedDuration, time } from './format'
 
 export function Home({ toast, go, backfill }: { toast: (msg: string, undo?: () => void) => void; go: (r: string) => void; backfill?: (days: string[]) => void }) {
   const snap = S.snapshot.value!
   const settings = S.settings.value
   const [steadyInfo, setSteadyInfo] = useState(false)
+  const [practiceAsk, setPracticeAsk] = useState<any>(null)
+  const [practiceHelp, setPracticeHelp] = useState(false)
+  const [dontAsk, setDontAsk] = useState(false)
+  const [editDose, setEditDose] = useState<string | null>(null)
   const [options, setOptions] = useState<any>(null)
   const [craving, setCraving] = useState(false)
   const [vape, setVape] = useState<any>(false)
@@ -48,12 +52,13 @@ export function Home({ toast, go, backfill }: { toast: (msg: string, undo?: () =
     if (press.current) clearTimeout(press.current)
     if (!longFired.current) tap(p)
   }
-  const moveTarget = async (pieces: number, reason: string) => {
-    await S.setTarget(pieces, reason)
+  const moveTarget = async (pieces: number, reason: string, detail = '') => {
+    await S.setTarget(pieces, reason, detail)
     const rung = snap.ladder.find((r) => Math.abs(r.pieces - pieces) < 1e-6)
     if (reason === 'down') setCelebrate(rung)
-    else toast(reason === 'up' ? `Stepped back to ${rung?.label}. That's normal.` : `Starting at ${rung?.label}.`)
+    else toast(reason === 'up' ? `Stepped up to ${rung?.label}. Your level is more accurate now.` : `Starting at ${rung?.label}.`)
   }
+  const pr = snap.practice
   const checkedIn = S.live('checkin').some((c) => new Date(c.at).toDateString() === new Date().toDateString())
   const battery = snap.battery
 
@@ -68,7 +73,11 @@ export function Home({ toast, go, backfill }: { toast: (msg: string, undo?: () =
           {(snap.target ?? snap.measured) && <>
             <p class="tier">{(snap.target ?? snap.measured)!.tier}</p>
             <div class="small">{(snap.target ?? snap.measured)!.plain}</div>
-            {snap.practicing && <div class="muted">Practice day: {snap.ladder.find((r) => Math.abs(r.pieces - (settings.practicePieces ?? 0)) < 1e-6)?.label ?? ''} pace</div>}
+            {pr.active && <div class="practice-row">
+              <div class="row"><b class="grow">Practice pace · {pr.active.tier} {pr.active.label.split(' · ')[1]?.replace(' a day', '')}</b><button class="btn outline small-btn" aria-label="What is practice pace?" onClick={() => setPracticeHelp(!practiceHelp)}>?</button></div>
+              {pr.netMin != null && <div class="small" style={{ color: pr.netMin >= 0 ? 'var(--tertiary)' : 'var(--muted)' }}>Practice net {signedDuration(pr.netMin)}{pr.day > 1 ? ` · day ${pr.day}` : ''}</div>}
+              {practiceHelp && <div class="muted" style={{ whiteSpace: 'pre-line' }}>{pr.explainer}</div>}
+            </div>}
             {snap.early && <div class="muted">Early estimate · firming up as you log your first week{snap.baselineState === 'progress' ? ` (day ${snap.baselineDay} of 7)` : ''}.</div>}
             {snap.target && snap.measured && snap.measured.pieces !== snap.target.pieces &&
               <div class="muted">Working at {snap.target.label}. Your last 7 days measure {snap.measured.label}.</div>}
@@ -108,9 +117,9 @@ export function Home({ toast, go, backfill }: { toast: (msg: string, undo?: () =
           <div class="stat small"><b>{snap.todayRodeOut}/{snap.todayCravings}</b><span>urges beaten</span></div>
           {snap.qualityLabel && <div class="stat small"><b>{snap.qualityLabel.split(' · ')[0].split(' ')[0]} {Math.round(snap.qualityScore!)}</b><span>quality</span></div>}
         </div>
-        {(((settings.showSteadyDays ?? true) && snap.steadyDays > 0) || snap.heldDays > 0 || snap.lighterThanStart != null || (snap.daysOffSmokeAndVape ?? 0) > 0 || snap.insights.journey != null) && <div class="wins small">
+        {(((settings.showSteadyDays ?? true) && snap.steadyDays > 0) || snap.heldTotal > 0 || snap.lighterThanStart != null || (snap.daysOffSmokeAndVape ?? 0) > 0 || snap.insights.journey != null) && <div class="wins small">
           {(settings.showSteadyDays ?? true) && snap.steadyDays > 0 && <div class="tappable" onClick={() => setSteadyInfo(!steadyInfo)}>✓ {snap.steadyDays} steady {snap.steadyDays === 1 ? 'day' : 'days'} <span class="muted">ⓘ</span>{steadyInfo && <div class="muted">{snap.steadyExplainer}</div>}</div>}
-          {snap.heldDays > 0 && snap.target && <div>✓ Held {snap.target.label} for {snap.heldDays} {snap.heldDays === 1 ? 'day' : 'days'}</div>}
+          {snap.heldTotal > 0 && snap.target && !snap.early && <div>✓ {snap.heldTotal} {snap.heldTotal === 1 ? 'day' : 'days'} held at {snap.target.tier} in total</div>}
           {snap.lighterThanStart != null && <div>✓ About {Math.round(snap.lighterThanStart * 100)}% lighter than when you started</div>}
           {(snap.daysOffSmokeAndVape ?? 0) > 0 && <div>✓ {snap.daysOffSmokeAndVape} days off cigarettes and vapes</div>}
           {snap.insights.journey != null && snap.insights.journey > 0 && <div>Journey to Clear Air: {Math.round(snap.insights.journey * 100)}%</div>}
@@ -127,8 +136,22 @@ export function Home({ toast, go, backfill }: { toast: (msg: string, undo?: () =
       {snap.practiceFollowUp && <div class="card accent">
         <h2>How was {snap.practiceFollowUp.label} pace?</h2>
         <div class="small">Step down to it, or stay where you are. Either is fine.</div>
-        <div class="row"><button class="btn" onClick={async () => { await S.updateSettings({ practiceDate: '', practicePieces: 0 }); moveTarget(snap.practiceFollowUp!.pieces, 'down') }}>Step down</button>
-          <button class="btn outline" onClick={() => S.updateSettings({ practiceDate: '', practicePieces: 0, stepDownSnoozedAt: Date.now() })}>Stay here</button></div>
+        <div class="row"><button class="btn" onClick={async () => { await S.updateSettings({ practiceAnswered: pr.followUpId ?? '' }); moveTarget(snap.practiceFollowUp!.pieces, 'down') }}>Step down</button>
+          <button class="btn outline" onClick={() => S.updateSettings({ practiceAnswered: pr.followUpId ?? '', stepDownSnoozedAt: Date.now() })}>Stay here</button></div>
+      </div>}
+      {pr.lighterOffer && snap.target && <div class="card accent">
+        <h2>{pr.lighterTitle}</h2>
+        <div class="small" style={{ whiteSpace: 'pre-line' }}>{pr.lighterBody}</div>
+        <div class="row wrap"><button class="btn" onClick={() => setPracticeAsk(pr.lighterOffer)}>Try {pr.lighterOffer.tier} pace</button>
+          <button class="btn outline" onClick={() => S.updateSettings({ lighterSnoozedAt: Date.now(), ...(dontAsk ? { lighterOffers: false } : {}) })}>Stay here</button></div>
+        <label class="row small"><input type="checkbox" style={{ width: 'auto' }} checked={dontAsk} onChange={() => setDontAsk(!dontAsk)} /> Don't ask me again</label>
+      </div>}
+      {pr.workFrom && snap.target && <div class="card accent">
+        <h2>{pr.workFrom.tier} pace held</h2>
+        <div class="small">You practiced {pr.workFrom.tier} pace for {pr.workFromHours} hours, practice net {signedDuration(pr.workFromNet)}. Work from {pr.workFrom.tier} from now on?</div>
+        <div class="row wrap"><button class="btn" onClick={async () => { await S.stopPractice(); await S.updateSettings({ practiceAnswered: pr.lastSessionId ?? '' }); await S.setTarget(pr.workFrom!.pieces, 'measured', 'from measured level'); toast(`Working from ${pr.workFrom!.label}.`) }}>Work from {pr.workFrom.tier}</button>
+          <button class="btn outline" onClick={() => S.updateSettings({ workFromSnoozedAt: Date.now() })}>Keep practicing</button>
+          <button class="btn outline" onClick={async () => { await S.stopPractice(); await S.updateSettings({ practiceAnswered: pr.lastSessionId ?? '', lighterSnoozedAt: Date.now() }) }}>Back to {snap.target.tier} pace</button></div>
       </div>}
       {snap.welcomeBack && <div class="card accent">
         <h2>Welcome back</h2>
@@ -145,13 +168,13 @@ export function Home({ toast, go, backfill }: { toast: (msg: string, undo?: () =
         <h2>Ready for {snap.stepDown.label}?</h2>
         <div class="small">You've held {snap.target.label} for {settings.holdDays} days. {snap.stepDownNote} Or stay here, that's fine too.</div>
         <div class="row wrap"><button class="btn" onClick={() => moveTarget(snap.stepDown!.pieces, 'down')}>Step down</button>
-          <button class="btn outline" onClick={() => { S.updateSettings({ practiceDate: snap.wakingToday, practicePieces: snap.stepDown!.pieces }); toast(`Practice day: ${snap.stepDown!.label} pace for today`) }}>Try it for a day</button>
+          <button class="btn outline" onClick={() => setPracticeAsk(snap.stepDown)}>Try it for a day</button>
           <button class="btn outline" onClick={() => S.updateSettings({ stepDownSnoozedAt: Date.now() })}>Stay here</button></div>
       </div>}
       {snap.stepUp && snap.target && <div class="card accent">
         <h2>This rung is tough right now</h2>
-        <div class="small">{snap.stepUpWhy} Stepping up to {snap.stepUp.label} for a while is normal, and it keeps you on gum instead of something worse.</div>
-        <div class="row"><button class="btn" onClick={() => moveTarget(snap.stepUp!.pieces, 'up')}>Step up</button>
+        <div class="small">{snap.stepUpWhy} Stepping up to {snap.stepUp.label} makes your level more accurate. Step-downs are offered when you're ready.</div>
+        <div class="row"><button class="btn" onClick={() => moveTarget(snap.stepUp!.pieces, 'up', (snap.stepUpWhy ?? '').replace(/\.$/, '').replace(/^./, (c) => c.toLowerCase()))}>Step up</button>
           <button class="btn outline" onClick={() => S.updateSettings({ stepUpSnoozedAt: Date.now() })}>I'm OK</button></div>
       </div>}
       {rp.recommend && <div class="card accent">
@@ -187,14 +210,27 @@ export function Home({ toast, go, backfill }: { toast: (msg: string, undo?: () =
         ))}
       </div>
       <div class="grid2">
-        <button class="btn outline" onClick={async () => { await S.logSleep('WAKE'); toast(`Good morning · ${time(Date.now())}`) }}>Good morning</button>
-        <button class="btn outline" onClick={async () => { await S.logSleep('SLEEP'); toast(`Good night · ${time(Date.now())}`) }}>Good night</button>
+        {([['WAKE', 'Good morning'], ['SLEEP', 'Good night']] as ['WAKE' | 'SLEEP', string][]).map(([kind, label]) => (
+          <button class="btn outline" onContextMenu={(e) => e.preventDefault()}
+            onPointerDown={() => { longFired.current = false; press.current = window.setTimeout(() => {
+              longFired.current = true
+              const v = prompt(`${label}: what time? (e.g. 7:30)`, '')
+              if (!v) return
+              const [hh, mm] = v.split(':').map(Number)
+              if (isNaN(hh)) return
+              const d = new Date(); d.setHours(hh, mm || 0, 0, 0); if (d.getTime() > Date.now()) d.setDate(d.getDate() - 1)
+              S.logSleep(kind, d.getTime()).then(() => toast(`${label} · ${time(d.getTime())}`))
+            }, 500) }}
+            onPointerUp={async () => { if (press.current) clearTimeout(press.current); if (!longFired.current) { await S.logSleep(kind); toast(`${label} · ${time(Date.now())}`) } }}
+            onPointerLeave={() => press.current && clearTimeout(press.current)}>{label}</button>
+        ))}
       </div>
+      <div class="muted">Usual day {minutesOfDay(settings.wakeMinutes)}–{minutesOfDay(settings.sleepMinutes)} · hold to set a time</div>
 
       <h2>Today</h2>
       {snap.todayDoses.length === 0 && <div class="muted">Nothing logged yet today.</div>}
       <div class="list">{snap.todayDoses.map((d) => (
-        <div class="item" onClick={() => { if (confirm(`Delete ${d.name} at ${time(d.at)}?`)) { S.remove(d.id); toast('Dose deleted', () => S.restore(d.id)) } }}>
+        <div class="item" onClick={() => setEditDose(d.id)}>
           <div>{d.name}<br /><span>{doseLine(d)}</span></div><b>{piecesLabel(d.pieces)}</b>
         </div>
       ))}</div>
@@ -238,6 +274,9 @@ export function Home({ toast, go, backfill }: { toast: (msg: string, undo?: () =
           : <div class="row"><button class="btn" onClick={async () => { setRelapseSheet(false); await S.setRelapse(true); toast('Relapse prevention mode turned on') }}>Turn on</button>
           <button class="btn outline" onClick={() => { setRelapseSheet(false); if (rp.recommend) S.updateSettings({ relapseCardDismissedAt: Date.now() }) }}>Not now</button></div>}
       </div></div>}
+      {practiceAsk && <PracticeDurationSheet rung={practiceAsk} initial={settings.practiceUntilBedtime ?? true} stopNote={pr.stopNote} onClose={() => setPracticeAsk(null)}
+        onStart={async (untilBedtime) => { const r = practiceAsk; setPracticeAsk(null); await S.startPractice(r.pieces, untilBedtime); toast(`Practice pace on: ${r.tier}. ${pr.stopNote}`) }} />}
+      {editDose && <EditDoseSheet id={editDose} onClose={() => setEditDose(null)} toast={toast} />}
       {checkIn && <CheckInSheet onClose={() => setCheckIn(false)} onSave={(c, m, s) => { setCheckIn(false); S.save('checkin', { id: Core.newId(), at: Date.now(), craving: c, mood: m, sleep: s }) }} />}
       {celebrate && <div class="sheet-bg" onClick={() => setCelebrate(null)}><div class="sheet" style={{ textAlign: 'center' }}>
         <div style={{ fontSize: 48 }}>🔥</div><h2>New rung: {celebrate.tier}</h2>

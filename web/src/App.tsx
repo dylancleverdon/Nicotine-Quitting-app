@@ -45,7 +45,7 @@ export function App() {
       {route === 'home' && <Home toast={show} go={setRoute} backfill={(d) => { setFillDays(d); setRoute('fill') }} />}
       {route === 'fill' && fillDays && <Backfill only={fillDays} title="Add what you had" onDone={() => { S.updateSettings({ welcomeBackDismissedAt: Date.now() }); setRoute('home') }} onCancel={() => setRoute('home')} />}
       {route === 'insights' && <Insights />}
-      {route === 'calendar' && <Calendar />}
+      {route === 'calendar' && <Calendar toast={show} />}
       {route === 'settings' && <Settings toast={show} go={setRoute} updateInfo={checked} />}
       {route === 'help' && <Help go={setRoute} />}
       {route === 'why' && <Why onBack={() => setRoute('help')} />}

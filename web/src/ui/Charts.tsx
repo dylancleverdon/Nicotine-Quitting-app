@@ -74,13 +74,13 @@ export function Wave({ points, typical = [], shade = [], now, height = 140, axes
   const y = (v: number) => height - (v / max) * height
   const line = points.map((p, i) => `${i ? 'L' : 'M'}${x(p[0]).toFixed(1)},${y(p[1]).toFixed(1)}`).join('')
   // Volatility overlay: its own scale (right), read in the scrub label and the legend.
-  const oTicks = overlay && overlay.length > 1 ? niceTicks(Math.max(0.2, ...overlay.map((p) => p[1])), 3) : undefined
+  const oTicks = overlay && overlay.length > 1 ? niceTicks(Math.max(1, ...overlay.map((p) => p[1])), 3) : undefined
   const oMax = oTicks ? oTicks[oTicks.length - 1] : 1
   const oLine = overlay && overlay.length > 1 ? overlay.map((p, i) => `${i ? 'L' : 'M'}${x(p[0]).toFixed(1)},${(height - (p[1] / oMax) * height).toFixed(1)}`).join('') : ''
   const near = (arr: number[][], t: number) => arr.reduce((a, b) => (Math.abs(b[0] - t) < Math.abs(a[0] - t) ? b : a))
   return (<>
     <Frame ticks={ticks} fmt={(v) => `${v} mg`} height={height} xt={timeTicks(t0, t1, axes ? 5 : 4)}
-      readout={(p) => { const t = t0 + p * (t1 - t0); const pt = near(points, t); return `${time(pt[0])} · ≈ ${pt[1].toFixed(1)} mg${oLine ? ` · volatility ≈ ${near(overlay!, t)[1].toFixed(1)} mg` : ''}` }}>
+      readout={(p) => { const t = t0 + p * (t1 - t0); const pt = near(points, t); return `${time(pt[0])} · ≈ ${pt[1].toFixed(1)} mg${oLine ? ` · volatility ≈ ${near(overlay!, t)[1].toFixed(1)} mg/h` : ''}` }}>
     <svg viewBox={`0 0 ${W} ${height}`} width="100%" height={height} preserveAspectRatio="none">
       <Grid ticks={ticks} y={y} />
       {shade.map(([a, b]) => b > a && <rect x={x(Math.max(a, t0))} y={0} width={Math.max(0, x(Math.min(b, t1)) - x(Math.max(a, t0)))} height={height} fill="var(--line)" opacity={0.35} />)}
@@ -91,7 +91,7 @@ export function Wave({ points, typical = [], shade = [], now, height = 140, axes
       {now && now >= t0 && now <= t1 && <line x1={x(now)} x2={x(now)} y1={0} y2={height} stroke="var(--muted)" />}
     </svg>
     </Frame>
-    {oLine && <div class="small muted" style={{ textAlign: 'right' }}><span style={{ color: 'var(--tertiary)' }}>━</span> Volatility (mg), right scale 0–{oMax}</div>}
+    {oLine && <div class="small muted" style={{ textAlign: 'right' }}><span style={{ color: 'var(--tertiary)' }}>━</span> Volatility (mg/h), right scale 0–{oMax}</div>}
   </>)
 }
 
@@ -228,5 +228,30 @@ export function ReceptorChart({ history, plan, stay, typical, height = 150, date
       <line x1={x(today)} x2={x(today)} y1={0} y2={height} stroke="var(--muted)" />
     </svg>
     </Frame>
+  )
+}
+
+export const KIND_COLORS: Record<string, string> = { GUM: '#8fc7b8', POUCH: '#ffb35c', LOZENGE: '#b8d98f', PATCH: '#9fb3e0', VAPE: '#e0443a', CIGARETTE: '#8a6a5a', OTHER: '#b0a49c' }
+
+/** A day's doses across 24 hours: one dot per dose, sized by pieces, coloured by type. */
+export function DoseStrip({ doses, dayStart }: { doses: { at: number; pieces: number; kind: string }[]; dayStart: number }) {
+  return (
+    <svg viewBox={`0 0 ${W} 40`} width="100%" height={40} preserveAspectRatio="none">
+      <line x1={0} x2={W} y1={20} y2={20} stroke="var(--line)" />
+      {[6, 12, 18].map((h) => <line x1={(h / 24) * W} x2={(h / 24) * W} y1={12} y2={28} stroke="var(--line)" />)}
+      {doses.map((d) => { const x = ((((d.at - dayStart) / 3600000) % 24 + 24) % 24) / 24 * W; return <circle cx={x} cy={20} r={4 + Math.min(10, d.pieces * 4)} fill={KIND_COLORS[d.kind] ?? 'var(--primary)'} opacity={0.85} /> })}
+    </svg>
+  )
+}
+
+/** Weekly stacked bars of pieces by delivery method. */
+export function StackedBars({ columns, height = 120 }: { columns: Record<string, number>[]; height?: number }) {
+  const totals = columns.map((c) => Object.values(c).reduce((a, b) => a + b, 0))
+  const max = Math.max(1, ...totals) * 1.1
+  const slot = W / Math.max(1, columns.length), w = slot * 0.7
+  return (
+    <svg viewBox={`0 0 ${W} ${height}`} width="100%" height={height} preserveAspectRatio="none">
+      {columns.map((c, i) => { let y = height; return Object.entries(c).map(([k, v]) => { const h = (v / max) * height; y -= h; return <rect x={i * slot + (slot - w) / 2} y={y} width={w} height={h} fill={KIND_COLORS[k] ?? 'var(--primary)'} /> }) })}
+    </svg>
   )
 }

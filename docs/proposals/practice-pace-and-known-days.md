@@ -1,6 +1,6 @@
 # Proposed update: known days, practice pace, honest volatility and level history
 
-Status: **building for Android 0.13.0 / web 0.10.0** (decisions of 2 Oct below; web caught up with Android in the same release). Dated 2 Oct 2026. Written against Android 0.12.0. Covers the
+Status: **built in Android 0.13.0 / web 0.10.0** (decisions of 2 Oct below; web caught up with Android in the same release). Dated 2 Oct 2026. Written against Android 0.12.0. Covers the
 suggestions received 29 Sep – 1 Oct and the open items from the 30 Sep review (see
 `docs/suggestions.md`).
 
@@ -121,7 +121,7 @@ that every screen's figures agree.
 - **Insights → Ladder → "Level history"**, newest first:
   > 1 Oct · Blaze 7 → 6 · stepped down
   > 28 Sep · Bonfire 5 → Blaze 7 · stepped up: a craving ended with a vape
-  > 27 Sep · Practised Campfire pace 2 pm – 9 pm: practice net +40m
+  > 27 Sep · Practiced Campfire pace 2 pm – 9 pm: practice net +40m
 - The reason for each step up, and each practice session, is stored from now on. Older entries show
   just the direction.
 - **Calendar:** ▼ or ▲ on days your level changed. The day view says "Level: Blaze 7 → 6".
@@ -139,12 +139,12 @@ that every screen's figures agree.
 - **Unavailable in Relapse prevention mode.** Trying to turn it on shows: "Practice pace is off
   while Relapse prevention mode is on, because its reminders follow your level's gap."
 
-**Which rungs you can practise**
+**Which rungs you can practice**
 - Down to your **measured level** (however many rungs below your working level that is, because
   your logs show you already live there), **or** one rung below your working level, whichever is
   lighter.
-- Never further. Someone at 7 measuring 4 can practise 6, 5 or 4. Someone at 4 measuring 4 can
-  practise 3.
+- Never further. Someone at 7 measuring 4 can practice 6, 5 or 4. Someone at 4 measuring 4 can
+  practice 3.
 
 **While it's on**
 - **Battery row:** labelled "Practice pace · Campfire 4" with a **?** button. Tapping it explains in
@@ -176,7 +176,7 @@ that every screen's figures agree.
 - "Stay here" hides it for a full hold period. It then has to meet the rules again.
 - Ticking "Don't ask me again" turns off **Settings → Your plan → Lighter-level practice offers**,
   which can be turned back on there.
-- It only ever offers to *practise*. It never changes your level by itself.
+- It only ever offers to *practice*. It never changes your level by itself.
 
 ## 8. "Work from your measured level"
 After a practice day **at your measured pace**, if practice pace was on for at least **75% of your

@@ -1,5 +1,6 @@
 import { useState } from 'preact/hooks'
 import { Core } from '../core'
+import * as S from '../store'
 import { TAGS, cravingColor, pieces, time } from './format'
 
 export function Sheet({ onClose, children }: { onClose: () => void; children: any }) {
@@ -121,3 +122,51 @@ export function CheckInSheet({ onClose, onSave }: { onClose: () => void; onSave:
 }
 
 export const doseLine = (d: any) => `${time(d.at)} · ≈ ${pieces(d.pieces)} pc${d.estimated ? ' · estimated' : ''}${d.tags?.length ? ' · ' + d.tags.join(', ').toLowerCase() : ''}`
+
+const pad = (n: number) => String(n).padStart(2, '0')
+const localInput = (t: number) => { const d = new Date(t); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}` }
+
+/** Change a logged dose's time or amount, or delete it (with Undo). */
+export function EditDoseSheet({ id, onClose, toast }: { id: string; onClose: () => void; toast: (m: string, undo?: () => void) => void }) {
+  const raw = S.live('dose').find((d) => d.id === id)
+  const [when, setWhen] = useState(raw ? localInput(raw.at) : '')
+  const [mult, setMult] = useState(raw?.multiplier ?? 1)
+  const [duration, setDuration] = useState(raw?.duration ?? 'FULL')
+  if (!raw) return null
+  return (
+    <Sheet onClose={onClose}>
+      <h2>{raw.productName || 'Dose'}</h2>
+      <h3>When</h3>
+      <input type="datetime-local" value={when} max={localInput(Date.now())} onInput={(e) => setWhen((e.target as HTMLInputElement).value)} />
+      {!raw.rangeLowMg && <><h3>How much</h3>
+        <div class="row wrap">{AMOUNTS.map(([v, l]) => <button class={`chip ${mult === v ? 'on' : ''}`} onClick={() => setMult(v)}>{l}</button>)}</div></>}
+      {ORAL.includes(raw.kind) && <>
+        <h3>How long it stayed in</h3>
+        <div class="row wrap">{[['FULL', 'Full'], ['HALF', 'About half'], ['QUICK', 'Quick']].map(([v, l]) => <button class={`chip ${duration === v ? 'on' : ''}`} onClick={() => setDuration(v)}>{l}</button>)}</div>
+      </>}
+      <div class="row"><button class="btn" disabled={!when} onClick={async () => {
+        await S.save('dose', { ...raw, at: new Date(when).getTime(), multiplier: mult, duration }); onClose(); toast('Saved')
+      }}>Save</button>
+        <button class="btn text" onClick={async () => { onClose(); await S.remove(raw.id); toast('Dose deleted', () => S.restore(raw.id)) }}>Delete</button></div>
+    </Sheet>
+  )
+}
+
+/** After accepting a practice offer: how long practice pace should run. */
+export function PracticeDurationSheet({ rung, initial, stopNote, onStart, onClose }: { rung: any; initial: boolean; stopNote: string; onStart: (untilBedtime: boolean) => void; onClose: () => void }) {
+  const [untilBedtime, setUntilBedtime] = useState(initial)
+  return (
+    <Sheet onClose={onClose}>
+      <h2>How long should practice pace run?</h2>
+      <div class="small"><b>{rung.tier} pace</b></div>
+      <DurationChoice value={untilBedtime} onChange={setUntilBedtime} />
+      <div class="muted">{stopNote}</div>
+      <div class="row"><button class="btn" onClick={() => onStart(untilBedtime)}>Start</button><button class="btn outline" onClick={onClose}>Cancel</button></div>
+    </Sheet>
+  )
+}
+
+export function DurationChoice({ value, onChange }: { value: boolean; onChange: (v: boolean) => void }) {
+  return <div>{([[true, 'Turn off at bedtime (just today)'], [false, 'Leave it on until I turn it off']] as [boolean, string][]).map(([v, l]) =>
+    <label class="row small"><input type="radio" name="practice-duration" style={{ width: 'auto' }} checked={value === v} onChange={() => onChange(v)} /> {l}</label>)}</div>
+}

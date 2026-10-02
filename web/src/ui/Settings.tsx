@@ -3,6 +3,7 @@ import { Core } from '../core'
 import * as S from '../store'
 import { minutesOfDay, time } from './format'
 import { deleteUnsent, sendNow, unsent } from '../feedback'
+import { DurationChoice } from './Sheets'
 
 const KINDS = ['GUM', 'POUCH', 'LOZENGE', 'PATCH', 'VAPE', 'CIGARETTE', 'OTHER']
 const DEFAULT_ABS: Record<string, number> = { GUM: 0.5, POUCH: 0.4, LOZENGE: 0.6, PATCH: 0.8, VAPE: 0.5, CIGARETTE: 0.1, OTHER: 0.5 }
@@ -50,11 +51,13 @@ export function Settings({ toast, go, updateInfo }: { toast: (m: string) => void
       <div class="small">{target ? `Working at ${target.label}` : 'Your target appears once your baseline is known.'}</div>
       {target && target.pieces > 0 && <button class="btn outline" onClick={() => {
         const i = snap.ladder.findIndex((r) => Math.abs(r.pieces - target.pieces) < 1e-6); const up = snap.ladder[Math.max(0, i - 1)]
-        S.setTarget(up.pieces, 'up'); toast(`Stepped back to ${up.label}. That's normal.`)
+        S.setTarget(up.pieces, 'up'); toast(`Stepped up to ${up.label}. Your level is more accurate now.`)
       }}>Step back up a rung</button>}
       <div class="small">Hold each rung for</div>
       <div class="row wrap">{[[3, '3 days'], [7, '1 week'], [14, '2 weeks'], [21, '3 weeks']].map(([d, l]) =>
         <button class={`chip ${s.holdDays === d ? 'on' : ''}`} onClick={() => S.updateSettings({ holdDays: d })}>{l}</button>)}</div>
+      {s.holdDays < 7 && <div class="muted">{snap.holdShortNote}</div>}
+      {target && target.pieces > 0 && <PracticePace />}
       <div class="small">First-piece goal</div>
       <div class="row wrap">{[[0, 'Off'], [15, '15 min after waking'], [30, '30 min after waking'], [60, '1 hour after waking'], [90, '1½ hours after waking']].map(([m, l]) =>
         <button class={`chip ${(s.morningDelayClock ?? -1) < 0 && s.morningDelayMinutes === m ? 'on' : ''}`} onClick={() => S.updateSettings({ morningDelayMinutes: m, morningDelayClock: -1 })}>{l}</button>)}</div>
@@ -70,7 +73,7 @@ export function Settings({ toast, go, updateInfo }: { toast: (m: string) => void
       <label class="row small"><input type="checkbox" style={{ width: 'auto' }} checked={!!s.hideDosePreview} onChange={() => S.updateSettings({ hideDosePreview: !s.hideDosePreview })} /> Hide stretch and pull on doses</label>
       <label class="row small"><input type="checkbox" style={{ width: 'auto' }} checked={!!s.detailedCharts} onChange={() => S.updateSettings({ detailedCharts: !s.detailedCharts })} /> Detailed charts: range choices and earlier/later on Insights charts</label>
       <label class="row small"><input type="checkbox" style={{ width: 'auto' }} checked={!!s.hideTimer} onChange={() => S.updateSettings({ hideTimer: !s.hideTimer })} /> Hide next piece timer: the time shows only when you tap, so Firewatch can learn how often you check</label>
-      <label class="row small"><input type="checkbox" style={{ width: 'auto' }} checked={s.windDown} onChange={() => S.updateSettings({ windDown: !s.windDown })} /> Wind down: no "clear for one" in the last hour before bed</label>
+      <label class="row small"><input type="checkbox" style={{ width: 'auto' }} checked={s.windDown} onChange={() => S.updateSettings({ windDown: !s.windDown })} /> Wind down before bed: a bedtime note in the last hour before bed</label>
       <label class="row small"><input type="checkbox" style={{ width: 'auto' }} checked={s.dailyCheckIn} onChange={() => S.updateSettings({ dailyCheckIn: !s.dailyCheckIn })} /> Daily check-in (cravings, mood, sleep)</label>
       {snap.baselineState !== 'complete' && <button class="btn outline" onClick={() => go('backfill')}>Back-date my baseline week</button>}
 
@@ -143,6 +146,10 @@ function ProductEditor({ product, onClose }: { product: any; onClose: () => void
       <div class="row wrap">{KINDS.map((k) => <button class={`chip ${p.kind === k ? 'on' : ''}`} onClick={() => setP({ ...p, kind: k, speed: SPEED[k] ?? 'BUILD', absPct: product.id ? p.absPct : Math.round(DEFAULT_ABS[k] * 100) })}>{k.toLowerCase()}</button>)}</div>
       <label class="small">Strength on the packaging (mg)<input inputMode="decimal" value={p.labelMg || ''} onInput={(e) => setP({ ...p, labelMg: Number((e.target as HTMLInputElement).value) })} /></label>
       <label class="small">Estimated % absorbed<input inputMode="numeric" value={p.absPct} onInput={(e) => setP({ ...p, absPct: Number((e.target as HTMLInputElement).value) })} /></label>
+      <div class="small">How fast it hits</div>
+      <div class="row wrap">{[['SPIKE', 'Spike in minutes'], ['BUILD', 'Builds over ~30 min'], ['CHEW', 'Chew and park'], ['FLAT', 'Slow and flat']].map(([v, l]) =>
+        <button class={`chip ${(p.speed === 'BUILD' && p.kind === 'GUM' ? 'CHEW' : p.speed) === v ? 'on' : ''}`} onClick={() => setP({ ...p, speed: v })}>{l}</button>)}</div>
+      <label class="small">Units in a tin or pack (optional)<input inputMode="numeric" value={p.unitsPerPack || ''} onInput={(e) => setP({ ...p, unitsPerPack: Number((e.target as HTMLInputElement).value) || 0 })} /></label>
       <label class="small">Price of one (optional)<input inputMode="decimal" value={p.unitPrice || ''} onInput={(e) => setP({ ...p, unitPrice: Number((e.target as HTMLInputElement).value) || 0 })} /></label>
       <div class="row"><button class="btn" disabled={!valid} onClick={() => {
         const { absPct, ...rest } = p
@@ -150,6 +157,27 @@ function ProductEditor({ product, onClose }: { product: any; onClose: () => void
       }}>Save</button>{product.id && <button class="btn text" onClick={() => { S.save('product', { ...product, archived: true, onHome: false }); onClose() }}>Remove</button>}</div>
     </div></div>
   )
+}
+
+/** Settings → Your plan → Practice pace. */
+function PracticePace() {
+  const snap = S.snapshot.value!
+  const pr = snap.practice
+  const s = S.settings.value
+  const [picked, setChoice] = useState<number | null>(null)
+  const choice = pr.allowed.some((r) => r.pieces === picked) ? picked : (pr.allowed[0]?.pieces ?? null)
+  const untilBedtime = pr.active ? pr.untilBedtime : (s.practiceUntilBedtime ?? true)
+  return <div class="card soft">
+    <h3>Practice pace</h3>
+    <div class="muted">Try a lighter pace without changing your level. The battery and dose preview use its gap; your level, net and steady days don't change.</div>
+    {snap.relapse.on ? <div class="muted">{pr.relapseNote}</div>
+      : pr.active ? <><div class="small">On · {pr.active.label}</div><button class="btn outline" onClick={() => S.stopPractice()}>Back to my pace</button></>
+      : pr.allowed.length > 0 && <>
+        <div class="row wrap">{pr.allowed.map((r) => <button class={`chip ${choice === r.pieces ? 'on' : ''}`} onClick={() => setChoice(r.pieces)}>{r.label}</button>)}</div>
+        <button class="btn outline" disabled={choice == null} onClick={() => choice != null && S.startPractice(choice, untilBedtime)}>Start</button></>}
+    {!snap.relapse.on && <DurationChoice value={untilBedtime} onChange={(v) => S.setPracticeUntilBedtime(v)} />}
+    <label class="row small"><input type="checkbox" style={{ width: 'auto' }} checked={s.lighterOffers ?? true} onChange={() => S.updateSettings({ lighterOffers: !(s.lighterOffers ?? true) })} /> Lighter-level practice offers: when your logs measure 2 or more rungs lighter, offer to practice that pace</label>
+  </div>
 }
 
 export { minutesOfDay }

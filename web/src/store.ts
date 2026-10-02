@@ -28,7 +28,7 @@ export const products = computed<any[]>(() => live('product').filter((p) => !p.a
 export const homeProducts = computed(() => products.value.filter((p) => p.onHome))
 
 const tsOf = (type: string, data: any): number | null =>
-  type === 'settings' ? null : type === 'product' ? data.createdAt ?? 0 : data.at ?? null
+  type === 'settings' ? null : type === 'product' ? data.createdAt ?? 0 : type === 'practice' ? data.start ?? null : data.at ?? null
 
 async function write(list: { type: string; data: any; deleted?: boolean }[]) {
   const now = Date.now()
@@ -87,7 +87,39 @@ export async function startGum() {
   await updateSettings({ relapseProductId: gum.find((p) => p.id === 'gum-4')?.id ?? gum[0]?.id ?? 'gum-4' })
   await setRelapse(true)
 }
-export const setTarget = (pieces: number, reason: string) => save('rung', { id: Core.newId(), at: Date.now(), pieces, reason })
+export const setTarget = (pieces: number, reason: string, detail = '') => save('rung', { id: Core.newId(), at: Date.now(), pieces, reason, detail })
+
+/** Mark an empty day 'clear' or 'ghost'; null puts it back to "?". */
+export async function markDay(date: string, state: 'clear' | 'ghost' | null) {
+  const id = `daymark-${date}`
+  if (state == null) { if (records.value.has(id)) await remove(id); return }
+  await save('daymark', { id, date, state, at: Date.now() })
+}
+
+/** The practice session that's on right now (raw record), if any. */
+export function activePractice(): any | null {
+  const p = snapshot.value?.practice
+  if (!p?.active) return null
+  return live('practice').filter((s) => s.end == null || s.end > Date.now()).sort((a, b) => b.start - a.start)[0] ?? null
+}
+
+export async function startPractice(pieces: number, untilBedtime: boolean) {
+  const cur = activePractice()
+  if (cur) await save('practice', { ...cur, end: Date.now() })
+  await save('practice', { id: Core.newId(), start: Date.now(), pieces, end: null, untilBedtime })
+  await updateSettings({ practiceUntilBedtime: untilBedtime })
+}
+
+export async function stopPractice() {
+  const cur = activePractice()
+  if (cur) await save('practice', { ...cur, end: Date.now() })
+}
+
+export async function setPracticeUntilBedtime(untilBedtime: boolean) {
+  const cur = activePractice()
+  if (cur) await save('practice', { ...cur, untilBedtime })
+  await updateSettings({ practiceUntilBedtime: untilBedtime })
+}
 
 // --- Backup files: identical format to the Android app. ---
 export function exportFile(reason = 'export') {

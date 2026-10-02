@@ -16,6 +16,8 @@ class WordingTest {
         Regex("don['’]t worry", RegexOption.IGNORE_CASE),
         Regex("you['’]ll get", RegexOption.IGNORE_CASE),
         Regex("better luck", RegexOption.IGNORE_CASE),
+        // House spelling: "practice" for the noun and the verb.
+        Regex("practis(e|ed|es|ing)", RegexOption.IGNORE_CASE),
     )
 
     @Test

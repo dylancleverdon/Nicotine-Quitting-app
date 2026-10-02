@@ -19,6 +19,8 @@ That schema is frozen at version 1.
 
 Dose field `estimated: true` marks back-dated rough entries (no real time): counted in totals and the tier, left out of timing stats.
 
+Added in 0.13.0: record types `daymark` (an empty day marked by D: `id` "daymark-<date>", `date` ISO, `state` "clear" or "ghost", `at`; un-marking is a tombstone; "?" is never stored, it's worked out from the logs) and `practice` (practice pace: `id`, `start`, `pieces`, `end` null while on, `untilBedtime`); field `detail` on `rung` (the reason, e.g. the step-up reason, default ""; `reason` "measured" = working from the measured level); settings `practiceUntilBedtime` (true), `lighterOffers` (true), `lighterSnoozedAt`, `practiceAnswered`, `workFromSnoozedAt` (0/""). The old `practiceDate`/`practicePieces` settings are no longer read.
+
 Speed profile `CHEW` (chew and park, gum) was added in 0.11.0; older versions read it as the default `BUILD`. Gum doses stored as `BUILD` are drawn as `CHEW`. Settings fields added in 0.11.0: `coachingTips` (false), `tipDismissedAt` (tip id → ms), `netExplained` (false), `showVolatility` (false).
 
 Settings fields `morningDelayClock` (minutes after midnight, -1 = off) and `timeFormat` (system/12h/24h) were added in 0.4.0.

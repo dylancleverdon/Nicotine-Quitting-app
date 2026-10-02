@@ -1,5 +1,15 @@
 # Firewatch web changelog
 
+## 0.10.0 · 2026-10-02
+- Days with nothing logged now show a "?" on the calendar and are left out of your figures until you tap them: mark a clear day 🌿, add what you had, or leave the day out 👻. Clear days count as wins. Your steady days have been recounted once with this rule.
+- New: **Practice pace.** Try a lighter pace from Settings → Your plan, or from "Try it for a day". It never changes your level. Choose "Turn off at bedtime" or "Leave it on until I turn it off".
+- If your logs show you're well below your level, Firewatch may offer to practice that pace, and later to work from there. Practicing is just practice: you can always go back to your usual pace.
+- New in Insights: how many recent days are known, your level history, and step ups and downs marked on the calendar (▲ ▼).
+- Volatility now measures how fast your nicotine level changes as well as how much (mg per hour). Past days are recalculated.
+- "Next step down" and "If you take each step" now always agree.
+- The pouch → gum swap tip now only shows with Coaching tips on.
+- Catching up with Android: tap a dose to change its time or amount; the calendar's day view shows the day's totals, sleep and level changes, and each month has a summary; new charts (dose strip, double-ups, daily check-in, product mix, next step down, then vs now); hold Good morning / Good night to set a time; choose how fast a product hits.
+
 ## 0.9.0 · 2026-09-29
 - New quick choices when logging: 2 and 3 hours ago.
 - Gum is now estimated the way it's really used, chew and park, so it arrives more slowly and gently in your nicotine wave. Your pieces, net and steady days don't change.

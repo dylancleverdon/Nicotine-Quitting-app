@@ -2,6 +2,15 @@
 
 Newest first. Each release is a "## <version>" heading; the app shows these notes in "What's new".
 
+## 0.13.0 · 2026-10-02
+- Days with nothing logged now show a "?" on the calendar and are left out of your figures until you tap them: mark a clear day 🌿, add what you had, or leave the day out 👻. Clear days count as wins. Your steady days have been recounted once with this rule.
+- New: **Practice pace.** Try a lighter pace from Settings → Your plan, or from "Try it for a day". It never changes your level. Choose "Turn off at bedtime" or "Leave it on until I turn it off".
+- If your logs show you're well below your level, Firewatch may offer to practice that pace, and later to work from there. Practicing is just practice: you can always go back to your usual pace.
+- New in Insights: how many recent days are known, your level history, and step ups and downs marked on the calendar (▲ ▼).
+- Volatility now measures how fast your nicotine level changes as well as how much (mg per hour). Past days are recalculated.
+- "Next step down" and "If you take each step" now always agree.
+- The pouch → gum swap tip now only shows with Coaching tips on.
+
 ## 0.12.0 · 2026-09-29
 - New in Insights → Forecasts: **Next step down** shows how many days in a row you've held your level, out of your hold period (e.g. "1 of 3 days held"). When it's full, the step down is offered on the Log tab.
 

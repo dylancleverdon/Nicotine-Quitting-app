@@ -1,6 +1,6 @@
 # Firewatch by Baastik Labs: design spec
 
-Baastik Labs · living spec, updated 28 Sep 2026 (Android 0.11 / web 0.9)
+Baastik Labs · living spec, updated 28 Sep 2026 (Android 0.13 / web 0.10)
 
 This describes what Firewatch does today and how it should feel. Read `docs/vision.md` first: the
 vision and principles there decide every trade-off here. The original 1.0 spec is kept in
@@ -59,10 +59,14 @@ as an estimate.
   since last, cravings ridden out, quality; today's nicotine curve with "≈ X mg in your system now".
 - **Morning stretch** ("Morning stretch: 1h 20m") until the first piece; a one-time "This is your
   net" card in the first days.
-- **Wins, only ever positive:** "✓ 23 steady days" (hideable; tap for what counts), "✓ Held Bonfire for 12 days", "✓ About 20% lighter than when you
+- **Practice pace** (when on): "Practice pace · Campfire 4" with a "?", and "Practice net +40m · day 3".
+- **Wins, only ever positive:** "✓ 23 steady days" (hideable; tap for what counts), "✓ 12 days held at Bonfire in total", "✓ About 20% lighter than when you
   started" (only when true), "✓ 30 days off cigarettes and vapes", "Journey to Clear Air: 40%".
 - **Offers:** starting point; step down ("…or stay here, that's fine too", with **Try it for a day**
-  and **Stay here**); "How was Campfire pace?" after a practice day; steady-days milestones;
+  and **Stay here**); "How was Campfire pace?" after a practice day; the lighter-level practice offer
+  ("Your logs measure Campfire · 4 a day", Try Campfire pace / Stay here / Don't ask me again, then a
+  second screen: Turn off at bedtime / Leave it on); "Campfire pace held. Work from Campfire?" (Work
+  from / Keep practicing / Back to Blaze pace); steady-days milestones;
   step up (with the reason); Relapse prevention mode suggestion; "Welcome back". With Coaching
   tips on, at most one tip ("Bridge with gum" when pouches are most of your use and the battery is
   at least half full), dismissable for 2 weeks.
@@ -82,7 +86,8 @@ as an estimate.
   add (p − 1) × gap of pull; below one add (1 − p) × gap of stretch. **Net** = stretch − pull = time
   ahead of or behind the rung's pace whatever the product (a Zyn 6 mg every 3h 50m nets 0 at
   Bonfire; two gum 2 mg = one gum 4 mg). Negative net is grey, never red. Paused in Relapse
-  prevention mode. The full-battery cheer stays.
+  prevention mode. The full-battery cheer stays. Stretch, pull and net always stay against the real
+  level, even with practice pace on.
 - **Dose preview** under each product between the name and the pieces (shown even with "Hide next piece timer"; its own toggle "Hide stretch and pull on doses"). Neutral wording only.
 - **Hide next piece timer** (opt-in): "Tap to see your next piece time"; each tap is a counted
   check, a "wanting it" signal used in Insights and the offers.
@@ -100,7 +105,7 @@ as an estimate.
   7/30/90/180 days held. **Steady days:** net ≥ 0 and no cigarette or vape (back-dated days: pieces
   at or under the rung; Relapse prevention mode: no cigarette or vape; empty days count only at
   Clear Air or when the app was in use). The total only ever goes up; milestones at 7/30/60/90/180/365.
-  A celebration, never a gate.
+  A celebration, never a gate. Empty days count only when marked clear 🌿 (recalculated once in 0.13).
 - **Step down (taper, optional):** offered after the hold period (Settings): that many full days in
   a row at or under the rung since the last change ("Next step down" in Insights → Forecasts shows
   "1 of 3 days held");
@@ -127,7 +132,9 @@ pause on mode days.
 
 Yesterday in review (facts only: pieces, net, volatility, mix, longest gap, stacked doses, morning
 stretch; up to two tips with Coaching tips on), Today (wave with optional volatility line, off by
-default; daily nicotine volatility = average one-hour swing; dose strip), Cravings ahead, Receptors (estimated healing, following the plan vs
+default; daily nicotine volatility in mg/h = root-mean-square of the rate of change over the waking
+day, the line uses the last 30 minutes; dose strip), Trends (with "27 of 30 days known" and "(6 of 7
+days known)" on the measured level), Ladder (with Level history), Cravings ahead, Receptors (estimated healing, following the plan vs
 staying), Stretch & pull, Trends, Patterns (heatmap, how cravings ended, checking, triggers),
 Going up (holding steady, clear hours, wins, money), Going down (quality, dose size, spike share,
 background level), Mix, Forecasts (Journey to Clear Air, arrival dates), Milestones (records,
@@ -138,6 +145,11 @@ charts. Forecasts show "If you take each step" from day one (plan → plan + rec
 Every figure is an estimate.
 
 ## 12. Calendar and back-dating
+
+**Days that count:** a full day with nothing logged is "?" (once its waking day is over) until D marks
+it on the calendar: "I had none" (clear 🌿: counts as 0, a win), "Add what you had", or "Don't log
+this day" (ghost 👻). "?" and ghost days are left out of every figure (level, tier, Insights, steady
+days, step-down count, wins, the calendar's month figures). Calendar shows ▲ / ▼ on level changes.
 
 **One day everywhere:** daily counts (pieces today, calendar, daily Insights bars, tiers, stretch and
 pull, steady days) use the waking day (wake-up to the next wake-up), so a 1 AM piece counts toward
@@ -153,7 +165,8 @@ missed day.
 ## 13. Settings
 
 Plan (step back up a rung, hold period, first-piece goal, time format, Hide next piece timer, wind
-down note, show steady days, Coaching tips (off), hide stretch and pull on doses, detailed charts, daily check-in), Relapse prevention mode, optional reminders, money, data (export,
+down note, show steady days, Coaching tips (off; the pouch → gum swap tip is part of it), practice pace,
+lighter-level practice offers, hide stretch and pull on doses, detailed charts, daily check-in), Relapse prevention mode, optional reminders, money, data (export,
 import, automatic backups off the phone), products and the reference piece (change "from today on", or back-dated with a warning), sleep schedule,
 unsent suggestions, Help, About, updates.
 

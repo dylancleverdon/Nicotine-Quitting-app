@@ -21,8 +21,15 @@ export interface DayView {
   date: string; pieces: number; mg: number; doses: number; cravings: number; rodeOut: number; level: number
   clearHours: number; quality: number | null; estimated: boolean; hasRange: boolean; low: number; high: number
   awakeHours: number; mouthMin: number; wakeToFirstMin: number | null; spikeMg: number; labelMg: number
-  borrowedPieces: number; barcode: boolean[]; doubleUps: number; volatility: number
+  borrowedPieces: number; barcode: boolean[]; doubleUps: number; volatility: number; kinds: Record<string, number>
 }
+export interface Practice {
+  active: Rung | null; untilBedtime: boolean; netMin: number | null; day: number; allowed: Rung[]
+  lighterOffer: Rung | null; lighterTitle: string | null; lighterBody: string | null
+  workFrom: Rung | null; workFromHours: number; workFromNet: number; lastSessionId: string | null; followUpId: string | null
+  explainer: string; stopNote: string; relapseNote: string
+}
+export interface DayDetail { doses: DoseView[]; cravings: CravingView[]; wave: number[][]; volatility: number[][]; wakeAt: number; sleepAt: number; sleeps: NamedValue[]; levels: string[]; state: string; pieces: number; mg: number }
 export interface NamedValue { label: string; value: number; extra: string }
 export interface Recap { key: string; title: string; pieces: number; drop: number | null; longestGapMin: number; trigger: string | null; rungs: string[]; cravings: number }
 export interface InsightsData {
@@ -39,6 +46,8 @@ export interface Snapshot {
   revealed: boolean; measured: Rung | null; target: Rung | null; battery: Battery | null
   stepDown: Rung | null; stepDownNote: string | null; stepUp: Rung | null; stepUpWhy: string | null; stepUpSameDay: boolean; cravingEndings: NamedValue[]; checks: NamedValue[]; checksToday: number; early: boolean; earlyUpdate: number | null; heldDays: number; held: string[][]; lighterThanStart: number | null; daysOffSmokeAndVape: number | null; welcomeBack: string[] | null; previews: Record<string, number>; steadyDays: number; wakingToday: string; steadyMilestone: number | null; practicing: boolean; practiceFollowUp: Rung | null; taperSteps: NamedValue[]; taperBasis: string | null; headsUps: string[]
   morningStretch: number | null; tip: NamedValue | null; yesterday: Review | null; steadyExplainer: string; netExplainer: string
+  practice: Practice; dayStates: Record<string, string>; levelMarks: Record<string, string>; history: NamedValue[]; recentStates: NamedValue[]; known7: number; heldTotal: number
+  stepProgress: { held: number; needed: number; next: Rung; offered: boolean } | null; doubleUpsWeekly: NamedValue[]; thenCurve: number[]; nowCurve: number[]; unknownNote: string; holdShortNote: string
   qualityScore: number | null; qualityLabel: string | null; swapTip: string | null; activeCraving: CravingView | null
   todayPieces: number; todayMg: number; todayCravings: number; todayRodeOut: number; lastDoseAt: number | null
   todayDoses: DoseView[]; todayCravingList: CravingView[]; wave: number[][]; wakeAt: number; sleepAt: number; typical: number[]
@@ -58,7 +67,7 @@ export const Core = {
   newId: (): string => core.newId(Date.now()),
   compute: (records: string): Snapshot => JSON.parse(core.compute(records, Date.now(), lastActivity())),
   waitedForFull: (records: string, doseId: string): boolean => core.waitedForFull(records, doseId),
-  day: (records: string, iso: string): { doses: DoseView[]; cravings: CravingView[]; wave: number[][]; volatility: number[][]; wakeAt: number; sleepAt: number } => JSON.parse(core.day(records, iso, Date.now())),
+  day: (records: string, iso: string): DayDetail => JSON.parse(core.day(records, iso, Date.now())),
   piecesOf: (product: any, records: string): number => core.absorbedPieces(JSON.stringify(product), records),
   doseFor: (product: any, at: number, opts: { multiplier?: number; duration?: string; acidic?: boolean; tags?: string[] } = {}): any =>
     JSON.parse(core.doseFor(JSON.stringify(product), core.newId(Date.now()), at, Date.now(), opts.multiplier ?? 1, opts.duration ?? 'FULL', opts.acidic ?? false, (opts.tags ?? []).join(','))),
