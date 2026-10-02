@@ -698,22 +698,6 @@ class EngineTest {
     }
 
     @Test
-    fun `practice day uses the next rung for one day only`() {
-        val s = com.baastiklabs.firewatch.core.model.Settings(practiceDate = "2026-09-10", practicePieces = 3.0)
-        val data = withTarget(listOf(gum4.toDose("a", at(10, 9), 0)), 4.0).copy(settings = s)
-        // Campfire 4 → practising Flicker 3: gap 5h 20m instead of 4h.
-        assertTrue(kotlin.math.abs(Progress.battery(data, 4.0, at(10, 10), tz).readyAt!! - (at(10, 9) + 320 * 60_000L)) <= 2 * 60_000L)
-        assertEquals(4.0, data.targetPieces)
-        val ct = com.baastiklabs.firewatch.core.engine.Control
-        assertTrue(ct.practicingToday(data, at(10, 10), tz))
-        assertNull(ct.practiceFollowUp(data, at(10, 10), tz))
-        assertEquals(3.0, ct.practiceFollowUp(data, at(11, 9), tz)!!.pieces)
-        // The next day is back to the usual gap.
-        val next = data.copy(doses = data.doses + gum4.toDose("b", at(11, 9), 0))
-        assertTrue(kotlin.math.abs(Progress.battery(next, 4.0, at(11, 10), tz).readyAt!! - (at(11, 9) + 240 * 60_000L)) <= 2 * 60_000L)
-    }
-
-    @Test
     fun `taper forecast shows a plan from day one`() {
         val ct = com.baastiklabs.firewatch.core.engine.Control
         val data = withTarget(emptyList(), 4.0)
@@ -794,13 +778,11 @@ class EngineTest {
         val vg = Insights(withTarget(listOf(gum)), tz, at(10, 22)).dayStat(d10).volatility
         val vv = Insights(withTarget(listOf(vape)), tz, at(10, 22)).dayStat(d10).volatility
         assertTrue(vv > vg && vg > 0, "vape=$vv gum=$vg")
-        // Daily figure = average one-hour swing over the waking day.
+        // Daily figure = volatility (RMS rate of change, mg/h) over the waking day.
         val data = withTarget(listOf(vape))
         val ins = Insights(data, tz, at(11, 12))
         val w = com.baastiklabs.firewatch.core.engine.Waking.day(data, d10, tz)
-        val curve = Kinetics.curve(data.doses, w.wakeAt - 3_600_000L, w.sleepAt, 5)
-        val avg = Kinetics.swing(curve).filter { it.first >= w.wakeAt }.map { it.second }.average()
-        assertEquals(avg, ins.dayStat(d10).volatility, 1e-9)
+        assertEquals(Kinetics.volatility(data.doses, w.wakeAt, w.sleepAt), ins.dayStat(d10).volatility, 1e-9)
         // The running curve for the stepper covers the same day.
         assertTrue(ins.volatilityCurve(d10).maxOf { it.second } > 0)
     }
@@ -863,5 +845,199 @@ class EngineTest {
         val data = withTarget((1..28).flatMap { d -> (0 until (4 + d / 7)).map { i -> gum4.toDose("t$d-$i", at(d, 8) + i * 60 * 60_000L, 0) } })
         val text = Insights(data, tz, at(29, 12)).taperSpeedText()!!
         assertTrue(text.startsWith("About") && text.contains("more each week"), text)
+    }
+
+    // ---- 0.13: known days, practice pace, level history, volatility in mg/h ----
+
+    private val PR = com.baastiklabs.firewatch.core.engine.Practice
+    private fun mark(date: String, state: String) = com.baastiklabs.firewatch.core.model.DayMark("daymark-$date", date, state, 1L)
+    private fun session(start: Long, pieces: Double, end: Long? = null, untilBedtime: Boolean = true) =
+        com.baastiklabs.firewatch.core.model.PracticeSession("p$start", start, pieces, end, untilBedtime)
+    private fun dosesOn(days: IntRange, perDay: Int, product: com.baastiklabs.firewatch.core.model.Product = gum4, from: Int = 8) =
+        days.flatMap { d -> (0 until perDay).map { i -> product.toDose("x$d-$i", at(d, from) + i * (14 * 60 / perDay.coerceAtLeast(1)) * 60_000L, 0) } }
+
+    @Test
+    fun `an empty day is a question mark once it's over, until marked`() {
+        val data = withTarget(listOf(gum4.toDose("a", at(2, 9), 0)))
+        val d3 = kotlinx.datetime.LocalDate(2026, 9, 3)
+        assertEquals(DayState.OPEN, Days.state(data, d3, tz, at(3, 20)))
+        assertEquals(DayState.UNKNOWN, Days.state(data, d3, tz, at(4, 8)))
+        // Cravings and Good morning don't make it clear.
+        val busy = data.copy(cravings = listOf(Craving("c", at(3, 10), 5)))
+        assertEquals(DayState.UNKNOWN, Days.state(busy, d3, tz, at(4, 8)))
+        assertEquals(DayState.CLEAR, Days.state(data.copy(dayMarkList = listOf(mark("2026-09-03", "clear"))), d3, tz, at(4, 8)))
+        assertEquals(DayState.GHOST, Days.state(data.copy(dayMarkList = listOf(mark("2026-09-03", "ghost"))), d3, tz, at(4, 8)))
+        // Before D started: never "?".
+        assertEquals(DayState.BEFORE, Days.state(data, kotlinx.datetime.LocalDate(2026, 8, 30), tz, at(4, 8)))
+    }
+
+    @Test
+    fun `question mark and ghost days are left out everywhere and clear days count as zero`() {
+        // 4 a day on the 2nd–8th, except the 5th (empty).
+        val doses = dosesOn(2..8, 4).filter { !it.id.startsWith("x5-") }
+        val base = withTarget(doses, 4.0)
+        val today = kotlinx.datetime.LocalDate(2026, 9, 9)
+        assertEquals(4.0, Progress.rollingAverage(base, today, tz)!!, 0.01)
+        assertEquals(6, Progress.knownDays(base, today, tz))
+        val ghost = base.copy(dayMarkList = listOf(mark("2026-09-05", "ghost")))
+        assertEquals(4.0, Progress.rollingAverage(ghost, today, tz)!!, 0.01)
+        val clear = base.copy(dayMarkList = listOf(mark("2026-09-05", "clear")))
+        assertEquals(24.0 / 7, Progress.rollingAverage(clear, today, tz)!!, 0.01)
+        assertEquals(7, Progress.knownDays(clear, today, tz))
+        // Insights leave "?" out and keep clear days.
+        val now = at(9, 12)
+        assertTrue(Insights(base, tz, now).days.none { it.date.dayOfMonth == 5 })
+        assertTrue(Insights(clear, tz, now).days.any { it.date.dayOfMonth == 5 && it.pieces == 0.0 })
+        // Steady days: a clear day counts, a "?" day doesn't.
+        val ct = com.baastiklabs.firewatch.core.engine.Control
+        assertTrue(5 !in ct.steadyDates(base, now, tz).map { it.dayOfMonth })
+        assertTrue(5 in ct.steadyDates(clear, now, tz).map { it.dayOfMonth })
+    }
+
+    @Test
+    fun `step-down count skips question mark days without resetting and the plan agrees`() {
+        val data = FirewatchData(
+            products = DefaultProducts.all(), doses = dosesOn(2..8, 4).filter { !it.id.startsWith("x6-") },
+            rungChanges = listOf(RungChange("r", at(1, 8), 4.0, "start")),
+            settings = com.baastiklabs.firewatch.core.model.Settings(holdDays = 5),
+        )
+        val now = at(9, 12)
+        val p = Progress.stepDownProgress(data, now, tz)!!
+        assertEquals(5, p.held)
+        assertTrue(p.ready)
+        // Two days short: the plan's first step is two days away.
+        val short = data.copy(settings = data.settings.copy(holdDays = 8))
+        val sp = Progress.stepDownProgress(short, now, tz)!!
+        assertEquals(6, sp.held)
+        val plan = com.baastiklabs.firewatch.core.engine.Control.taperPlan(short, now, tz)!!
+        assertEquals(kotlinx.datetime.LocalDate(2026, 9, 11), plan.steps.first().date)
+    }
+
+    @Test
+    fun `practice pace limits, bedtime end and relapse mode`() {
+        // Working at 7, measuring 4: can practice 6, 5 or 4.
+        val data = withTarget(dosesOn(2..9, 4), 7.0)
+        val now = at(10, 9)
+        assertEquals(listOf(6.0, 5.0, 4.0), PR.allowedRungs(data, now, tz).map { it.pieces })
+        // At 4 measuring 4: only 3.
+        assertEquals(listOf(3.0), PR.allowedRungs(withTarget(dosesOn(2..9, 4), 4.0), now, tz).map { it.pieces })
+        // Turn off at bedtime (23:00) vs leave it on.
+        val bed = data.copy(practices = listOf(session(at(10, 9), 5.0)))
+        assertNotNull(PR.active(bed, at(10, 22), tz))
+        assertNull(PR.active(bed, at(10, 23, 30), tz))
+        val on = data.copy(practices = listOf(session(at(10, 9), 5.0, untilBedtime = false)))
+        assertNotNull(PR.active(on, at(12, 10), tz))
+        assertNull(PR.active(on.copy(practices = listOf(on.practices[0].copy(end = at(11, 9)))), at(12, 10), tz))
+        // Off in Relapse prevention mode.
+        assertNull(PR.active(bed.copy(modeChanges = listOf(modeOn(at(10, 8)))), at(10, 12), tz))
+        assertTrue(PR.allowedRungs(data.copy(modeChanges = listOf(modeOn(at(10, 8)))), now, tz).isEmpty())
+    }
+
+    @Test
+    fun `practice pace changes only the battery and counts practice net only while on`() {
+        // Level 4 (4h gap), practicing 2 (8h gap) from 13:00. A piece at 9:00.
+        val doses = listOf(gum4.toDose("a", at(10, 9), 0))
+        val plain = withTarget(doses, 4.0)
+        val prac = plain.copy(practices = listOf(session(at(10, 13), 2.0)))
+        // At 13:00 the battery is full either way; switching keeps the charge.
+        val b0 = Progress.battery(plain, 4.0, at(10, 11), tz)
+        val b1 = Progress.battery(prac, 4.0, at(10, 11), tz)
+        assertEquals(b0.charge, b1.charge, 1e-9)
+        // A piece at 14:00: the next one is 8 hours later under practice pace.
+        val more = prac.copy(doses = doses + gum4.toDose("b", at(10, 14), 0))
+        val b = Progress.battery(more, 4.0, at(10, 15), tz)
+        assertEquals(2.0, b.practicePieces)
+        assertTrue(kotlin.math.abs(b.readyAt!! - (at(10, 14) + 480 * 60_000L)) <= 2 * 60_000L, "${b.readyAt}")
+        // Normal stretch, pull and net stay against the real level.
+        val plainMore = plain.copy(doses = more.doses)
+        assertEquals(Progress.battery(plainMore, 4.0, at(10, 15), tz).netMinutesToday, b.netMinutesToday, 1e-9)
+        assertEquals(BE.day(plainMore, d10, tz, at(10, 23))!!.netMin, BE.day(more, d10, tz, at(10, 23))!!.netMin, 1e-9)
+        // Practice net: only 13:00 onward, against the 8h gap: full at 13:00 → 1h stretch, then the
+        // 14:00 piece empties it; no pull (it was full).
+        assertEquals(60.0, BE.practiceNetDay(more, d10, tz, at(10, 15))!!, 1.0)
+        // Level, steady days and the step-down count are untouched.
+        assertEquals(4.0, more.targetPieces)
+    }
+
+    @Test
+    fun `lighter level offer rules`() {
+        val s = com.baastiklabs.firewatch.core.model.Settings(holdDays = 3)
+        val data = FirewatchData(products = DefaultProducts.all(), doses = dosesOn(2..9, 4), settings = s,
+            rungChanges = listOf(RungChange("r", at(1, 8), 7.0, "start")))
+        val now = at(10, 9)
+        assertEquals(4.0, PR.lighterOffer(data, now, tz)!!.pieces)
+        // Within a hold period of any level change (here a step up).
+        val up = data.copy(rungChanges = data.rungChanges + RungChange("u", at(9, 8), 7.0, "up"))
+        assertNull(PR.lighterOffer(up, now, tz))
+        // Only one rung lighter: covered by the step-down count.
+        assertNull(PR.lighterOffer(data.copy(rungChanges = listOf(RungChange("r", at(1, 8), 5.0, "start"))), now, tz))
+        // Under 6 of 7 days known.
+        val gaps = data.copy(doses = data.doses.filter { !it.id.startsWith("x8-") && !it.id.startsWith("x9-") })
+        assertNull(PR.lighterOffer(gaps, now, tz))
+        // "Don't ask me again", snoozed, practice on, Relapse prevention mode.
+        assertNull(PR.lighterOffer(data.copy(settings = s.copy(lighterOffers = false)), now, tz))
+        assertNull(PR.lighterOffer(data.copy(settings = s.copy(lighterSnoozedAt = at(9, 9))), now, tz))
+        assertNull(PR.lighterOffer(data.copy(practices = listOf(session(at(10, 8), 4.0))), now, tz))
+        assertNull(PR.lighterOffer(data.copy(modeChanges = listOf(modeOn(at(9, 8)))), now, tz))
+        // It replaces the step-down offer while it shows.
+        assertNull(Progress.stepDownOffer(data, now, tz))
+    }
+
+    @Test
+    fun `work from measured level needs 75 percent of the hold period at practice pace`() {
+        val s = com.baastiklabs.firewatch.core.model.Settings(holdDays = 3)
+        // 4 a day, on pace for 4 a day (every 4 hours from wake-up).
+        val onPace = (2..12).flatMap { d -> (0 until 4).map { i -> gum4.toDose("x$d-$i", at(d, 7) + i * 240 * 60_000L, 0) } }
+        val base = FirewatchData(products = DefaultProducts.all(), doses = onPace, settings = s,
+            rungChanges = listOf(RungChange("r", at(1, 8), 7.0, "start")))
+        // Hold 3 → 75% of 48 waking hours = 36 h. Left on from 10th 9:00: by the 12th's morning,
+        // 14 h + 16 h = 30 h (not enough); by the 13th's morning 46 h.
+        val run = base.copy(practices = listOf(session(at(10, 9), 4.0, untilBedtime = false)))
+        assertNull(PR.workFromOffer(run, at(12, 9), tz))
+        val offer = PR.workFromOffer(run, at(13, 9), tz)
+        assertNotNull(offer)
+        assertEquals(4.0, offer.rung.pieces)
+        assertTrue(offer.coveredMin >= 36 * 60, "${offer.coveredMin}")
+        // Several bedtime sessions add up the same way.
+        val days = base.copy(practices = (10..12).map { session(at(it, 7), 4.0) })
+        assertNotNull(PR.workFromOffer(days, at(13, 9), tz))
+        // Practice net below zero: no offer.
+        val heavy = run.copy(doses = run.doses + (10..12).flatMap { d -> (0 until 6).map { i -> gum4.toDose("h$d-$i", at(d, 12) + i * 20 * 60_000L, 0) } })
+        assertNull(PR.workFromOffer(heavy, at(13, 9), tz))
+    }
+
+    @Test
+    fun `level history and calendar marks`() {
+        val data = withTarget(emptyList(), 5.0).copy(
+            rungChanges = listOf(RungChange("r", at(1, 8), 5.0, "start"), RungChange("u", at(5, 10), 7.0, "up", "a craving ended with a vape"), RungChange("d", at(9, 10), 6.0, "down")),
+            practices = listOf(session(at(7, 14), 6.0)),
+        )
+        val h = PR.history(data, at(10, 12), tz) { "${it.dayOfMonth} Sep" }
+        assertEquals("9 Sep · Blaze 7 → 6 · stepped down", h[0].text)
+        assertTrue(h[1].text.startsWith("7 Sep · Practiced Blaze pace 2 pm – 11 pm: practice net"), h[1].text)
+        assertEquals("5 Sep · Bonfire 5 → Blaze 7 · stepped up: a craving ended with a vape", h[2].text)
+        assertEquals(mapOf("2026-09-05" to "up", "2026-09-09" to "down"), PR.levelMarks(data, tz))
+    }
+
+    @Test
+    fun `volatility counts how fast as well as how much`() {
+        val from = at(10, 12); val to = at(10, 15)
+        val vape = vapeDose("v", from, gum4.toDose("g", from, 0).absorbedMg())
+        val zyn = pouch6.toDose("z", from, 0)
+        val gum = gum4.toDose("g", from, 0)
+        val vv = Kinetics.volatility(listOf(vape), from, to)
+        val vz = Kinetics.volatility(listOf(zyn), from, to)
+        val vg = Kinetics.volatility(listOf(gum), from, to)
+        println("volatility mg/h: vape=$vv zyn=$vz gum=$vg; steepest: vape=${Kinetics.steepestClimb(listOf(vape), from, to)} zyn=${Kinetics.steepestClimb(listOf(zyn), from, to)} gum=${Kinetics.steepestClimb(listOf(gum), from, to)}")
+        assertTrue(vv > vz && vz > vg && vg > 0, "vape=$vv zyn=$vz gum=$vg")
+        assertEquals(0.0, Kinetics.volatility(emptyList(), from, to), 1e-12)
+    }
+
+    @Test
+    fun `swap tip only with coaching tips on`() {
+        val zyn3 = listOf(DefaultProducts.all().first { it.id == DefaultProducts.ZYN_3MG }.toDose("z", at(10, 9), 0))
+        val C = com.baastiklabs.firewatch.core.engine.Coaching
+        assertNull(C.swapTip(withTarget(zyn3), zyn3))
+        assertNotNull(C.swapTip(withTarget(zyn3, settings = com.baastiklabs.firewatch.core.model.Settings(coachingTips = true)), zyn3))
     }
 }

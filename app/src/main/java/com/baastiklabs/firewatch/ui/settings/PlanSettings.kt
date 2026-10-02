@@ -60,6 +60,12 @@ fun PlanSettings(vm: FirewatchViewModel, data: FirewatchData) {
                 FilterChip(selected = s.holdDays == d, onClick = { update { it.copy(holdDays = d) } }, label = { Text(label) })
             }
         }
+        if (s.holdDays < 7) Text(
+            com.baastiklabs.firewatch.core.Help.HOLD_SHORT_NOTE,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        if (target != null && target > 0) PracticePaceSettings(vm, data)
         Text("First-piece goal", style = MaterialTheme.typography.titleSmall)
         var customDelay by remember { mutableStateOf(false) }
         val isPreset = s.morningDelayClock < 0 && s.morningDelayMinutes in listOf(0, 15, 30, 60, 90)
@@ -225,4 +231,45 @@ private fun CustomDelayDialog(s: Settings, onDismiss: () -> Unit, onSave: (minut
             onPick = { t -> clock = t.hour * 60 + t.minute; pickTime = false },
         )
     }
+}
+
+/**
+ * Settings → Your plan → Practice pace: choose a rung and start, "Back to my pace", the duration
+ * choice (changeable any time, even while it's on), and the lighter-level offers switch.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun PracticePaceSettings(vm: FirewatchViewModel, data: FirewatchData) {
+    val scope = rememberCoroutineScope()
+    val repo = vm.repository
+    val tz = kotlinx.datetime.TimeZone.currentSystemDefault()
+    val now = System.currentTimeMillis()
+    val practice = com.baastiklabs.firewatch.core.engine.Practice
+    val active = practice.active(data, now, tz)
+    val allowed = remember(data) { practice.allowedRungs(data, now, tz) }
+    var choice by remember(data) { mutableStateOf(active?.pieces ?: allowed.firstOrNull()?.pieces) }
+    val untilBedtime = active?.untilBedtime ?: data.settings.practiceUntilBedtime
+    Text("Practice pace", style = MaterialTheme.typography.titleSmall)
+    Text(
+        "Try a lighter pace without changing your level. The battery and dose preview use its gap; your level, net and steady days don't change.",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    if (data.relapseOn) {
+        Text(com.baastiklabs.firewatch.core.Help.PRACTICE_RELAPSE_NOTE, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    } else if (active != null) {
+        Text("On · ${Ladder.rung(active.pieces).label}", style = MaterialTheme.typography.bodyMedium)
+        OutlinedButton(onClick = { scope.launch { repo.stopPractice() } }) { Text("Back to my pace") }
+    } else if (allowed.isNotEmpty()) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            allowed.forEach { r -> FilterChip(selected = choice == r.pieces, onClick = { choice = r.pieces }, label = { Text(r.label) }) }
+        }
+        OutlinedButton(onClick = { choice?.let { p -> scope.launch { repo.startPractice(p, untilBedtime) } } }, enabled = choice != null) { Text("Start") }
+    }
+    if (!data.relapseOn) com.baastiklabs.firewatch.ui.practice.DurationChoice(untilBedtime) { v -> scope.launch { repo.setPracticeUntilBedtime(v) } }
+    ToggleRow(
+        "Lighter-level practice offers",
+        "When your logs measure 2 or more rungs lighter, offer to practice that pace",
+        data.settings.lighterOffers,
+    ) { v -> scope.launch { repo.updateSettings { it.copy(lighterOffers = v) } } }
 }

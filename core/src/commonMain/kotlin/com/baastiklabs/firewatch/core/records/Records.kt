@@ -46,6 +46,8 @@ object RecordTypes {
     const val MODE = "mode"
     const val TIMER_CHECK = "timercheck"
     const val REF_CHANGE = "refchange"
+    const val DAY_MARK = "daymark"
+    const val PRACTICE = "practice"
 
     const val SETTINGS_ID = "settings"
 }
@@ -108,6 +110,12 @@ object RecordCodec {
     fun refChange(c: RefChange, previousJson: String?, now: Long, deleted: Boolean = false) =
         encode(RecordTypes.REF_CHANGE, c.id, c.at, c, RefChange.serializer(), previousJson, now, deleted)
 
+    fun dayMark(m: com.baastiklabs.firewatch.core.model.DayMark, previousJson: String?, now: Long, deleted: Boolean = false) =
+        encode(RecordTypes.DAY_MARK, m.id, m.at, m, com.baastiklabs.firewatch.core.model.DayMark.serializer(), previousJson, now, deleted)
+
+    fun practice(p: com.baastiklabs.firewatch.core.model.PracticeSession, previousJson: String?, now: Long, deleted: Boolean = false) =
+        encode(RecordTypes.PRACTICE, p.id, p.start, p, com.baastiklabs.firewatch.core.model.PracticeSession.serializer(), previousJson, now, deleted)
+
     fun settings(s: Settings, previousJson: String?, now: Long) =
         encode(RecordTypes.SETTINGS, RecordTypes.SETTINGS_ID, null, s, Settings.serializer(), previousJson, now)
 }
@@ -124,7 +132,12 @@ data class FirewatchData(
     val modeChanges: List<ModeChange> = emptyList(),
     val timerChecks: List<TimerCheck> = emptyList(),
     val refChanges: List<RefChange> = emptyList(),
+    val dayMarkList: List<com.baastiklabs.firewatch.core.model.DayMark> = emptyList(),
+    val practices: List<com.baastiklabs.firewatch.core.model.PracticeSession> = emptyList(),
 ) {
+    /** Marked empty days: ISO date → "clear" / "ghost". */
+    val dayMarks: Map<String, String> by lazy { dayMarkList.sortedBy { it.at }.associate { it.date to it.state } }
+
     /** Relapse prevention mode is on right now. */
     val relapseOn: Boolean get() = modeChanges.lastOrNull { it.mode == "relapse" }?.on == true
 
@@ -179,6 +192,8 @@ data class FirewatchData(
                 modeChanges = decodeAll(RecordTypes.MODE, ModeChange.serializer()).sortedBy { it.at },
                 timerChecks = decodeAll(RecordTypes.TIMER_CHECK, TimerCheck.serializer()).sortedBy { it.at },
                 refChanges = decodeAll(RecordTypes.REF_CHANGE, RefChange.serializer()).sortedBy { it.at },
+                dayMarkList = decodeAll(RecordTypes.DAY_MARK, com.baastiklabs.firewatch.core.model.DayMark.serializer()),
+                practices = decodeAll(RecordTypes.PRACTICE, com.baastiklabs.firewatch.core.model.PracticeSession.serializer()).sortedBy { it.start },
             )
         }
     }

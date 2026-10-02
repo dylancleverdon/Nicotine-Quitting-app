@@ -102,6 +102,23 @@ object Help {
     /** The one-time card the first time net appears. */
     const val NET_EXPLAINER = "This is your net: +40m means you're 40 minutes ahead of your pace today, counting both timing and dose size. Holding it at zero or better is how you stay in control."
 
+    /** Practice pace: the two-line explainer behind the "?" on the battery row. */
+    const val PRACTICE_EXPLAINER = "Practice pace tries a lighter pace without changing your level: the battery and dose preview use its gap, and practice net shows how it's going.\nStop any time in Settings → Your plan → Practice pace."
+
+    const val PRACTICE_STOP_NOTE = "You can stop any time in Settings → Your plan → Practice pace."
+
+    const val PRACTICE_RELAPSE_NOTE = "Practice pace is off while Relapse prevention mode is on, because its reminders follow your level's gap."
+
+    const val HOLD_SHORT_NOTE = "Shorter holds mean faster steps. Each step is easier to keep with more days at it."
+
+    const val UNKNOWN_DAYS_NOTE = "? = nothing logged that day. Tap one to mark it clear, add what you had, or leave it out. Until then it's left out of your figures."
+
+    /** The lighter-level practice offer (§7), worded as D approved. */
+    fun lighterOfferTitle(measuredLabel: String) = "Your logs measure $measuredLabel"
+    fun lighterOfferBody(workingLabel: String, measuredTier: String) =
+        "You're working at $workingLabel. Practicing $measuredTier pace for a while is a way to check it. If it suits you, you can then choose to work from $measuredTier: a more accurate level.\n\n" +
+            "Practicing is just practice. You can stop any time and go back to your usual pace, with no step down."
+
     fun search(query: String): List<Article> {
         val q = query.trim().lowercase()
         if (q.isEmpty()) return articles

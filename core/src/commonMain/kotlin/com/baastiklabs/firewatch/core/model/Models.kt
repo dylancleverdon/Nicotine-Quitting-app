@@ -174,6 +174,14 @@ data class Settings(
     /** Practice day: this waking day (ISO date) uses [practicePieces] for the battery. "" = none. */
     val practiceDate: String = "",
     val practicePieces: Double = 0.0,
+    /** Practice pace default: turn off at bedtime (true) or leave it on until turned off. */
+    val practiceUntilBedtime: Boolean = true,
+    /** Lighter-level practice offers (§7); "Don't ask me again" turns this off. */
+    val lighterOffers: Boolean = true,
+    val lighterSnoozedAt: Long = 0,
+    /** The practice session whose follow-up ("How was it?" / "Work from") was answered. */
+    val practiceAnswered: String = "",
+    val workFromSnoozedAt: Long = 0,
 )
 
 /**
@@ -226,8 +234,43 @@ data class RungChange(
     val id: String,
     val at: Long,
     val pieces: Double,
-    /** "start", "down" or "up". */
+    /** "start", "down" or "up" ("measured": work from the measured level after practice). */
     val reason: String = "",
+    /** Why, in plain words (e.g. the step-up reason). Empty for older entries. */
+    val detail: String = "",
+)
+
+/**
+ * A day with nothing logged, marked by D: [state] "clear" (a real 0-nicotine day, counts as 0) or
+ * "ghost" (left out of every figure). Unmarked empty days are "?" (worked out, never stored).
+ * One per date: the id is "daymark-<date>"; un-marking is a tombstone.
+ */
+@Serializable
+data class DayMark(
+    val id: String,
+    /** ISO date of the waking day. */
+    val date: String,
+    val state: String,
+    val at: Long = 0,
+) {
+    companion object {
+        const val CLEAR = "clear"
+        const val GHOST = "ghost"
+        fun idFor(date: String) = "daymark-$date"
+    }
+}
+
+/**
+ * Practice pace: a lighter pace for the battery and dose preview, without changing D's level.
+ * [end] null = still on. [untilBedtime]: ends at bedtime of the waking day it's in.
+ */
+@Serializable
+data class PracticeSession(
+    val id: String,
+    val start: Long,
+    val pieces: Double,
+    val end: Long? = null,
+    val untilBedtime: Boolean = true,
 )
 
 object DefaultProducts {

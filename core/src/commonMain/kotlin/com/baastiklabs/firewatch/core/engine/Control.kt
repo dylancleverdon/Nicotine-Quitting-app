@@ -39,7 +39,7 @@ object Control {
         val status = Baseline.status(data, today, tz)
         if (status !is BaselineStatus.InProgress) return null
         val first = data.doses.firstOrNull()?.at?.localDate(tz) ?: return null
-        val full = (0 until first.daysUntil(today)).map { first.plus(it, DateTimeUnit.DAY) }
+        val full = (0 until first.daysUntil(today)).map { first.plus(it, DateTimeUnit.DAY) }.filter { Progress.known(data, it, tz) }
         if (full.isEmpty()) return null
         val avg = full.map { Progress.pace(data, it, tz).scaled }.average()
         val d = full.size.coerceAtMost(7)
@@ -59,7 +59,7 @@ object Control {
         val today = now.localDate(tz)
         return (1..since.daysUntil(today)).count { i ->
             val d = today.minus(i, DateTimeUnit.DAY)
-            d > since && Progress.pace(data, d, tz).scaled <= target + 0.25
+            d > since && Progress.known(data, d, tz) && Progress.pace(data, d, tz).scaled <= target + 0.25
         }
     }
 
@@ -75,7 +75,7 @@ object Control {
             var (n, _) = out[rc.pieces] ?: (0 to null)
             val milestones = HashMap<Int, LocalDate>()
             while (d < end && d < today) {
-                if (Progress.pace(data, d, tz).scaled <= rc.pieces + 0.25) { n++; milestones[n] = d }
+                if (Progress.known(data, d, tz) && Progress.pace(data, d, tz).scaled <= rc.pieces + 0.25) { n++; milestones[n] = d }
                 d = d.plus(1, DateTimeUnit.DAY)
             }
             out[rc.pieces] = n to (milestones[n] ?: out[rc.pieces]?.second)
@@ -87,7 +87,7 @@ object Control {
     fun heldSeries(data: FirewatchData, now: Long, tz: TimeZone, n: Int = 42): List<Triple<LocalDate, Double, Double?>> {
         val today = now.localDate(tz)
         val first = data.doses.firstOrNull()?.at?.localDate(tz) ?: return emptyList()
-        return (n downTo 1).map { today.minus(it, DateTimeUnit.DAY) }.filter { it >= first }.map { d ->
+        return (n downTo 1).map { today.minus(it, DateTimeUnit.DAY) }.filter { it >= first && Progress.known(data, it, tz) }.map { d ->
             val wake = Waking.day(data, d, tz).wakeAt
             Triple(d, Progress.pace(data, d, tz).scaled, BatteryEngine.targetAt(data, wake + DAY - 1))
         }
@@ -144,19 +144,18 @@ object Control {
         val target = BatteryEngine.targetAt(data, nextWake - 1) ?: return null
         val doses = data.doses.filter { it.at >= w.wakeAt && it.at < nextWake }
         if (doses.any { Cravings.isRelapseDose(it) }) return false
-        // A day with nothing logged only counts at Clear Air, or if the app was clearly in use
-        // (a craving or Good morning / Good night): otherwise it's probably just untracked.
-        if (doses.isEmpty() && target > 0 &&
-            data.cravings.none { it.at >= w.wakeAt && it.at < nextWake } &&
-            data.sleepEvents.none { it.at >= w.wakeAt && it.at < nextWake }
-        ) return false
+        // A day with nothing logged counts only when D marked it clear 🌿; "?" and ghost days don't.
+        if (doses.isEmpty()) return com.baastiklabs.firewatch.core.Days.state(data, date, tz, now) == com.baastiklabs.firewatch.core.DayState.CLEAR
         if (Relapse.isModeDay(data, date, tz)) return true
         if (doses.isNotEmpty() && doses.all { it.estimated }) return doses.sumOf { data.piecesOf(it) } <= target + 0.25
         val day = BatteryEngine.day(data, date, tz, now) ?: return null
         return day.netMin >= 0
     }
 
-    /** Steady days so far (full waking days only). It only ever goes up: bad days just don't add. */
+    /**
+     * Steady days so far (full waking days only). It only ever goes up: bad days just don't add.
+     * (Recalculated once in 0.13 for "?" days.)
+     */
     fun steadyDays(data: FirewatchData, now: Long, tz: TimeZone): Int = steadyDates(data, now, tz).size
 
     fun steadyDates(data: FirewatchData, now: Long, tz: TimeZone): List<LocalDate> {
@@ -176,23 +175,11 @@ object Control {
     fun newSteadyMilestone(data: FirewatchData, steady: Int): Int? =
         STEADY_MILESTONES.lastOrNull { steady >= it }?.takeIf { it > data.settings.steadyMilestoneSeen }
 
-    // ---- Practice day ----
+    // ---- Practice day (now practice pace, see [Practice]) ----
 
-    /** True while today (waking day) is a practice day at the next rung. */
-    fun practicingToday(data: FirewatchData, now: Long, tz: TimeZone): Boolean {
-        val s = data.settings
-        return s.practiceDate.isNotEmpty() && s.practicePieces > 0 &&
-            s.practiceDate == BatteryEngine.currentDay(data, now, tz).first.date.toString()
-    }
+    fun practicingToday(data: FirewatchData, now: Long, tz: TimeZone): Boolean = Practice.active(data, now, tz) != null
 
-    /** After a practice day: the rung that was practised, to ask "How was it?". Null otherwise. */
-    fun practiceFollowUp(data: FirewatchData, now: Long, tz: TimeZone): Rung? {
-        val s = data.settings
-        if (s.practiceDate.isEmpty() || s.practicePieces <= 0) return null
-        val today = BatteryEngine.currentDay(data, now, tz).first.date
-        val practised = runCatching { LocalDate.parse(s.practiceDate) }.getOrNull() ?: return null
-        return if (practised < today) Ladder.rung(s.practicePieces) else null
-    }
+    fun practiceFollowUp(data: FirewatchData, now: Long, tz: TimeZone): Rung? = Practice.followUp(data, now, tz)?.let { Ladder.rung(it.pieces) }
 
     // ---- Taper forecast ----
 
@@ -209,8 +196,10 @@ object Control {
         val current = data.targetPieces ?: Progress.measuredRung(data, today, tz)?.pieces ?: return null
         if (current <= 0) return TaperPlan(emptyList(), "You're at Clear Air", data.settings.holdDays)
         val hold = data.settings.holdDays.coerceAtLeast(1)
-        val since = data.rungChanges.lastOrNull()?.at?.localDate(tz)
-        var daysLeft = (hold - (since?.daysUntil(today) ?: 0)).coerceIn(1, hold)
+        // One step-down count everywhere: the plan's first step is as many known days away as the
+        // step-down progress still needs (the same count "Next step down" shows).
+        val progress = Progress.stepDownProgress(data, now, tz)
+        var daysLeft = if (progress != null && data.targetPieces != null) (hold - progress.held).coerceIn(0, hold) else hold
         var rung = current
         var date = today
         val plan = ArrayList<TaperStep>()

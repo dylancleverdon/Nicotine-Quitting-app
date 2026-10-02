@@ -33,6 +33,8 @@ data class Battery(
     val pullMinutesToday: Double = 0.0,
     /** In the last hour before usual bedtime (wind-down on): show a bedtime note, keep the guidance. */
     val closeToBed: Boolean = false,
+    /** Practice pace is on at this many pieces a day (the battery and preview use its gap). */
+    val practicePieces: Double? = null,
 ) {
     val netMinutesToday: Double get() = stretchMinutesToday - pullMinutesToday
 }
@@ -59,15 +61,36 @@ object Progress {
         return DayPace(date, pieces, day.awakeMinutes)
     }
 
-    /** 7-day rolling average of scaled pieces a day, ending with [today] (partial days excluded). */
+    /** Is this past day counted ("?" and ghost days are left out everywhere)? */
+    fun known(data: FirewatchData, date: LocalDate, tz: TimeZone): Boolean =
+        com.baastiklabs.firewatch.core.Days.state(data, date, tz, Long.MAX_VALUE).known
+
+    /**
+     * 7-day rolling average of scaled pieces a day over the known days among the last [days] full
+     * days before [today] ("?" and ghost days left out; clear days count as 0).
+     */
     fun rollingAverage(data: FirewatchData, today: LocalDate, tz: TimeZone, days: Int = ROLLING_DAYS): Double? {
         val first = data.doses.minOfOrNull { it.at }?.localDate(tz) ?: return null
         val end = today.minus(1, DateTimeUnit.DAY)
         if (end < first) return null
         val start = maxOf(first, end.minus(days - 1, DateTimeUnit.DAY))
         val paces = generateSequence(start) { it.plus(1, DateTimeUnit.DAY) }.takeWhile { it <= end }
-            .map { pace(data, it, tz) }.toList()
+            .filter { known(data, it, tz) }.map { pace(data, it, tz) }.toList()
+        if (paces.isEmpty()) return null
         return paces.sumOf { it.scaled } / paces.size
+    }
+
+    /** The last [n] full days, oldest first, with their state (the confidence strip). */
+    fun recentStates(data: FirewatchData, now: Long, tz: TimeZone, n: Int = 30): List<Pair<LocalDate, com.baastiklabs.firewatch.core.DayState>> {
+        val today = BatteryEngine.currentDay(data, now, tz).first.date
+        return (n downTo 1).map { today.minus(it, DateTimeUnit.DAY) }.map { it to com.baastiklabs.firewatch.core.Days.state(data, it, tz, now) }
+            .filter { it.second != com.baastiklabs.firewatch.core.DayState.BEFORE }
+    }
+
+    /** How many of the last [days] full days are known (for "6 of 7 days known"). */
+    fun knownDays(data: FirewatchData, today: LocalDate, tz: TimeZone, days: Int = ROLLING_DAYS): Int {
+        val start = com.baastiklabs.firewatch.core.Days.startDate(data, tz) ?: return 0
+        return (1..days).map { today.minus(it, DateTimeUnit.DAY) }.count { it >= start && known(data, it, tz) }
     }
 
     fun measuredRung(data: FirewatchData, today: LocalDate, tz: TimeZone): Rung? =
@@ -87,8 +110,9 @@ object Progress {
         if (target <= 0) return null
         // First week: the "Your starting point" card replaces the early estimate instead.
         if (Control.isEarly(data)) return null
-        // A practice day (or its "How was it?" follow-up) stands in for the offer.
-        if (Control.practicingToday(data, now, tz) || Control.practiceFollowUp(data, now, tz) != null) return null
+        // Practice pace (or its "How was it?" follow-up), or the lighter-level offer, stands in for it.
+        if (Practice.active(data, now, tz) != null || Practice.followUp(data, now, tz) != null) return null
+        if (Practice.lighterOffer(data, now, tz) != null || Practice.workFromOffer(data, now, tz) != null) return null
         if (now - data.settings.stepDownSnoozedAt < 24 * 60 * MIN) return null
         val progress = stepDownProgress(data, now, tz) ?: return null
         return if (progress.ready) progress.next else null
@@ -107,8 +131,12 @@ object Progress {
         val sinceDate = since.localDate(tz)
         var day = now.localDate(tz).minus(1, DateTimeUnit.DAY)
         var held = 0
-        while (held < hold && day > sinceDate && pace(data, day, tz).scaled <= target + 0.25) {
-            held++
+        // "?" and ghost days are skipped, not counted and not a reset: people have off days.
+        while (held < hold && day > sinceDate) {
+            if (known(data, day, tz)) {
+                if (pace(data, day, tz).scaled > target + 0.25) break
+                held++
+            }
             day = day.minus(1, DateTimeUnit.DAY)
         }
         return StepDownProgress(held, hold, Ladder.nextDown(target))

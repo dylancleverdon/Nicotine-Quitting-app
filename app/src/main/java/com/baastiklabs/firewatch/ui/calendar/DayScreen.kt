@@ -133,8 +133,44 @@ fun DayScreen(
                     Stat("${summary.cravingsRodeOut} of ${summary.cravings}", "cravings ridden out")
                 }
             }
-            if (entries.isEmpty()) {
-                item { Text("Nothing logged this day.", style = MaterialTheme.typography.bodyMedium) }
+            val state = Days.state(data, kDate, tz, now)
+            // Level changes that day: "Level: Blaze 7 → 6".
+            data.rungChanges.withIndex().filter { (i, rc) ->
+                i > 0 && com.baastiklabs.firewatch.core.engine.BatteryEngine.currentDay(data, rc.at, tz).first.date == kDate
+            }.forEach { (i, rc) ->
+                val from = com.baastiklabs.firewatch.core.engine.Ladder.rung(data.rungChanges[i - 1].pieces)
+                val to = com.baastiklabs.firewatch.core.engine.Ladder.rung(rc.pieces)
+                val text = if (from.tier == to.tier) "${from.tier.title} ${com.baastiklabs.firewatch.core.engine.Ladder.piecesText(from.pieces)} → ${com.baastiklabs.firewatch.core.engine.Ladder.piecesText(to.pieces)}"
+                    else "${from.tier.title} ${com.baastiklabs.firewatch.core.engine.Ladder.piecesText(from.pieces)} → ${to.label}"
+                item { Text("Level: $text", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary) }
+            }
+            if (entries.isEmpty() || summary.doseCount == 0) {
+                item {
+                    Text(
+                        when (state) {
+                            com.baastiklabs.firewatch.core.DayState.CLEAR -> "🌿 A clear day: no nicotine."
+                            com.baastiklabs.firewatch.core.DayState.GHOST -> "👻 Left out of your figures."
+                            com.baastiklabs.firewatch.core.DayState.UNKNOWN -> "? Nothing logged this day. It's left out of your figures until you say what happened."
+                            else -> "Nothing logged this day."
+                        },
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
+                if (state == com.baastiklabs.firewatch.core.DayState.UNKNOWN || state == com.baastiklabs.firewatch.core.DayState.CLEAR || state == com.baastiklabs.firewatch.core.DayState.GHOST) item {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        if (state != com.baastiklabs.firewatch.core.DayState.CLEAR) OutlinedButton(
+                            onClick = { scope.launch { vm.repository.markDay(kDate.toString(), com.baastiklabs.firewatch.core.model.DayMark.CLEAR) } },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) { Text("🌿 I had none") }
+                        if (state != com.baastiklabs.firewatch.core.DayState.GHOST) OutlinedButton(
+                            onClick = { scope.launch { vm.repository.markDay(kDate.toString(), com.baastiklabs.firewatch.core.model.DayMark.GHOST) } },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) { Text("👻 Don't log this day") }
+                        if (state != com.baastiklabs.firewatch.core.DayState.UNKNOWN) androidx.compose.material3.TextButton(
+                            onClick = { scope.launch { vm.repository.markDay(kDate.toString(), null) } },
+                        ) { Text("Undo: back to ?") }
+                    }
+                }
             }
             items(entries, key = { entry ->
                 when (entry) {

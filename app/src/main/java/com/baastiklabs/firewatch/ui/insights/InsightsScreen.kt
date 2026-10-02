@@ -121,7 +121,7 @@ fun InsightsScreen(
                 "Cravings ahead" -> item { CravingsAheadSection(data, now, tz) }
                 "Receptors" -> item { ReceptorSection(data, now, tz) }
                 "Stretch & pull" -> item { StretchSection(ins) }
-                "Trends" -> item { TrendsSection(ins) }
+                "Trends" -> item { TrendsSection(ins, data, now, tz) }
                 "Patterns" -> item { PatternsSection(ins, data, tz) }
                 "Going up" -> item { GoingUpSection(ins, data) }
                 "Going down" -> item { GoingDownSection(ins, data, now) }
@@ -183,7 +183,7 @@ private fun TodaySection(
     var back by rememberSaveable { mutableStateOf(0) }
     val today = ins.days.last().date
     val date = today.minus(back, kotlinx.datetime.DateTimeUnit.DAY)
-    val w = ins.days.firstOrNull { it.date == date } ?: ins.days.last()
+    val w = remember(ins, date) { ins.days.firstOrNull { it.date == date } ?: ins.dayStat(date) }
     val oldest = ins.days.first().date
     Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
         androidx.compose.material3.TextButton(onClick = { back++ }, enabled = date > oldest) { Text("‹") }
@@ -221,12 +221,12 @@ private fun TodaySection(
     }
     val vol = ins.fullDays.win()
     if (vol.isNotEmpty()) {
-        ChartCard("Nicotine volatility", "Each day's average one-hour swing, with a 7-day average line. Lower means steadier nicotine through the day.") {
+        ChartCard("Nicotine volatility", "How fast and how much your nicotine level changes, each day (mg per hour), with a 7-day average line. Lower means steadier nicotine through the day.") {
             val vs = vol.map { it.volatility }
             BarChart(
                 vs.map { Bar(it) },
                 line = vs.indices.map { i -> vs.subList(maxOf(0, i - 6), i + 1).average() },
-                yFmt = { "${fmtNum(it)} mg" },
+                yFmt = { "${fmtNum(it)} mg/h" },
                 xLabels = dates(vol),
             )
         }
@@ -255,7 +255,7 @@ private fun YesterdayCard(data: FirewatchData, now: Long) {
         Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
             Stat("≈ ${Fmt.pieces(r.pieces)}", "pieces")
             r.netMin?.let { Stat(Fmt.signedMinutes(it), "net") }
-            Stat("≈ ${fmt1(r.volatility)} mg", "volatility")
+            Stat("≈ ${fmt1(r.volatility)} mg/h", "volatility")
         }
         val lines = listOfNotNull(
             r.mix.takeIf { it.isNotEmpty() }?.joinToString(", ", prefix = "Mix: ") { "${(it.second * 100).roundToInt()}% ${com.baastiklabs.firewatch.core.engine.Coaching.kindName(it.first)}" },
@@ -392,7 +392,37 @@ private fun StretchSection(ins: Insights) = Col {
 }
 
 @Composable
-private fun TrendsSection(ins: Insights) = Col {
+private fun TrendsSection(ins: Insights, data: FirewatchData, now: Long, tz: TimeZone) = Col {
+    val states = remember(data, now / 600_000) { Progress.recentStates(data, now, tz, 30) }
+    if (states.isNotEmpty()) {
+        val known = states.count { it.second.known }
+        val measured = Progress.measuredRung(data, now.localDate(tz), tz)
+        val known7 = Progress.knownDays(data, now.localDate(tz), tz)
+        ChartCard("$known of ${states.size} days known", "One dot per day: filled = logged, 🌿 = clear, ? = nothing logged, 👻 = left out. Only known days count in your figures.") {
+            Row(horizontalArrangement = Arrangement.spacedBy(2.dp), modifier = Modifier.fillMaxWidth()) {
+                states.forEach { (_, st) ->
+                    Text(
+                        when (st) {
+                            com.baastiklabs.firewatch.core.DayState.LOGGED -> "●"
+                            com.baastiklabs.firewatch.core.DayState.CLEAR -> "🌿"
+                            com.baastiklabs.firewatch.core.DayState.GHOST -> "👻"
+                            else -> "?"
+                        },
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (st.known) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+            }
+            measured?.let {
+                Text(
+                    "Your last 7 days measure ${it.label}" + if (known7 < 7) " ($known7 of 7 days known)" else "",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
+        }
+    }
     val days = ins.days.win()
     val offset = ins.days.size - days.size
     val bands = listOf(
@@ -556,7 +586,7 @@ private fun GoingDownSection(ins: Insights, data: FirewatchData, now: Long) = Co
     ChartCard("Nicotine quality", "How you use nicotine, on a food scale. Gum, lozenges and patches are broccoli; smoke is burger and fries. Switching method raises it; using a vape less doesn't.") {
         TrendLine(quality, color = MaterialTheme.colorScheme.tertiary, yFmt = num, top = 100.0, xLabels = dates(days))
         ins.days.last().quality?.let { Text("Today: ${Quality.label(it)}", style = MaterialTheme.typography.titleMedium) }
-        Quality.swapTip(ins.days.last().doses, data.referenceMg)?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+        com.baastiklabs.firewatch.core.engine.Coaching.swapTip(data, ins.days.last().doses)?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
         Quality.Food.entries.forEach { f -> Text("${f.emoji} ${f.title}: ${f.min}+", style = MaterialTheme.typography.bodySmall) }
         Text("Per dose: gum, lozenge, patch 100 · pouch 60 · vape 25 · cigarette 5 (max 10). Minus points for a big single dose and for stacking doses.",
             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -768,6 +798,19 @@ private fun MilestonesSection(ins: Insights, now: Long) = Col {
 
 @Composable
 private fun LadderSection(data: FirewatchData, now: Long, tz: TimeZone) = Col {
+    val history = remember(data) {
+        com.baastiklabs.firewatch.core.engine.Practice.history(data, now, tz) { Fmt.dayMonth(it) }
+    }
+    if (history.isNotEmpty()) {
+        ChartCard("Level history", "Newest first. Step ups keep their reason; practice pace shows its practice net.") {
+            history.forEach { h ->
+                Text(
+                    (when (h.kind) { "down" -> "▼ "; "up" -> "▲ "; "practice" -> "◇ "; else -> "• " }) + h.text,
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+        }
+    }
     val measured = Progress.measuredRung(data, now.localDate(tz), tz)
     val target = data.targetPieces
     ChartCard("The ladder", "Each rung is one piece a day lighter. Named tiers are the big landmarks.") {

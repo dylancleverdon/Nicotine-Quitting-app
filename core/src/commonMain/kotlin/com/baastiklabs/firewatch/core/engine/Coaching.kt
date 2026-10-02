@@ -105,6 +105,10 @@ object Coaching {
         return Tip(BRIDGE, "A ${gum.name} now is net-neutral and can take the edge off before your next piece.")
     }
 
+    /** The pouch → gum quality swap tip: only with Coaching tips on. */
+    fun swapTip(data: FirewatchData, doses: List<com.baastiklabs.firewatch.core.model.Dose>): String? =
+        if (data.settings.coachingTips) Quality.swapTip(doses, data.referenceMg) else null
+
     private fun Long.toHour(tz: TimeZone): Int =
         kotlinx.datetime.Instant.fromEpochMilliseconds(this).toLocalDateTime(tz).hour
 

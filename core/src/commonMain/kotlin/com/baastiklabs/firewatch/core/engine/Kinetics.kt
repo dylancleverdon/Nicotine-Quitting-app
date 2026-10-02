@@ -82,19 +82,47 @@ object Kinetics {
         else contribution(d, (atMs - d.at) / 60_000.0)
     }
 
+    /** Level at every minute from [from] to [to] (inclusive). */
+    private fun minuteLevels(doses: List<Dose>, from: Long, to: Long): DoubleArray {
+        val relevant = doses.filter { it.at <= to && it.at >= from - 48 * 3_600_000L }
+        val n = ((to - from) / 60_000L).toInt() + 1
+        return DoubleArray(n.coerceAtLeast(0)) { level(relevant, from + it * 60_000L) }
+    }
+
     /**
-     * Nicotine volatility: the one-hour swing (highest minus lowest level over the hour before each
-     * point) along an evenly spaced [curve]. Needs an hour of curve before the first point shown.
+     * Nicotine volatility: how fast and how much the level changes. The root-mean-square of the
+     * rate of change (mg per hour) over [from, to): steep stretches count extra, steady or clear
+     * time is near zero.
      */
-    fun swing(curve: List<Pair<Long, Double>>): List<Pair<Long, Double>> {
-        if (curve.size < 2) return curve.map { it.first to 0.0 }
-        val step = curve[1].first - curve[0].first
-        val window = (60 * 60_000L / step).toInt().coerceAtLeast(1)
-        return curve.indices.map { i ->
-            val from = (i - window).coerceAtLeast(0)
-            val slice = curve.subList(from, i + 1)
-            curve[i].first to (slice.maxOf { it.second } - slice.minOf { it.second })
+    fun volatility(doses: List<Dose>, from: Long, to: Long): Double {
+        if (to - from < 2 * 60_000L) return 0.0
+        val lv = minuteLevels(doses, from, to)
+        var sum = 0.0
+        for (i in 1 until lv.size) { val r = (lv[i] - lv[i - 1]) * 60.0; sum += r * r }
+        return kotlin.math.sqrt(sum / (lv.size - 1))
+    }
+
+    /** Running volatility (mg/h) over the [windowMin] minutes before each point, every [stepMin]. */
+    fun volatilityCurve(doses: List<Dose>, from: Long, to: Long, stepMin: Int = 5, windowMin: Int = 30): List<Pair<Long, Double>> {
+        if (to <= from) return emptyList()
+        val start = from - windowMin * 60_000L
+        val lv = minuteLevels(doses, start, to)
+        val sq = DoubleArray(lv.size)
+        for (i in 1 until lv.size) { val r = (lv[i] - lv[i - 1]) * 60.0; sq[i] = sq[i - 1] + r * r }
+        val out = ArrayList<Pair<Long, Double>>()
+        var t = from
+        while (t <= to) {
+            val i = ((t - start) / 60_000L).toInt()
+            out += t to kotlin.math.sqrt((sq[i] - sq[i - windowMin]) / windowMin)
+            t += stepMin * 60_000L
         }
+        return out
+    }
+
+    /** Steepest climb (mg/h) over [from, to). */
+    fun steepestClimb(doses: List<Dose>, from: Long, to: Long): Double {
+        val lv = minuteLevels(doses, from, to)
+        return (1 until lv.size).maxOfOrNull { (lv[it] - lv[it - 1]) * 60.0 } ?: 0.0
     }
 
     /** Level at evenly spaced points from [fromMs] to [toMs]. */

@@ -1,8 +1,34 @@
 # Proposed update: known days, practice pace, honest volatility and level history
 
-Status: **proposed, not built.** Dated 2 Oct 2026. Written against Android 0.12.0. Covers the
+Status: **building for Android 0.13.0 / web 0.10.0** (decisions of 2 Oct below; web caught up with Android in the same release). Dated 2 Oct 2026. Written against Android 0.12.0. Covers the
 suggestions received 29 Sep – 1 Oct and the open items from the 30 Sep review (see
 `docs/suggestions.md`).
+
+## Decisions (2 Oct, from D)
+- Spelling: **practice** everywhere, noun and verb.
+- "Try it for a day" on the step-down offer becomes practice pace, then the same morning question.
+- Steady days: the old "empty day counts if a craving or Good morning/night was logged" rule goes;
+  only clear 🌿 days count as empty steady days. **Steady days are recalculated once** under the new
+  rules (the total can drop once; after that it only goes up).
+- Practice pace has a **duration choice: "Turn off at bedtime" or "Leave it on until I turn it off"**.
+  It's in Settings → Your plan → Practice pace (changeable any time, even while running), and on a
+  second screen after accepting an offer (so the offer card isn't crowded).
+- **"Work from your measured level"** (§8) is offered once practice pace at the measured pace has
+  covered **at least 75% of the hold period's waking hours** (e.g. a 3-day hold: 75% of 3 × 16 h =
+  36 h), counted over the run since it was turned on, with practice net ≥ 0. Choices: Work from X /
+  Keep practicing / Back to Y pace.
+- A multi-day run shows "Practice net +1h 10m · day 3"; level, steady days and the step-down count
+  stay against the real level.
+- Volatility is recalculated in mg/h, Yesterday in review included.
+- **Web app** gets all of this and catches up with every Android feature a browser can do
+  (not notifications, widgets or the watch).
+- Offer wording (D approved):
+  > **Your logs measure Campfire · 4 a day**
+  > You're working at Blaze · 7. Practicing Campfire pace for a while is a way to check it. If it
+  > suits you, you can then choose to work from Campfire: a more accurate level.
+  > Practicing is just practice. You can stop any time and go back to your usual pace, with no step
+  > down.
+  > [Try Campfire pace] [Stay here]  ☐ Don't ask me again
 
 ## Summary
 **Honest days**

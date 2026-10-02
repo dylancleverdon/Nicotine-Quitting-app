@@ -8,6 +8,7 @@ import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.daysUntil
+import kotlinx.datetime.plus
 import kotlinx.datetime.toLocalDateTime
 
 fun Long.localDate(tz: TimeZone): LocalDate = Instant.fromEpochMilliseconds(this).toLocalDateTime(tz).date
@@ -24,7 +25,49 @@ data class DaySummary(
     val lastDoseAt: Long? = null,
 )
 
+/**
+ * What a full waking day is, for counting. LOGGED and CLEAR are "known" and count everywhere;
+ * UNKNOWN ("?": nothing logged, not explained) and GHOST (D chose not to log it) are left out of
+ * every figure. OPEN = the day isn't over yet; BEFORE = before D started.
+ */
+enum class DayState { LOGGED, CLEAR, UNKNOWN, GHOST, OPEN, BEFORE;
+    val known: Boolean get() = this == LOGGED || this == CLEAR
+    val leftOut: Boolean get() = this == UNKNOWN || this == GHOST
+}
+
 object Days {
+    /** The first waking day that counts: D's first level or first dose, whichever came first. */
+    fun startDate(data: FirewatchData, tz: TimeZone): LocalDate? =
+        listOfNotNull(data.rungChanges.firstOrNull()?.at, data.doses.firstOrNull()?.at).minOrNull()?.let { wakingDate(data, it, tz) }
+
+    /** Any dose in [from, to) (doses are sorted by time). */
+    fun anyDose(data: FirewatchData, from: Long, to: Long): Boolean {
+        val ds = data.doses
+        var lo = 0; var hi = ds.size
+        while (lo < hi) { val m = (lo + hi) / 2; if (ds[m].at < from) lo = m + 1 else hi = m }
+        return lo < ds.size && ds[lo].at < to
+    }
+
+    /**
+     * The one rule for which days count. A day becomes "?" only once its waking day is over (at the
+     * next wake-up); opening the app, cravings or Good morning / night never make it clear.
+     */
+    fun state(data: FirewatchData, date: LocalDate, tz: TimeZone, now: Long): DayState {
+        val start = startDate(data, tz) ?: return DayState.BEFORE
+        if (date < start) return DayState.BEFORE
+        val w = com.baastiklabs.firewatch.core.engine.Waking.day(data, date, tz)
+        val next = com.baastiklabs.firewatch.core.engine.Waking.day(data, date.plus(1, kotlinx.datetime.DateTimeUnit.DAY), tz).wakeAt
+        if (anyDose(data, w.wakeAt, next)) return if (next > now) DayState.OPEN else DayState.LOGGED
+        if (next > now) return DayState.OPEN
+        return when (data.dayMarks[date.toString()]) {
+            com.baastiklabs.firewatch.core.model.DayMark.CLEAR -> DayState.CLEAR
+            com.baastiklabs.firewatch.core.model.DayMark.GHOST -> DayState.GHOST
+            else -> DayState.UNKNOWN
+        }
+    }
+
+    fun known(data: FirewatchData, date: LocalDate, tz: TimeZone, now: Long): Boolean = state(data, date, tz, now).known
+
     /**
      * The one "which day" rule: the waking day (wake-up to the next wake-up) that [t] belongs to.
      * A 1 AM piece counts toward the night before. Daily counts everywhere use this; continuous

@@ -230,7 +230,7 @@ fun WaveChart(
     val (primary, grid, muted) = chartColors()
     val overlayColor = MaterialTheme.colorScheme.tertiary
     if (points.size < 2) return
-    val oMax = if (overlay.size > 1) niceTicks(overlay.maxOf { it.second }.coerceAtLeast(0.2)).last() else 1.0
+    val oMax = if (overlay.size > 1) niceTicks(overlay.maxOf { it.second }.coerceAtLeast(1.0)).last() else 1.0
     val t0 = points.first().first
     val t1 = points.last().first
     val ticks = if (compact) null else niceTicks(max(points.maxOf { it.second }, typical.maxOfOrNull { it.second } ?: 0.0).coerceAtLeast(0.5))
@@ -238,7 +238,7 @@ fun WaveChart(
     ChartFrame(ticks, { "${fmtNum(it)} mg" }, height, timeTicks(t0, t1, if (compact) 4 else 5), modifier, readout = { p ->
         val t = t0 + (p * (t1 - t0)).toLong()
         val pt = points.minByOrNull { kotlin.math.abs(it.first - t) }!!
-        val vol = overlay.takeIf { it.size > 1 }?.minByOrNull { kotlin.math.abs(it.first - t) }?.let { " · volatility ≈ ${fmtNum(Math.round(it.second * 10) / 10.0)} mg" } ?: ""
+        val vol = overlay.takeIf { it.size > 1 }?.minByOrNull { kotlin.math.abs(it.first - t) }?.let {  " · volatility ≈ ${fmtNum(Math.round(it.second * 10) / 10.0)} mg/h" } ?: ""
         "${com.baastiklabs.firewatch.ui.Fmt.time(pt.first)} · ≈ ${fmtNum(Math.round(pt.second * 10) / 10.0)} mg$vol"
     }) {
     Canvas(Modifier.fillMaxWidth().height(height)) {
@@ -279,7 +279,7 @@ fun WaveChart(
     }
     if (overlay.size > 1) {
         androidx.compose.material3.Text(
-            "━ Volatility (mg), right scale 0–${fmtNum(oMax)}",
+            "━ Volatility (mg/h), right scale 0–${fmtNum(oMax)}",
             style = MaterialTheme.typography.labelSmall,
             color = overlayColor,
             modifier = Modifier.fillMaxWidth(),

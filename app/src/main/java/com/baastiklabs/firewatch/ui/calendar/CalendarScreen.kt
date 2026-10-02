@@ -35,6 +35,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -69,6 +70,14 @@ fun CalendarScreen(data: FirewatchData, now: Long, onOpenDay: (LocalDate) -> Uni
         Days.summaries(data, tz, now).mapKeys { it.key.toJavaLocalDate() }
     }
     val firstLog: LocalDate? = remember(data) { data.doses.minOfOrNull { it.at }?.localDate(tz)?.toJavaLocalDate() }
+    // Logged / clear 🌿 / "?" / ghost 👻 for every day shown, and ▲ / ▼ on level changes.
+    val states: Map<LocalDate, com.baastiklabs.firewatch.core.DayState> = remember(data, minute, monthText) {
+        val first = month.atDay(1).minusDays(7)
+        (0 until 45).map { first.plusDays(it.toLong()) }.associateWith { d ->
+            Days.state(data, kotlinx.datetime.LocalDate(d.year, d.monthValue, d.dayOfMonth), tz, now)
+        }
+    }
+    val marks = remember(data) { com.baastiklabs.firewatch.core.engine.Practice.levelMarks(data, tz) }
     val dark = isSystemInDarkTheme()
 
     Column(
@@ -130,6 +139,8 @@ fun CalendarScreen(data: FirewatchData, now: Long, onOpenDay: (LocalDate) -> Uni
                             isModeDay = !date.isAfter(today) && com.baastiklabs.firewatch.core.engine.Relapse.isModeDay(data, kotlinx.datetime.LocalDate(date.year, date.monthValue, date.dayOfMonth), kotlinx.datetime.TimeZone.currentSystemDefault()),
                             isBaseline = firstLog != null && !date.isBefore(firstLog) && date.isBefore(firstLog.plusDays(Baseline.DAYS.toLong())),
                             pieces = summaries[date]?.pieces ?: 0.0,
+                            state = states[date],
+                            levelMark = marks[date.toString()],
                             dark = dark,
                             modifier = Modifier.weight(1f),
                             onClick = { onOpenDay(date) },
@@ -139,8 +150,15 @@ fun CalendarScreen(data: FirewatchData, now: Long, onOpenDay: (LocalDate) -> Uni
             }
         }
 
+        if (states.any { (d, s) -> YearMonth.from(d) == month && s == com.baastiklabs.firewatch.core.DayState.UNKNOWN }) {
+            Text(
+                com.baastiklabs.firewatch.core.Help.UNKNOWN_DAYS_NOTE,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
         Legend(dark)
-        MonthSummary(month, summaries, firstLog, today)
+        MonthSummary(month, summaries, states, firstLog, today)
         EstimateNote()
     }
 }
@@ -154,6 +172,8 @@ private fun DayCell(
     beforeFirstLog: Boolean,
     isBaseline: Boolean,
     pieces: Double,
+    state: com.baastiklabs.firewatch.core.DayState?,
+    levelMark: String?,
     isModeDay: Boolean = false,
     dark: Boolean,
     modifier: Modifier,
@@ -161,7 +181,8 @@ private fun DayCell(
 ) {
     val level = CalendarScale.level(pieces)
     val shape = RoundedCornerShape(10.dp)
-    val tracked = !isFuture && !beforeFirstLog
+    val leftOut = state == com.baastiklabs.firewatch.core.DayState.UNKNOWN || state == com.baastiklabs.firewatch.core.DayState.GHOST
+    val tracked = !isFuture && !beforeFirstLog && !leftOut
     val background = when {
         !inMonth -> MaterialTheme.colorScheme.background
         !tracked -> MaterialTheme.colorScheme.surfaceContainerLow
@@ -182,6 +203,29 @@ private fun DayCell(
                     else -> MaterialTheme.colorScheme.onSurfaceVariant
                 },
             )
+            val badge = when (state) {
+                com.baastiklabs.firewatch.core.DayState.UNKNOWN -> "?"
+                com.baastiklabs.firewatch.core.DayState.GHOST -> "👻"
+                com.baastiklabs.firewatch.core.DayState.CLEAR -> "🌿"
+                else -> null
+            }
+            badge?.let {
+                Text(
+                    it,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.outline,
+                    modifier = Modifier.align(Alignment.BottomEnd).padding(end = 3.dp, bottom = 1.dp)
+                        .then(if (state == com.baastiklabs.firewatch.core.DayState.GHOST) Modifier.alpha(0.6f) else Modifier),
+                )
+            }
+            levelMark?.let {
+                Text(
+                    if (it == "down") "▼" else "▲",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.align(Alignment.TopEnd).padding(end = 3.dp, top = 1.dp),
+                )
+            }
             if (isBaseline) {
                 Box(
                     Modifier
@@ -207,7 +251,7 @@ private fun Legend(dark: Boolean) {
             Text("Heavy", style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(start = 4.dp))
         }
         Text(
-            "Colour = pieces that day: none, up to 1, 3, 5, 8, 12, more. A dot marks your baseline week; a ring marks Relapse prevention mode days.",
+            "Colour = pieces that day: none, up to 1, 3, 5, 8, 12, more. 🌿 a clear day, ? nothing logged, 👻 left out. ▲ ▼ your level changed. A dot marks your baseline week; a ring marks Relapse prevention mode days.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -215,15 +259,18 @@ private fun Legend(dark: Boolean) {
 }
 
 @Composable
-private fun MonthSummary(month: YearMonth, summaries: Map<LocalDate, DaySummary>, firstLog: LocalDate?, today: LocalDate) {
+private fun MonthSummary(month: YearMonth, summaries: Map<LocalDate, DaySummary>, states: Map<LocalDate, com.baastiklabs.firewatch.core.DayState>, firstLog: LocalDate?, today: LocalDate) {
     if (firstLog == null) return
     val start = maxOf(month.atDay(1), firstLog)
     val end = minOf(month.atEndOfMonth(), today)
     if (end.isBefore(start)) return
-    val days = generateSequence(start) { it.plusDays(1) }.takeWhile { !it.isAfter(end) }.toList()
+    // "?" and ghost days are left out; clear days count as 0.
+    val days = generateSequence(start) { it.plusDays(1) }.takeWhile { !it.isAfter(end) }
+        .filter { states[it]?.leftOut != true }.toList()
+    if (days.isEmpty()) return
     val pieces = days.map { summaries[it]?.pieces ?: 0.0 }
     val total = pieces.sum()
-    val clearDays = pieces.count { it < 0.05 }
+    val clearDays = days.count { states[it] == com.baastiklabs.firewatch.core.DayState.CLEAR }
     val lightest = days.zip(pieces).minByOrNull { it.second }
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {

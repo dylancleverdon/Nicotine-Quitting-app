@@ -130,14 +130,20 @@ fun HomeScreen(
             repo.setTarget(it, com.baastiklabs.firewatch.core.engine.Control.EARLY)
         }
     }
-    val heldDays = remember(data, minute) { com.baastiklabs.firewatch.core.engine.Control.heldDays(data, now, tz) }
     val lighter = remember(data, minute / 60) { com.baastiklabs.firewatch.core.engine.Control.lighterThanStart(data, now, tz) }
     val daysOff = remember(data, minute / 60) { com.baastiklabs.firewatch.core.engine.Control.daysOffSmokeAndVape(data, now, tz) }
     val journey = remember(data, minute / 60) { if (revealed) Insights(data, tz, now).journey() else null }
     val steadyDays = remember(data, minute / 30) { com.baastiklabs.firewatch.core.engine.Control.steadyDays(data, now, tz) }
     val steadyMilestone = com.baastiklabs.firewatch.core.engine.Control.newSteadyMilestone(data, steadyDays)
-    val practicing = com.baastiklabs.firewatch.core.engine.Control.practicingToday(data, now, tz)
-    val practiceFollowUp = remember(data, minute) { com.baastiklabs.firewatch.core.engine.Control.practiceFollowUp(data, now, tz) }
+    val practiceStatus = remember(data, minute) { com.baastiklabs.firewatch.core.engine.Practice.status(data, now, tz) }
+    val followUpSession = remember(data, minute) { com.baastiklabs.firewatch.core.engine.Practice.followUp(data, now, tz) }
+    val practiceFollowUp = followUpSession?.let { Ladder.rung(it.pieces) }
+    val lighterOffer = remember(data, minute) { if (revealed) com.baastiklabs.firewatch.core.engine.Practice.lighterOffer(data, now, tz) else null }
+    val workFrom = remember(data, minute) { if (revealed) com.baastiklabs.firewatch.core.engine.Practice.workFromOffer(data, now, tz) else null }
+    var practiceAsk by remember { mutableStateOf<Double?>(null) }
+    val heldTotal = remember(data, minute) {
+        target?.let { com.baastiklabs.firewatch.core.engine.Control.heldByRung(data, now, tz)[it.pieces]?.first } ?: 0
+    }
     val previews = remember(data, minute) {
         val t = target?.pieces
         if (t == null || data.settings.hideDosePreview) emptyMap()
@@ -175,9 +181,9 @@ fun HomeScreen(
         scope.launch { snackbar.showSnackbar(if (on) "Relapse prevention mode turned on" else "Relapse prevention mode turned off") }
     }
 
-    fun moveTarget(pieces: Double, reason: String) {
+    fun moveTarget(pieces: Double, reason: String, detail: String = "") {
         scope.launch {
-            repo.setTarget(pieces, reason)
+            repo.setTarget(pieces, reason, detail)
             if (reason == "down") {
                 celebrate = Ladder.rung(pieces)
                 return@launch
@@ -186,7 +192,7 @@ fun HomeScreen(
             snackbar.showSnackbar(
                 when (reason) {
                     "down" -> "New rung: ${r.label}. That's real progress."
-                    "up" -> "Stepped back to ${r.label}. That's normal; it's how the climb down works."
+                    "up" -> "Stepped up to ${r.label}. Your level is more accurate now."
                     else -> "Starting at ${r.label}."
                 },
             )
@@ -317,18 +323,13 @@ fun HomeScreen(
                 }
             }
             val wins = listOfNotNull(
-                if (heldDays > 0 && target != null && !early) "✓ Held ${target.label} for $heldDays ${if (heldDays == 1) "day" else "days"}" else null,
+                // A running total that never resets (not the step-down count).
+                if (heldTotal > 0 && target != null && !early) "✓ $heldTotal ${if (heldTotal == 1) "day" else "days"} held at ${target.tier.title} in total" else null,
                 lighter?.let { "✓ About ${(it * 100).toInt()}% lighter than when you started" },
                 daysOff?.takeIf { it > 0 }?.let { "✓ $it days off cigarettes and vapes" },
                 journey?.takeIf { it > 0 }?.let { "Journey to Clear Air: ${(it * 100).toInt()}%" },
             )
-            if (practicing) item {
-                Text(
-                    "Practice day: ${com.baastiklabs.firewatch.core.engine.Ladder.rung(data.settings.practicePieces).label} pace",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+            practiceStatus?.let { st -> item { com.baastiklabs.firewatch.ui.practice.PracticeStatusRow(st) } }
             if (early) item {
                 Text(
                     "Early estimate · firming up as you log your first week" +
@@ -362,11 +363,51 @@ fun HomeScreen(
                     body = "Step down to it, or stay where you are. Either is fine.",
                     primary = "Step down",
                     onPrimary = {
-                        scope.launch { repo.updateSettings { it.copy(practiceDate = "", practicePieces = 0.0) } }
+                        scope.launch { repo.updateSettings { it.copy(practiceAnswered = followUpSession?.id ?: "") } }
                         moveTarget(r.pieces, "down")
                     },
                     secondary = "Stay here",
-                    onSecondary = { scope.launch { repo.updateSettings { it.copy(practiceDate = "", practicePieces = 0.0, stepDownSnoozedAt = repo.now()) } } },
+                    onSecondary = { scope.launch { repo.updateSettings { it.copy(practiceAnswered = followUpSession?.id ?: "", stepDownSnoozedAt = repo.now()) } } },
+                )
+            }
+        }
+        lighterOffer?.takeIf { target != null }?.let { m ->
+            item {
+                LighterOfferCard(
+                    title = com.baastiklabs.firewatch.core.Help.lighterOfferTitle(m.label),
+                    body = com.baastiklabs.firewatch.core.Help.lighterOfferBody(target!!.label, m.tier.title),
+                    tryLabel = "Try ${m.tier.title} pace",
+                    onTry = { practiceAsk = m.pieces },
+                    onStay = { dontAsk ->
+                        scope.launch { repo.updateSettings { it.copy(lighterSnoozedAt = repo.now(), lighterOffers = if (dontAsk) false else it.lighterOffers) } }
+                    },
+                )
+            }
+        }
+        workFrom?.takeIf { target != null }?.let { w ->
+            item {
+                val hours = (w.coveredMin / 60).toInt()
+                OfferCard(
+                    title = "${w.rung.tier.title} pace held",
+                    body = "You practiced ${w.rung.tier.title} pace for $hours hours, practice net ${Fmt.signedMinutes(w.netMin)}. Work from ${w.rung.tier.title} from now on?",
+                    primary = "Work from ${w.rung.tier.title}",
+                    onPrimary = {
+                        scope.launch {
+                            repo.stopPractice()
+                            repo.updateSettings { it.copy(practiceAnswered = data.practices.lastOrNull()?.id ?: "") }
+                            repo.setTarget(w.rung.pieces, "measured", "from measured level")
+                            snackbar.showSnackbar("Working from ${w.rung.label}.")
+                        }
+                    },
+                    secondary = "Keep practicing",
+                    onSecondary = { scope.launch { repo.updateSettings { it.copy(workFromSnoozedAt = repo.now()) } } },
+                    tertiary = "Back to ${target!!.tier.title} pace",
+                    onTertiary = {
+                        scope.launch {
+                            repo.stopPractice()
+                            repo.updateSettings { it.copy(practiceAnswered = data.practices.lastOrNull()?.id ?: "", lighterSnoozedAt = repo.now()) }
+                        }
+                    },
                 )
             }
         }
@@ -408,12 +449,7 @@ fun HomeScreen(
                     secondary = "Stay here",
                     onSecondary = { scope.launch { repo.updateSettings { it.copy(stepDownSnoozedAt = repo.now()) } } },
                     tertiary = "Try it for a day",
-                    onTertiary = {
-                        scope.launch {
-                            repo.updateSettings { it.copy(practiceDate = wakingToday.toString(), practicePieces = stepDown.pieces) }
-                            snackbar.showSnackbar("Practice day: ${stepDown.label} pace for today")
-                        }
-                    },
+                    onTertiary = { practiceAsk = stepDown.pieces },
                 )
             }
         }
@@ -422,9 +458,9 @@ fun HomeScreen(
             item {
                 OfferCard(
                     title = "This rung is tough right now",
-                    body = "${stepUpFull.why} Stepping up to ${stepUp.label} for a while is normal, and it keeps you on gum instead of something worse. Come back down when it's ready.",
+                    body = "${stepUpFull.why} Stepping up to ${stepUp.label} makes your level more accurate. Step-downs are offered when you're ready.",
                     primary = "Step up",
-                    onPrimary = { moveTarget(stepUp.pieces, "up") },
+                    onPrimary = { moveTarget(stepUp.pieces, "up", stepUpFull.why.trimEnd('.').replaceFirstChar { it.lowercase() }) },
                     secondary = "I'm OK",
                     onSecondary = { scope.launch { repo.updateSettings { it.copy(stepUpSnoozedAt = repo.now()) } } },
                 )
@@ -455,7 +491,7 @@ fun HomeScreen(
             }
         }
         if (headsUps.isNotEmpty()) item { HeadsUpCard(headsUps) }
-        Quality.swapTip(todayDoses, data.referenceMg)?.let { tip ->
+        com.baastiklabs.firewatch.core.engine.Coaching.swapTip(data, todayDoses)?.let { tip ->
             item {
                 Text(tip, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
@@ -674,6 +710,20 @@ fun HomeScreen(
                 vapeFor = null
                 logVape(v, p.name, p.id)
             },
+        )
+    }
+    practiceAsk?.let { pieces ->
+        com.baastiklabs.firewatch.ui.practice.PracticeDurationDialog(
+            rungTitle = Ladder.rung(pieces).tier.title,
+            initialUntilBedtime = data.settings.practiceUntilBedtime,
+            onStart = { untilBedtime ->
+                practiceAsk = null
+                scope.launch {
+                    repo.startPractice(pieces, untilBedtime)
+                    snackbar.showSnackbar("Practice pace on: ${Ladder.rung(pieces).tier.title}. ${com.baastiklabs.firewatch.core.Help.PRACTICE_STOP_NOTE}")
+                }
+            },
+            onDismiss = { practiceAsk = null },
         )
     }
     celebrate?.let { r ->
@@ -948,3 +998,23 @@ fun DoseRow(dose: Dose, referenceMg: Double, onClick: () -> Unit) {
     )
 }
 
+
+/** The lighter-level practice offer: only ever offers to practice, with "Don't ask me again". */
+@Composable
+private fun LighterOfferCard(title: String, body: String, tryLabel: String, onTry: () -> Unit, onStay: (dontAsk: Boolean) -> Unit) {
+    var dontAsk by remember { mutableStateOf(false) }
+    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer), shape = RoundedCornerShape(20.dp)) {
+        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Text(body, style = MaterialTheme.typography.bodyMedium)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = onTry) { Text(tryLabel) }
+                OutlinedButton(onClick = { onStay(dontAsk) }) { Text("Stay here") }
+            }
+            Row(Modifier.clickable { dontAsk = !dontAsk }, verticalAlignment = Alignment.CenterVertically) {
+                androidx.compose.material3.Checkbox(checked = dontAsk, onCheckedChange = { dontAsk = it })
+                Text("Don't ask me again", style = MaterialTheme.typography.bodySmall)
+            }
+        }
+    }
+}

@@ -72,6 +72,11 @@ object BatteryEngine {
         until: Long,
         awakeUntil: Long,
         stopBefore: Dose? = null,
+        // Practice pace: the gap changes at these times (time → gap from then on). The charge
+        // carries over; only the refill speed changes.
+        segments: List<Pair<Long, Double>>? = null,
+        // Only count stretch and pull inside these windows (practice net). Null = everywhere.
+        countIn: List<Pair<Long, Long>>? = null,
     ): Sim {
         val doses = dayDoses(data, day, nextWake)
         var charge = 1.0
@@ -83,26 +88,38 @@ object BatteryEngine {
         val stretchFrom = data.rungChanges.firstOrNull()?.at ?: Long.MAX_VALUE
         val end = minOf(until, nextWake)
         var t = day.wakeAt
-        fun advance(to: Long) {
-            if (to <= t) return
+        fun gapAt(x: Long): Double = segments?.lastOrNull { it.first <= x }?.second ?: interval
+        fun nextBreak(x: Long): Long = segments?.firstOrNull { it.first > x }?.first ?: Long.MAX_VALUE
+        fun counted(a: Long, b: Long): Double =
+            if (countIn == null) (b - a) / MIN.toDouble()
+            else countIn.sumOf { (s, e) -> (minOf(b, e) - maxOf(a, s)).coerceAtLeast(0L) } / MIN.toDouble()
+        fun inCount(x: Long) = countIn == null || countIn.any { x >= it.first && x < it.second }
+        fun step(to: Long) {
+            val gap = gapAt(t)
             val refillEnd = minOf(to, awakeEnd)
             if (refillEnd > t) {
-                val fullAt = t + ((1.0 - charge).coerceAtLeast(0.0) * interval * MIN).toLong()
+                val fullAt = t + ((1.0 - charge).coerceAtLeast(0.0) * gap * MIN).toLong()
                 val sStart = maxOf(fullAt, t, stretchFrom)
                 val sEnd = minOf(refillEnd, day.sleepAt)
-                if (sEnd > sStart) stretch += (sEnd - sStart) / MIN.toDouble()
-                charge = (charge + (refillEnd - t) / MIN.toDouble() / interval).coerceAtMost(1.0)
+                if (sEnd > sStart) stretch += counted(sStart, sEnd)
+                charge = (charge + (refillEnd - t) / MIN.toDouble() / gap).coerceAtMost(1.0)
             }
             t = to
+        }
+        fun advance(to: Long) {
+            while (t < to) step(minOf(to, nextBreak(t)))
         }
         for (d in doses) {
             if (d.at > end) break
             advance(d.at)
             if (stopBefore != null && d.id == stopBefore.id) return Sim(charge, stretch, pull, charge >= 1.0 - 1e-9)
             val full = charge >= 1.0 - 1e-9
-            if (!full) pull += (1.0 - charge) * interval
-            val p = data.piecesOf(d)
-            if (p > 1.0) pull += (p - 1.0) * interval else stretch += (1.0 - p) * interval
+            val gap = gapAt(d.at)
+            if (inCount(d.at)) {
+                if (!full) pull += (1.0 - charge) * gap
+                val p = data.piecesOf(d)
+                if (p > 1.0) pull += (p - 1.0) * gap else stretch += (1.0 - p) * gap
+            }
             fullBeforeLast = full
             charge = 0.0
         }
@@ -142,10 +159,34 @@ object BatteryEngine {
     /** For tests: the waking day that [t] falls in, with the next wake-up. */
     internal fun dayOf(data: FirewatchData, t: Long, tz: TimeZone) = currentDay(data, t, tz)
 
-    /** The rung in force for the battery on this waking day: a practice day uses the next rung. */
-    fun practiceTarget(data: FirewatchData, day: WakingDay, fallback: Double): Double {
-        val s = data.settings
-        return if (s.practiceDate.isNotEmpty() && s.practiceDate == day.date.toString() && s.practicePieces > 0) s.practicePieces else fallback
+    /**
+     * The battery's gap through a waking day with practice pace: (time → gap from then on), or null
+     * when practice pace wasn't on that day.
+     */
+    internal fun practiceSegments(data: FirewatchData, day: WakingDay, nextWake: Long, realGap: Double, tz: TimeZone): List<Pair<Long, Double>>? {
+        val windows = Practice.windows(data, day.wakeAt, nextWake, tz)
+        if (windows.isEmpty()) return null
+        val out = ArrayList<Pair<Long, Double>>()
+        out += day.wakeAt to realGap
+        for (w in windows) { out += w.start to intervalFor(w.pieces); out += w.end to realGap }
+        return out.sortedBy { it.first }
+    }
+
+    /**
+     * Practice net for one waking day: stretch − pull counted only while practice pace was on,
+     * against the practice gap. Null when practice pace wasn't on that day.
+     */
+    fun practiceNetDay(data: FirewatchData, date: LocalDate, tz: TimeZone, now: Long): Double? {
+        val day = Waking.day(data, date, tz)
+        if (day.wakeAt > now) return null
+        val nextWake = Waking.day(data, date.plus(1, DateTimeUnit.DAY), tz).wakeAt
+        val target = targetAt(data, minOf(now, nextWake - 1)) ?: return null
+        val realGap = intervalFor(target)
+        val segments = practiceSegments(data, day, nextWake, realGap, tz) ?: return null
+        val windows = Practice.windows(data, day.wakeAt, nextWake, tz).map { it.start to minOf(it.end, now) }
+        val lateDose = dayDoses(data, day, nextWake).lastOrNull { it.at >= day.sleepAt }?.at ?: 0L
+        val sim = simulate(data, day, nextWake, realGap, now, lateDose, segments = segments, countIn = windows)
+        return sim.stretch - sim.pull
     }
 
     /**
@@ -168,11 +209,17 @@ object BatteryEngine {
 
     fun now(data: FirewatchData, targetPieces: Double, now: Long, tz: TimeZone, lastActivityAt: Long = 0L): Battery {
         val (day, nextWake) = currentDay(data, now, tz)
-        val interval = intervalFor(practiceTarget(data, day, targetPieces))
+        val realGap = intervalFor(targetPieces)
         val lateDose = dayDoses(data, day, nextWake).lastOrNull { it.at >= day.sleepAt }?.at ?: 0L
         val activity = maxOf(lastActivityAt, lateDose).takeIf { it in day.sleepAt..now } ?: 0L
-        val sim = simulate(data, day, nextWake, interval, now, activity)
-        val charge = sim.charge
+        // Stretch, pull and net always stay against the real level; practice pace only changes the
+        // battery's refill speed (and so the next-piece time and the dose preview).
+        val sim = simulate(data, day, nextWake, realGap, now, activity)
+        val segments = practiceSegments(data, day, nextWake, realGap, tz)
+        val shown = if (segments == null) sim else simulate(data, day, nextWake, realGap, now, activity, segments = segments)
+        val charge = shown.charge
+        val active = Practice.active(data, now, tz)
+        val interval = active?.let { intervalFor(it.pieces) } ?: realGap
 
         val state: BatteryState
         var readyAt: Long? = null
@@ -204,7 +251,7 @@ object BatteryEngine {
         // Wind-down is a note only: it never replaces the guidance.
         val closeToBed = data.settings.windDown && now in (day.sleepAt - 60 * MIN) until day.sleepAt
         if (Relapse.isModeDay(data, day.date, tz)) return Battery(charge, state, readyAt, 0.0, interval, 0.0, closeToBed)
-        return Battery(charge, state, readyAt, sim.stretch, interval, sim.pull, closeToBed)
+        return Battery(charge, state, readyAt, sim.stretch, interval, sim.pull, closeToBed, practicePieces = active?.pieces)
     }
 
     /**
@@ -237,7 +284,7 @@ object BatteryEngine {
         val target = targetAt(data, day.wakeAt) ?: data.rungChanges.firstOrNull { it.at < day.sleepAt }?.pieces ?: return null
         val nextWake = Waking.day(data, date.plus(1, DateTimeUnit.DAY), tz).wakeAt
         val lateDose = dayDoses(data, day, nextWake).lastOrNull { it.at >= day.sleepAt }?.at ?: 0L
-        val sim = simulate(data, day, nextWake, intervalFor(practiceTarget(data, day, target)), now, lateDose)
+        val sim = simulate(data, day, nextWake, intervalFor(target), now, lateDose)
         if (Relapse.isModeDay(data, date, tz)) return DayBattery(date, 0.0, 0.0, paused = true)
         return DayBattery(date, sim.stretch, sim.pull)
     }

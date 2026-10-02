@@ -55,7 +55,7 @@ data class DayStat(
     /** 48 half-hour cells: true = nicotine in the system. */
     val barcode: List<Boolean>,
     val kindPieces: Map<ProductKind, Double>,
-    /** Average one-hour swing (mg) across the waking day: nicotine volatility. */
+    /** Nicotine volatility over the waking day (mg/h): how fast and how much the level changes. */
     val volatility: Double = 0.0,
     /** Longest gap between two timed doses (minutes), and the dose that started it. */
     val longestGapMin: Double? = null,
@@ -72,10 +72,15 @@ class Insights(private val data: FirewatchData, private val tz: TimeZone, privat
     val today: LocalDate = now.localDate(tz)
     val firstDate: LocalDate? = data.doses.minOfOrNull { it.at }?.localDate(tz)
 
-    /** All days from the first log to today. */
+    /**
+     * All counted days from the first log to today. "?" and ghost days are left out (the one rule
+     * for which days count); clear days stay in as 0.
+     */
     val days: List<DayStat> by lazy {
         val first = firstDate ?: return@lazy emptyList()
-        generateSequence(first) { it.plus(1, DateTimeUnit.DAY) }.takeWhile { it <= today }.map { day(it) }.toList()
+        generateSequence(first) { it.plus(1, DateTimeUnit.DAY) }.takeWhile { it <= today }
+            .filter { it == today || !com.baastiklabs.firewatch.core.Days.state(data, it, tz, now).leftOut }
+            .map { day(it) }.toList()
     }
 
     val baselineDays: List<DayStat> by lazy {
@@ -122,8 +127,7 @@ class Insights(private val data: FirewatchData, private val tz: TimeZone, privat
         val volatility = run {
             val end = minOf(w.sleepAt, now)
             if (end <= w.wakeAt) 0.0
-            else Kinetics.swing(Kinetics.curve(data.doses.filter { it.at in (w.wakeAt - 13 * 60 * MIN)..end }, w.wakeAt - 60 * MIN, end, 5))
-                .filter { it.first >= w.wakeAt }.map { it.second }.average()
+            else Kinetics.volatility(data.doses.filter { it.at in (w.wakeAt - 13 * 60 * MIN)..end }, w.wakeAt, end)
         }
         val gap = timedToday.zipWithNext().maxByOrNull { (a, b) -> b.at - a.at }
         return DayStat(
@@ -172,15 +176,14 @@ class Insights(private val data: FirewatchData, private val tz: TimeZone, privat
         return Kinetics.curve(data.doses, w.wakeAt - 2 * 60 * MIN, w.sleepAt + 60 * MIN, stepMin)
     }
 
-    /** Nicotine volatility along a day's wave: the one-hour swing at each point (mg). */
+    /** Running volatility along a day's wave (mg/h over the last 30 minutes at each point). */
     fun volatilityCurve(date: LocalDate, stepMin: Int = 5): List<Pair<Long, Double>> {
         val curve = dayCurve(date, stepMin)
         if (curve.isEmpty()) return curve
-        val lead = Kinetics.curve(data.doses, curve.first().first - 60 * MIN, curve.first().first - stepMin * MIN, stepMin)
-        return Kinetics.swing(lead + curve).drop(lead.size)
+        return Kinetics.volatilityCurve(data.doses, curve.first().first, curve.last().first, stepMin)
     }
 
-    /** Daily volatility: each full day's average one-hour swing (mg). */
+    /** Daily volatility: each full day's volatility over its waking day (mg/h). */
     fun dailyVolatility(): List<Pair<LocalDate, Double>> = fullDays.map { it.date to it.volatility }
 
     fun todayCurve(stepMin: Int = 5): List<Pair<Long, Double>> {
@@ -340,7 +343,8 @@ class Insights(private val data: FirewatchData, private val tz: TimeZone, privat
 
     /** Average % drop per week, from a fitted line through the last 28 days (positive = going down). */
     fun taperPercentPerWeek(): Double? {
-        val pts = lastDays(28).mapIndexedNotNull { i, d -> if (d.pieces > 0.05) i.toDouble() to ln(d.scaledPieces) else null }
+        val from = today.minus(28, DateTimeUnit.DAY)
+        val pts = fullDays.filter { it.date >= from }.mapNotNull { d -> if (d.pieces > 0.05) from.daysUntil(d.date).toDouble() to ln(d.scaledPieces) else null }
         if (pts.size < 7) return null
         val mx = pts.map { it.first }.average()
         val my = pts.map { it.second }.average()

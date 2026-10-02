@@ -46,6 +46,8 @@ class Repository(
     private val modeChanges = HashMap<String, ModeChange>()
     private val timerChecks = HashMap<String, TimerCheck>()
     private val refChanges = HashMap<String, RefChange>()
+    private val dayMarks = HashMap<String, com.baastiklabs.firewatch.core.model.DayMark>()
+    private val practices = HashMap<String, com.baastiklabs.firewatch.core.model.PracticeSession>()
     private var settings = Settings()
 
     private val _data = MutableStateFlow(FirewatchData())
@@ -127,9 +129,54 @@ class Repository(
     // --- Rungs & check-ins ---
 
     /** Moves the target rung. [reason] is "start", "down" or "up". */
-    suspend fun setTarget(pieces: Double, reason: String) {
+    suspend fun setTarget(pieces: Double, reason: String, detail: String = "") {
         val now = clock()
-        mutate { t -> listOf(RecordCodec.rung(RungChange(Ids.newId(now), now, pieces, reason), null, t)) }
+        mutate { t -> listOf(RecordCodec.rung(RungChange(Ids.newId(now), now, pieces, reason, detail), null, t)) }
+    }
+
+    /** Mark an empty day "clear" or "ghost" (ISO date); null removes the mark (back to "?"). */
+    suspend fun markDay(date: String, state: String?) {
+        val now = clock()
+        val id = com.baastiklabs.firewatch.core.model.DayMark.idFor(date)
+        mutate { t ->
+            val existing = records[id]
+            if (state == null) listOfNotNull(existing?.copy(deleted = true, updatedAt = t))
+            else listOf(RecordCodec.dayMark(com.baastiklabs.firewatch.core.model.DayMark(id, date, state, now), existing?.json, t))
+        }
+    }
+
+    /** Start practice pace (ends any session that's on). */
+    suspend fun startPractice(pieces: Double, untilBedtime: Boolean) {
+        val now = clock()
+        mutate { t ->
+            endActive(now, t) + RecordCodec.practice(
+                com.baastiklabs.firewatch.core.model.PracticeSession(Ids.newId(now), now, pieces, null, untilBedtime), null, t,
+            )
+        }
+        updateSettings { it.copy(practiceUntilBedtime = untilBedtime) }
+    }
+
+    /** "Back to my pace": ends practice pace now. */
+    suspend fun stopPractice() {
+        val now = clock()
+        mutate { t -> endActive(now, t) }
+    }
+
+    /** "Turn off at bedtime" / "Leave it on": the default, and the session that's on (if any). */
+    suspend fun setPracticeUntilBedtime(untilBedtime: Boolean) {
+        val now = clock()
+        mutate { t ->
+            practices.values.filter { it.end == null && it.start <= now }.map { s ->
+                RecordCodec.practice(s.copy(untilBedtime = untilBedtime), records[s.id]?.json, t)
+            }
+        }
+        updateSettings { it.copy(practiceUntilBedtime = untilBedtime) }
+    }
+
+    private fun endActive(now: Long, t: Long): List<RecordEnvelope> {
+        val tz = kotlinx.datetime.TimeZone.currentSystemDefault()
+        val active = com.baastiklabs.firewatch.core.engine.Practice.active(_data.value, now, tz) ?: return emptyList()
+        return listOf(RecordCodec.practice(active.copy(end = now), records[active.id]?.json, t))
     }
 
     /**
@@ -241,6 +288,8 @@ class Repository(
             RecordTypes.MODE -> put(modeChanges, env, ModeChange.serializer())
             RecordTypes.TIMER_CHECK -> put(timerChecks, env, TimerCheck.serializer())
             RecordTypes.REF_CHANGE -> put(refChanges, env, RefChange.serializer())
+            RecordTypes.DAY_MARK -> put(dayMarks, env, com.baastiklabs.firewatch.core.model.DayMark.serializer())
+            RecordTypes.PRACTICE -> put(practices, env, com.baastiklabs.firewatch.core.model.PracticeSession.serializer())
             RecordTypes.SETTINGS -> settings =
                 (if (env.deleted) null else RecordCodec.decode(env.json, Settings.serializer())) ?: Settings()
             else -> Unit // A newer version's record type: kept in storage and backups, ignored here.
@@ -264,6 +313,8 @@ class Repository(
             modeChanges = modeChanges.values.sortedBy { it.at },
             timerChecks = timerChecks.values.sortedBy { it.at },
             refChanges = refChanges.values.sortedBy { it.at },
+            dayMarkList = dayMarks.values.toList(),
+            practices = practices.values.sortedBy { it.start },
         )
         onChange?.invoke()
     }
