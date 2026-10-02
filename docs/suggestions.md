@@ -31,6 +31,11 @@ Statuses: **Undecided** · **Planned** (in a proposal, not built) · **Done** (r
 | 2026-09-29 | Idea | A mode that gives quitting guidance, so nobody gets unwanted guidance | Done (0.11.0) | §9: Coaching tips, off by default. |
 | 2026-09-29 | Bug | Taper speed said "that's OK, it happens": a positive spin on a miss | Done (0.11.0) | §2: plus one Settings line; a test bans spin phrases. |
 | 2026-09-29 | Bug | Time changes don't save when entering a gum from a few hours ago | Done (0.11.0) | §1: the edit sheet cancels its own save; plus 2h/3h quick chips. |
+| 2026-09-29 | Idea | Volatility only shows dose size, not how a fast hit feels | Planned | `proposals/practice-pace-and-known-days.md` §10: rate-of-change measure. |
+| 2026-09-29 | Idea | Record of step downs and step ups, somewhere in Insights | Planned | `proposals/practice-pace-and-known-days.md` §5 |
+| 2026-09-29 | Idea | "Next step down" can disagree with "If you take each step" | Planned | `proposals/practice-pace-and-known-days.md` §4 |
+| 2026-10-01 | Idea | Tell apart days you forgot to log from days you chose not to | Planned | `proposals/practice-pace-and-known-days.md` §1–§2: "?", clear and ghost days. |
+| 2026-10-01 | Idea | Accurate step-down counter; show step downs and ups on the calendar | Planned | `proposals/practice-pace-and-known-days.md` §4–§5 |
 
 ## From design reviews
 
@@ -52,7 +57,7 @@ Ideas raised while reviewing the app, not sent through the form.
 | 2026-09-28 | Faster battery maths (dose to dose, not minute by minute) | Done | 0.10.0 |
 | 2026-09-28 | One shared "which day" rule | Done | 0.10.0 |
 | 2026-09-28 | Continuity tests | Done | 0.10.0 |
-| 2026-09-28 | Confidence label on the level ("6 of 7 days logged") | Declined | Too much information. |
+| 2026-09-28 | Confidence label on the level ("6 of 7 days logged") | Planned | Reopened 2026-10-02, Insights only: `proposals/practice-pace-and-known-days.md` §3 |
 | 2026-09-28 | Absorption check-in per product | Declined | Estimates stay fixed per product. |
 | 2026-09-28 | Steady days total with milestones | Done | 0.10.0 |
 | 2026-09-28 | Trigger plans | Declined | |
@@ -68,7 +73,11 @@ Ideas raised while reviewing the app, not sent through the form.
 | 2026-09-29 | Rethink stretch and pull (e.g. live net, net in pieces) | Declined | Kept as they are for now. |
 | 2026-09-29 | Late nights: stop refills after bedtime for stretch and pull | Declined | Tiers already count per waking hour. |
 | 2026-09-29 | Step-down progress ("1 of 3 days held") in Insights → Forecasts | Done | 0.12.0 |
-| 2026-09-30 | One step-down count everywhere: "If you take each step" starts from the held-days count; "Held N days" worded as a total; continuity test | Undecided | Proposed after "0 of 3" vs "around 30 Sep" mismatch. |
-| 2026-09-30 | Offer to work from a lighter measured level ("Your last 7 days measure Campfire · 4 a day. Work from there?") | Undecided | Mirror of the heavier-level step-up offer. |
-| 2026-09-30 | Pouch → gum quality swap tip ("Swapping pouches for gum would move today from 🍎 to 🥦") shown to everyone on Log tab and Insights | Undecided | From 0.3.0; conflicts with declined swaps. Remove, or show only with Coaching tips on. |
+| 2026-09-30 | One step-down count everywhere: "If you take each step" starts from the held-days count; "Held N days" worded as a total; continuity test | Planned | `proposals/practice-pace-and-known-days.md` §4 |
+| 2026-09-30 | Offer to work from a lighter measured level ("Your last 7 days measure Campfire · 4 a day. Work from there?") | Planned | As a practice offer only, with strict rules: `proposals/practice-pace-and-known-days.md` §7–§8 |
+| 2026-09-30 | Pouch → gum quality swap tip ("Swapping pouches for gum would move today from 🍎 to 🥦") shown to everyone on Log tab and Insights | Planned | Behind Coaching tips: `proposals/practice-pace-and-known-days.md` §11 |
 | 2026-09-30 | Web app catch-up: "Next step down" card (Android 0.12.0) | Later | Web app not a priority. |
+| 2026-10-02 | Practice pace (try a lighter pace for the day, from Settings or offers) | Planned | `proposals/practice-pace-and-known-days.md` §6 |
+| 2026-10-02 | "Challenge mode" name | Declined | Framed tapering as a test; called Practice pace instead. |
+| 2026-10-02 | Two-rung step down | Declined | Replaced by practice limits and "Work from your measured level" (`proposals/practice-pace-and-known-days.md` §8). |
+| 2026-10-02 | Note on short hold periods in Settings | Planned | `proposals/practice-pace-and-known-days.md` §9 |
