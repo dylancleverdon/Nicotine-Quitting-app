@@ -68,3 +68,7 @@ Ideas raised while reviewing the app, not sent through the form.
 | 2026-09-29 | Rethink stretch and pull (e.g. live net, net in pieces) | Declined | Kept as they are for now. |
 | 2026-09-29 | Late nights: stop refills after bedtime for stretch and pull | Declined | Tiers already count per waking hour. |
 | 2026-09-29 | Step-down progress ("1 of 3 days held") in Insights → Forecasts | Done | 0.12.0 |
+| 2026-09-30 | One step-down count everywhere: "If you take each step" starts from the held-days count; "Held N days" worded as a total; continuity test | Undecided | Proposed after "0 of 3" vs "around 30 Sep" mismatch. |
+| 2026-09-30 | Offer to work from a lighter measured level ("Your last 7 days measure Campfire · 4 a day. Work from there?") | Undecided | Mirror of the heavier-level step-up offer. |
+| 2026-09-30 | Pouch → gum quality swap tip ("Swapping pouches for gum would move today from 🍎 to 🥦") shown to everyone on Log tab and Insights | Undecided | From 0.3.0; conflicts with declined swaps. Remove, or show only with Coaching tips on. |
+| 2026-09-30 | Web app catch-up: "Next step down" card (Android 0.12.0) | Later | Web app not a priority. |
