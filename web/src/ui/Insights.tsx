@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'preact/hooks'
 import { Core } from '../core'
 import * as S from '../store'
-import { Barcode, Bars, DoseStrip, ForecastChart, Heatmap, KIND_COLORS, Line, Meter, ReceptorChart, StackedBars, Wave, dateLabels } from './Charts'
+import { kindColor } from '../theme'
+import { Barcode, Bars, Diverging, DoseStrip, ForecastChart, Heatmap, KIND_ORDER, Line, Meter, ReceptorChart, StackedBars, Wave, dateLabels } from './Charts'
 import { dayTitle, duration, pieces, shortDate, signedDuration, time } from './format'
 
 const SECTIONS = ['Today', 'Cravings ahead', 'Receptors', 'Stretch & pull', 'Trends', 'Patterns', 'Going up', 'Going down', 'Mix', 'Forecasts', 'Milestones', 'Ladder']
@@ -34,6 +35,8 @@ export function Insights() {
   const h = (v: number) => `${v}h`
   const n = (v: number) => `${v}`
   const dayStart = new Date(snap.today + 'T00:00').getTime()
+  const ch = snap.charts
+  const hm = (m: number) => `${m < 0 ? '−' : '+'}${duration(Math.abs(m) * 60000)}`
   return (
     <main>
       <h1>Insights</h1>
@@ -129,6 +132,9 @@ export function Insights() {
           {snap.stretchSummary && <div class="small">{snap.stretchSummary}</div>}
           {paused > 0 && <div class="muted">{paused} {paused === 1 ? 'day' : 'days'} in Relapse prevention mode: stretch and pull paused.</div>}
         </Card>
+        {ch.netSplit.length > 0 && (() => { const ns = win(ch.netSplit); return <Card title="Where your net comes from" sub="Each day's net, split into timing (orange: waiting for a full battery) and dose size (teal: pieces smaller or bigger than one).">
+          <Diverging a={ns.map((r) => Number(r[1]))} b={ns.map((r) => Number(r[2]))} labels={dateLabels(ns.map((r) => r[0]))} fmt={hm} />
+        </Card> })()}
       })()}
       {sec === 'Trends' && <>
         {snap.recentStates.length > 0 && <Card title={`${snap.recentStates.filter((s) => s.extra === 'logged' || s.extra === 'clear').length} of ${snap.recentStates.length} days known`} sub="One dot per day: filled = logged, 🌿 = clear, ? = nothing logged, 👻 = left out. Only known days count in your figures.">
@@ -156,6 +162,12 @@ export function Insights() {
             <div class="stats"><Stat v={snap.checksToday} l="checks today" />{perPiece > 0 && <Stat v={(total14 / perPiece).toFixed(1)} l="checks per piece (2 weeks)" />}</div>
           </Card>
         })()}
+        {ch.gapSizes.some((g) => g.value > 0) && <Card title="Gap sizes" sub="Time between pieces over your last 30 known days. Longer gaps are spacing at work.">
+          <Bars values={ch.gapSizes.map((g) => g.value)} fmt={n} x={ch.gapSizes.map((g) => g.label)} /></Card>}
+        {ch.weekShape.some((d) => d.value > 0) && <Card title="Week shape" sub="Average pieces by weekday, last 8 weeks.">
+          <Bars values={ch.weekShape.map((d) => d.value)} fmt={n} x={ch.weekShape.map((d) => d.label)} /></Card>}
+        {ch.firstPiece.length > 1 && <Card title="First piece: weekdays vs weekends" sub="Minutes from waking to the first piece, week by week. Weekdays orange, weekends teal.">
+          <Line values={ch.firstPiece.map((r) => Math.max(0, Number(r[1])))} second={ch.firstPiece.map((r) => Math.max(0, Number(r[2])))} fmt={(v) => `${v}m`} x={dateLabels(ch.firstPiece.map((r) => r[0]))} /></Card>}
         <Card title="Triggers">{ins.triggers.length ? ins.triggers.map((t) => <div class="row small"><span class="grow">{t.label}</span>{t.value}</div>) : <div class="muted">Hold a product to tag what was going on.</div>}</Card>
         <Card title="Comparisons">{ins.comparisons.map((c) => <div class="small">{c.label}: ≈ {pieces(c.value)} vs {pieces(Number(c.extra))}</div>)}</Card>
       </>}
@@ -169,6 +181,10 @@ export function Insights() {
             <div class="stats"><Stat v={held} l={`of the last ${hs.length} days held`} />{snap.heldDays > 0 && snap.target && <Stat v={snap.heldDays} l={`days held at ${snap.target.label}`} />}</div>
           </Card>
         })()}
+        {ch.longestGaps.length > 1 && <Card title="Longest gap each day" sub="The day's biggest stretch between pieces.">
+          <Bars values={win(ch.longestGaps).map((g) => g.value / 60)} fmt={h} x={dateLabels(win(ch.longestGaps).map((g) => g.label))} /></Card>}
+        {ch.cravingWeekly.length > 1 && <Card title="Craving strength over time" sub="Average strength of the cravings you logged, week by week (1–10). It usually fades as receptors settle.">
+          <Line values={ch.cravingWeekly.map((c) => c.value)} color="var(--tertiary)" fmt={n} top={10} x={dateLabels(ch.cravingWeekly.map((c) => c.label))} /></Card>}
         <Card title="Clear hours" sub="Hours each day your level sat near zero while awake."><Line values={full.map((d) => d.clearHours)} color="var(--tertiary)" fmt={h} x={dl(full)} /></Card>
         <Card title="Wins"><div class="stats"><Stat v={`≈ ${pieces(ins.avoidedPieces)}`} l="pieces avoided" /><Stat v={`${ins.avoidedMg.toFixed(1)} mg`} l="nicotine avoided" />
           <Stat v={ins.winRate != null ? `${Math.round(ins.winRate * 100)}%` : '–'} l="craving win rate" /></div></Card>
@@ -204,12 +220,15 @@ export function Insights() {
             days.slice(i, i + 7).forEach((d) => Object.entries(d.kinds ?? {}).forEach(([k, v]) => { w[k] = (w[k] ?? 0) + v }))
             weeks.push(w)
           }
-          const kinds = Object.keys(KIND_COLORS).filter((k) => weeks.some((w) => w[k]))
+          const kinds = KIND_ORDER.filter((k) => weeks.some((w) => w[k]))
           return <Card title="Product mix" sub="Nicotine by delivery method, week by week.">
             <StackedBars columns={weeks} />
-            <div class="row wrap small">{kinds.map((k) => <span><span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, background: KIND_COLORS[k], marginRight: 4 }} />{k.toLowerCase()}</span>)}</div>
+            <div class="row wrap small">{kinds.map((k) => <span><span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, background: kindColor(k), marginRight: 4 }} />{k.toLowerCase()}</span>)}</div>
           </Card>
         })()}
+        {Object.keys(ch.kindsByHour).length > 0 && <Card title="Doses by product over the day" sub="Pieces by hour of day, last 30 known days, coloured by type.">
+          <StackedBars columns={Array.from({ length: 24 }, (_, hr) => Object.fromEntries(Object.entries(ch.kindsByHour).map(([k, v]) => [k, v[hr]])))} />
+          <div class="xaxis-plain small muted"><span>12 AM</span><span>6 AM</span><span>12 PM</span><span>6 PM</span><span>11 PM</span></div></Card>}
         <Card title="Label vs absorbed"><div class="stats"><Stat v={`${Math.round(snap.days.reduce((a, d) => a + d.labelMg, 0))} mg`} l="on the labels" /><Stat v={`≈ ${Math.round(snap.days.reduce((a, d) => a + d.mg, 0))} mg`} l="absorbed" /></div></Card>
         <Card title="Borrowed share"><b>{Math.round((snap.days.reduce((a, d) => a + d.borrowedPieces, 0) / Math.max(0.001, snap.days.reduce((a, d) => a + d.pieces, 0))) * 100)}%</b></Card>
       </>}
@@ -220,6 +239,10 @@ export function Insights() {
         {snap.taperSteps.length > 0 && <Card title="If you take each step" sub={`Stepping down each time it's offered (every ${S.settings.value.holdDays} days). Optional: staying steady is a win too. ${snap.taperBasis ?? ''}.`}>
           {snap.taperSteps.map((t) => <div class="row small"><span class="grow">{t.label}</span>around {shortDate(t.extra)}</div>)}
         </Card>}
+        {ch.paceVsPlan.length > 0 && <Card title="Pace vs your plan" sub="Your pieces each day (bars) against your level, then the plan if you take each step (line). Optional: staying steady is a win too.">
+          <Bars values={ch.paceVsPlan.map((r) => (r[1] ? Number(r[1]) : 0))} line={ch.paceVsPlan.map((r) => (r[2] ? Number(r[2]) : 0))} faded={ch.paceVsPlan.map((r) => !r[1])} fmt={n} x={dateLabels(ch.paceVsPlan.map((r) => r[0]))} /></Card>}
+        {ch.daysFree.length > 0 && <Card title="Days nicotine-free" sub="A total that only goes up.">
+          <Line values={ch.daysFree.map((d) => d.value)} stepped color="var(--tertiary)" fmt={n} x={dateLabels(ch.daysFree.map((d) => d.label))} /></Card>}
         <Card title="Journey to Clear Air">{ins.journey != null ? <><h2>{Math.round(ins.journey * 100)}%</h2><Meter value={ins.journey} /></> : <div class="muted">Starts after your baseline week.</div>}</Card>
         <Card title="Taper speed"><b>{ins.taperText ?? 'Needs a week or two more data.'}</b></Card>
         <Card title="Arrival dates">{ins.arrivals.map((a) => <div class="small">{a.label}: {a.extra ? (a.extra <= snap.today ? 'reached' : shortDate(a.extra)) : 'not at this pace yet'}</div>)}</Card>
@@ -228,6 +251,8 @@ export function Insights() {
       {sec === 'Milestones' && <>
         <Card title="Records"><div class="stats"><Stat v={duration(ins.longestGapMin * 60000)} l="longest gap" /><Stat v={ins.lightestPieces != null ? `≈ ${pieces(ins.lightestPieces)}` : '–'} l="lightest day" />
           <Stat v={duration(ins.stretchMin * 60000)} l="total stretch" /><Stat v={ins.daysAtRung} l="days at this rung" /></div></Card>
+        {ch.steadyByMonth.length > 0 && <Card title="Steady days by month" sub="A total for each month, never a streak.">
+          <Bars values={ch.steadyByMonth.map((m) => m.value)} fmt={n} x={ch.steadyByMonth.map((m) => new Date(m.label + '-15').toLocaleDateString([], { month: 'short' }))} /></Card>}
         <Card title="Insights">{ins.cards.map((c) => <div class="small">• {c}</div>)}</Card>
         <Card title="Badges" sub="Never taken away.">{ins.badges.length ? ins.badges.slice().reverse().map((b) => <div class="small">🔥 {b.label} · {b.extra}</div>) : <div class="muted">Your first badges come with your first step down.</div>}</Card>
         {ins.recaps.length > 0 && <Card title="Recap"><div class="scroll-x">{ins.recaps.map((r, i) => <button class={`chip ${recap === i ? 'on' : ''}`} onClick={() => setRecap(i)}>{r.title}</button>)}</div>
@@ -239,6 +264,10 @@ export function Insights() {
       </>}
       {sec === 'Ladder' && snap.history.length > 0 && <Card title="Level history" sub="Newest first. Step ups keep their reason; practice pace shows its practice net.">
         {snap.history.map((h) => <div class="small">{h.extra === 'down' ? '▼' : h.extra === 'up' ? '▲' : h.extra === 'practice' ? '◇' : '•'} {h.label}</div>)}
+      </Card>}
+      {sec === 'Ladder' && ch.practiceRuns.length > 0 && <Card title="Practice pace runs" sub="Each run's practice net (bars) and the waking hours it covered.">
+        <Bars values={ch.practiceRuns.map((r) => Math.max(0, r.value / 60))} fmt={h} x={ch.practiceRuns.map((r) => r.label)} />
+        {ch.practiceRuns.map((r) => <div class="small">{r.label} pace · {Math.round(Number(r.extra))} h · practice net {hm(r.value)}</div>)}
       </Card>}
       {sec === 'Ladder' && <Card title="The ladder" sub="Each rung is one piece a day lighter.">
         {snap.ladder.map((r) => {

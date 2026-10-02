@@ -354,6 +354,77 @@ class Insights(private val data: FirewatchData, private val tz: TimeZone, privat
         return (1 - exp(slope * 7)) * 100
     }
 
+    // ---- 0.14 charts ----
+
+    /** Gap sizes over the last [n] known full days: counts under 1h, 1–2h, 2–4h, 4h+ (timed doses, same day). */
+    fun gapSizes(n: Int = 30): List<Pair<String, Int>> {
+        val buckets = IntArray(4)
+        lastDays(n).forEach { d ->
+            d.doses.filter { !it.estimated }.zipWithNext().forEach { (a, b) ->
+                val h = (b.at - a.at) / 3_600_000.0
+                buckets[when { h < 1 -> 0; h < 2 -> 1; h < 4 -> 2; else -> 3 }]++
+            }
+        }
+        return listOf("Under 1h", "1–2h", "2–4h", "4h+").zip(buckets.toList())
+    }
+
+    /** Average pieces by weekday (Monday first) over the last 8 weeks of known full days. */
+    fun weekShape(): List<Pair<String, Double>> {
+        val recent = lastDays(56)
+        return DayOfWeek.entries.map { dow ->
+            val ds = recent.filter { it.date.dayOfWeek == dow }
+            dow.name.take(3).lowercase().replaceFirstChar { it.uppercase() } to (if (ds.isEmpty()) 0.0 else ds.map { it.pieces }.average())
+        }
+    }
+
+    /** Minutes from waking to the first piece, averaged per week: (week start, weekdays, weekends). */
+    fun firstPieceWeekdaysVsWeekends(): List<Triple<LocalDate, Double?, Double?>> =
+        fullDays.chunked(7).map { w ->
+            fun avg(f: (DayStat) -> Boolean) = w.filter { f(it) && it.wakeToFirstMin != null }.mapNotNull { it.wakeToFirstMin }.takeIf { it.isNotEmpty() }?.average()
+            Triple(w.first().date, avg { it.date.dayOfWeek.ordinal < 5 }, avg { it.date.dayOfWeek.ordinal >= 5 })
+        }
+
+    /** Longest gap between timed pieces, each known full day (minutes; null = fewer than two). */
+    fun longestGaps(): List<Pair<LocalDate, Double?>> = fullDays.map { it.date to it.longestGapMin }
+
+    /** Average logged craving strength per week (week start, average, count). */
+    fun cravingStrengthWeekly(): List<Triple<LocalDate, Double, Int>> {
+        val first = firstDate ?: return emptyList()
+        return data.cravings.filter { it.at.localDate(tz) >= first }.groupBy { first.daysUntil(it.at.localDate(tz)) / 7 }
+            .entries.sortedBy { it.key }.map { (w, cs) -> Triple(first.plus(w * 7, DateTimeUnit.DAY), cs.map { it.intensity.toDouble() }.average(), cs.size) }
+    }
+
+    /** Net per day split into timing and dose size (minutes): (date, timing, size). */
+    fun netSplit(): List<Triple<LocalDate, Double, Double>> =
+        stretchPull.filter { it.date < today && !it.paused }.map { Triple(it.date, it.netMin - it.sizeNetMin, it.sizeNetMin) }
+
+    /** Pieces by hour of day and product kind over the last 30 known full days. */
+    fun kindsByHour(): Map<ProductKind, DoubleArray> {
+        val out = HashMap<ProductKind, DoubleArray>()
+        lastDays(30).flatMap { it.doses }.forEach { d ->
+            val h = Instant.fromEpochMilliseconds(d.at).toLocalDateTime(tz).hour
+            out.getOrPut(d.kind) { DoubleArray(24) }[h] += data.piecesOf(d)
+        }
+        return out
+    }
+
+    /** Steady days per month ("2026-09" → count). A total, never a streak. */
+    fun steadyByMonth(): List<Pair<String, Int>> =
+        Control.steadyDates(data, now, tz).groupBy { "${it.year}-${it.monthNumber.toString().padStart(2, '0')}" }
+            .entries.sortedBy { it.key }.map { it.key to it.value.size }
+
+    /**
+     * Pace vs your plan: daily pieces for the last [n] known days with the working level each day,
+     * then the "If you take each step" dates ahead. Only after a first step down.
+     */
+    fun paceVsPlan(n: Int = 28): Pair<List<Triple<LocalDate, Double?, Double?>>, Boolean> {
+        val steppedDown = data.rungChanges.zipWithNext().any { (a, b) -> b.pieces < a.pieces }
+        if (!steppedDown) return emptyList<Triple<LocalDate, Double?, Double?>>() to false
+        val past = lastDays(n).map { Triple(it.date, it.pieces as Double?, BatteryEngine.targetAt(data, it.wakeAt + 12 * 3_600_000L)) }
+        val plan = Control.taperPlan(data, now, tz)?.steps?.map { Triple(it.date, null as Double?, it.rung.pieces as Double?) } ?: emptyList()
+        return (past + plan) to true
+    }
+
     /** Taper speed in plain words: a win when lighter, neutral otherwise (no spin). */
     fun taperSpeedText(): String? {
         val p = taperPercentPerWeek() ?: return null

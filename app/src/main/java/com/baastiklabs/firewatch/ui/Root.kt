@@ -152,7 +152,9 @@ fun FirewatchRoot(vm: FirewatchViewModel) {
                     onOpenAbout = { route = "about" },
                     onBackfill = { route = "backfill" },
                     onOpenHelp = { route = "help" },
+                    onOpenThemes = { route = "themes" },
                 )
+                route == "themes" -> com.baastiklabs.firewatch.ui.settings.ThemesScreen(vm, data, onBack = { route = "settings" })
                 route.startsWith("day/") -> DayScreen(
                     vm = vm,
                     data = data,

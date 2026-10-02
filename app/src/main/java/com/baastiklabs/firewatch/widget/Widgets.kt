@@ -47,10 +47,21 @@ import com.baastiklabs.firewatch.core.toDose
 import com.baastiklabs.firewatch.ui.Fmt
 import kotlinx.datetime.TimeZone
 
-private val Bg = ColorProvider(Color(0xFF1E1613))
-private val Ember = ColorProvider(Color(0xFFFF7A2F))
-private val OnDark = ColorProvider(Color(0xFFF3E7DF))
-private val Muted = ColorProvider(Color(0xFFC9B5A8))
+/** Widget colours follow the chosen theme (and the phone's light/dark setting). */
+private class WidgetColors(val p: com.baastiklabs.firewatch.core.Themes.Palette) {
+    private fun c(h: String) = ColorProvider(com.baastiklabs.firewatch.ui.theme.hexColor(h))
+    val bg = c(p.surface); val ember = c(p.primary); val onDark = c(p.text); val muted = c(p.muted)
+    val track = c(p.surface3); val onEmber = c(p.onPrimary)
+    fun craving(level: Int): Color = androidx.compose.ui.graphics.lerp(
+        com.baastiklabs.firewatch.ui.theme.hexColor(p.cravingLow), com.baastiklabs.firewatch.ui.theme.hexColor(p.cravingHigh), (level - 1) / 9f)
+
+    companion object {
+        fun of(context: Context, s: com.baastiklabs.firewatch.core.model.Settings): WidgetColors {
+            val dark = (context.resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES
+            return WidgetColors(com.baastiklabs.firewatch.core.Themes.palette(s.theme, s.themeMode, dark, s.trueBlack, s.calmColours, s.colourBlindCharts))
+        }
+    }
+}
 
 private val productKey = ActionParameters.Key<String>("product")
 private val levelKey = ActionParameters.Key<Int>("level")
@@ -96,18 +107,19 @@ class QuickLogWidget : GlanceAppWidget() {
         }
         val products = data.homeProducts.filter { !(it.kind == ProductKind.VAPE && it.borrowedFrom != null) }.take(4)
         val puffs = Puffs.get(context)
+        val wc = WidgetColors.of(context, app(context).graph.repository.data.value.settings)
         provideContent {
             Column(
-                GlanceModifier.fillMaxSize().background(Bg).cornerRadius(20.dp).padding(10.dp),
+                GlanceModifier.fillMaxSize().background(wc.bg).cornerRadius(20.dp).padding(10.dp),
             ) {
                 Text(
                     status?.first ?: "Firewatch",
-                    style = TextStyle(color = OnDark, fontSize = 14.sp, fontWeight = FontWeight.Bold),
+                    style = TextStyle(color = wc.onDark, fontSize = 14.sp, fontWeight = FontWeight.Bold),
                     modifier = GlanceModifier.clickable(actionStartActivity<MainActivity>()),
                 )
                 status?.second?.let { charge ->
-                    Row(GlanceModifier.fillMaxWidth().height(6.dp).background(ColorProvider(Color(0xFF3A2C25))).cornerRadius(3.dp)) {
-                        Spacer(GlanceModifier.height(6.dp).width((charge * 160).toInt().dp).background(Ember).cornerRadius(3.dp))
+                    Row(GlanceModifier.fillMaxWidth().height(6.dp).background(wc.track).cornerRadius(3.dp)) {
+                        Spacer(GlanceModifier.height(6.dp).width((charge * 160).toInt().dp).background(wc.ember).cornerRadius(3.dp))
                     }
                 }
                 Spacer(GlanceModifier.height(6.dp))
@@ -118,7 +130,7 @@ class QuickLogWidget : GlanceAppWidget() {
                                 text = p.name,
                                 onClick = actionRunCallback<LogProductAction>(actionParametersOf(productKey to p.id)),
                                 modifier = GlanceModifier.defaultWeight().padding(2.dp),
-                                colors = ButtonDefaults.buttonColors(backgroundColor = Ember, contentColor = ColorProvider(Color(0xFF2A1206))),
+                                colors = ButtonDefaults.buttonColors(backgroundColor = wc.ember, contentColor = wc.onEmber),
                             )
                         }
                     }
@@ -182,16 +194,17 @@ class CravingWidget : GlanceAppWidget() {
         val repo = app(context).graph.repository
         repo.ensureLoaded()
         val active = Cravings.active(repo.data.value, System.currentTimeMillis())
+        val wc = WidgetColors.of(context, app(context).graph.repository.data.value.settings)
         provideContent {
-            Column(GlanceModifier.fillMaxSize().background(Bg).cornerRadius(20.dp).padding(10.dp)) {
+            Column(GlanceModifier.fillMaxSize().background(wc.bg).cornerRadius(20.dp).padding(10.dp)) {
                 if (active != null) {
                     // No buttons: thinking about the app mid-craving can feed the craving.
-                    Text("Craving logged at ${Fmt.time(active.at)}.", style = TextStyle(color = OnDark, fontSize = 14.sp, fontWeight = FontWeight.Bold))
+                    Text("Craving logged at ${Fmt.time(active.at)}.", style = TextStyle(color = wc.onDark, fontSize = 14.sp, fontWeight = FontWeight.Bold))
                     Spacer(GlanceModifier.height(4.dp))
-                    Text("You've got this.", style = TextStyle(color = Muted, fontSize = 12.sp))
+                    Text("You've got this.", style = TextStyle(color = wc.muted, fontSize = 12.sp))
                 } else {
-                    Text("Craving? How strong (1–10)", style = TextStyle(color = OnDark, fontSize = 13.sp, fontWeight = FontWeight.Bold))
-                    Text("1 passing · 5 distracting · 10 worst", style = TextStyle(color = Muted, fontSize = 11.sp))
+                    Text("Craving? How strong (1–10)", style = TextStyle(color = wc.onDark, fontSize = 13.sp, fontWeight = FontWeight.Bold))
+                    Text("1 passing · 5 distracting · 10 worst", style = TextStyle(color = wc.muted, fontSize = 11.sp))
                     listOf(1..5, 6..10).forEach { range ->
                         Row(GlanceModifier.fillMaxWidth()) {
                             range.forEach { level ->
@@ -200,7 +213,7 @@ class CravingWidget : GlanceAppWidget() {
                                     onClick = actionRunCallback<LogCravingAction>(actionParametersOf(levelKey to level)),
                                     modifier = GlanceModifier.defaultWeight().padding(2.dp),
                                     colors = ButtonDefaults.buttonColors(
-                                        backgroundColor = ColorProvider(craving(level)),
+                                        backgroundColor = ColorProvider(wc.craving(level)),
                                         contentColor = ColorProvider(Color.White),
                                     ),
                                 )
@@ -212,13 +225,6 @@ class CravingWidget : GlanceAppWidget() {
         }
     }
 
-    private fun craving(level: Int): Color {
-        val f = (level - 1) / 9f
-        return Color(0xFF5FA893).let { a ->
-            val b = Color(0xFFE0443A)
-            Color(a.red + (b.red - a.red) * f, a.green + (b.green - a.green) * f, a.blue + (b.blue - a.blue) * f)
-        }
-    }
 }
 
 class CravingWidgetReceiver : GlanceAppWidgetReceiver() {

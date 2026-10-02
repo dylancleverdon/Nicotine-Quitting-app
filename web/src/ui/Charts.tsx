@@ -1,6 +1,7 @@
 // Small SVG charts. Every figure is an estimate; charts are for shape and comparison.
 import { useState } from 'preact/hooks'
 import { dayMonth, hourLabel, time } from './format'
+import { kindColor } from '../theme'
 const W = 320
 
 /** Round axis values: 0 up to a "nice" top at or above [max], about [n] steps. */
@@ -45,8 +46,10 @@ export function Frame({ ticks, fmt, height, xt, children, indent, readout }: { t
   const [pos, setPos] = useState<number | null>(null)
   const at = (e: PointerEvent) => { const r = (e.currentTarget as HTMLElement).getBoundingClientRect(); setPos(Math.max(0, Math.min(1, (e.clientX - r.left) / r.width))) }
   const label = pos != null && readout ? readout(pos) : null
+  // Screen readers get one line: the latest point.
+  const summary = readout ? `Chart. Latest: ${readout(0.999) ?? ''}` : 'Chart'
   return (
-    <div class="chart-frame">
+    <div class="chart-frame" role="img" aria-label={summary}>
       <div class="chart">
         {ticks && fmt && <div class="yaxis" style={{ height }}>{ticks.map((t) => <span style={{ bottom: `${(t / top) * 100}%` }}>{fmt(t)}</span>)}</div>}
         <div class="plot" style={readout ? { touchAction: 'pan-y' } : undefined}
@@ -175,7 +178,10 @@ export function Barcode({ rows }: { rows: boolean[][] }) {
   )
 }
 
-export const Meter = ({ value }: { value: number }) => <div class="bar"><i style={{ width: `${Math.max(0, Math.min(1, value)) * 100}%` }} /></div>
+export const Meter = ({ value, label = 'Progress' }: { value: number; label?: string }) => {
+  const v = Math.max(0, Math.min(1, value))
+  return <div class="bar" role="progressbar" aria-label={label} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(v * 100)}><i style={{ width: `${v * 100}%` }} /></div>
+}
 
 /** 24-hour craving forecast: likelihood curve, hourly dots coloured by likely strength, sleep shaded, now marked. */
 export function ForecastChart({ points, now, height = 130 }: { points: number[][]; now: number; height?: number }) {
@@ -231,7 +237,8 @@ export function ReceptorChart({ history, plan, stay, typical, height = 150, date
   )
 }
 
-export const KIND_COLORS: Record<string, string> = { GUM: '#8fc7b8', POUCH: '#ffb35c', LOZENGE: '#b8d98f', PATCH: '#9fb3e0', VAPE: '#e0443a', CIGARETTE: '#8a6a5a', OTHER: '#b0a49c' }
+/** Product colours for the current theme. */
+export const KIND_ORDER = ['GUM', 'POUCH', 'LOZENGE', 'PATCH', 'VAPE', 'CIGARETTE', 'OTHER']
 
 /** A day's doses across 24 hours: one dot per dose, sized by pieces, coloured by type. */
 export function DoseStrip({ doses, dayStart }: { doses: { at: number; pieces: number; kind: string }[]; dayStart: number }) {
@@ -239,7 +246,7 @@ export function DoseStrip({ doses, dayStart }: { doses: { at: number; pieces: nu
     <svg viewBox={`0 0 ${W} 40`} width="100%" height={40} preserveAspectRatio="none">
       <line x1={0} x2={W} y1={20} y2={20} stroke="var(--line)" />
       {[6, 12, 18].map((h) => <line x1={(h / 24) * W} x2={(h / 24) * W} y1={12} y2={28} stroke="var(--line)" />)}
-      {doses.map((d) => { const x = ((((d.at - dayStart) / 3600000) % 24 + 24) % 24) / 24 * W; return <circle cx={x} cy={20} r={4 + Math.min(10, d.pieces * 4)} fill={KIND_COLORS[d.kind] ?? 'var(--primary)'} opacity={0.85} /> })}
+      {doses.map((d) => { const x = ((((d.at - dayStart) / 3600000) % 24 + 24) % 24) / 24 * W; return <circle cx={x} cy={20} r={4 + Math.min(10, d.pieces * 4)} fill={kindColor(d.kind)} opacity={0.85} /> })}
     </svg>
   )
 }
@@ -251,7 +258,24 @@ export function StackedBars({ columns, height = 120 }: { columns: Record<string,
   const slot = W / Math.max(1, columns.length), w = slot * 0.7
   return (
     <svg viewBox={`0 0 ${W} ${height}`} width="100%" height={height} preserveAspectRatio="none">
-      {columns.map((c, i) => { let y = height; return Object.entries(c).map(([k, v]) => { const h = (v / max) * height; y -= h; return <rect x={i * slot + (slot - w) / 2} y={y} width={w} height={h} fill={KIND_COLORS[k] ?? 'var(--primary)'} /> }) })}
+      {columns.map((c, i) => { let y = height; return Object.entries(c).map(([k, v]) => { const h = (v / max) * height; y -= h; return <rect x={i * slot + (slot - w) / 2} y={y} width={w} height={h} fill={kindColor(k)} /> }) })}
     </svg>
+  )
+}
+
+/** Two series per day around zero (e.g. net from timing and from dose size): up = ahead, down = behind. */
+export function Diverging({ a, b, labels, height = 120, fmt }: { a: number[]; b: number[]; labels: string[]; height?: number; fmt: (v: number) => string }) {
+  if (!a.length) return null
+  const max = Math.max(1, ...a.map(Math.abs), ...b.map(Math.abs))
+  const slot = W / a.length, w = slot * 0.35, mid = height / 2
+  const y = (v: number) => mid - (v / max) * (mid - 2)
+  return (
+    <Frame height={height} xt={indexTicks(labels, 4, true)} readout={(p) => { const i = Math.min(a.length - 1, Math.floor(p * a.length)); return `${labels[i]} · timing ${fmt(a[i])} · dose size ${fmt(b[i])}` }}>
+      <svg viewBox={`0 0 ${W} ${height}`} width="100%" height={height} preserveAspectRatio="none" role="img" aria-label="Net from timing (orange) and from dose size (teal), per day">
+        <line x1={0} x2={W} y1={mid} y2={mid} stroke="var(--line)" />
+        {a.map((v, i) => <rect x={i * slot + slot * 0.1} y={Math.min(mid, y(v))} width={w} height={Math.abs(y(v) - mid)} fill="var(--primary)" />)}
+        {b.map((v, i) => <rect x={i * slot + slot * 0.5} y={Math.min(mid, y(v))} width={w} height={Math.abs(y(v) - mid)} fill="var(--tertiary)" />)}
+      </svg>
+    </Frame>
   )
 }

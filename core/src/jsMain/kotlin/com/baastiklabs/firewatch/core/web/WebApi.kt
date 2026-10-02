@@ -84,6 +84,21 @@ external object JsJodaTimeZoneModule
     val lastSessionId: String?, val followUpId: String?,
     val explainer: String, val stopNote: String, val relapseNote: String,
 )
+@Serializable data class ClearAirDto(val active: Boolean, val daysFree: Int, val healing: Double?, val offer: Boolean)
+@Serializable data class ChartsDto(
+    val gapSizes: List<NamedValue>, val weekShape: List<NamedValue>,
+    /** [week start, weekdays min or -1, weekends min or -1]. */
+    val firstPiece: List<List<String>>,
+    val longestGaps: List<NamedValue>, val cravingWeekly: List<NamedValue>,
+    /** [date, timing min, size min]. */
+    val netSplit: List<List<String>>,
+    val kindsByHour: Map<String, List<Double>>,
+    val steadyByMonth: List<NamedValue>,
+    /** [date, pieces or "", level or ""]; empty unless there's been a step down. */
+    val paceVsPlan: List<List<String>>,
+    val practiceRuns: List<NamedValue>,
+    val daysFree: List<NamedValue>,
+)
 @Serializable data class StepProgressDto(val held: Int, val needed: Int, val next: RungDto, val offered: Boolean)
 @Serializable data class ReviewDto(
     val date: String, val pieces: Double, val netMin: Double?, val volatility: Double, val mix: List<NamedValue>,
@@ -186,6 +201,8 @@ external object JsJodaTimeZoneModule
     val nowCurve: List<Double>,
     val unknownNote: String,
     val holdShortNote: String,
+    val clearAir: ClearAirDto,
+    val charts: ChartsDto,
 )
 @Serializable data class InsightsDto(
     val avoidedPieces: Double, val avoidedMg: Double, val money: Double, val winRate: Double?, val cravingMinutes: Double?,
@@ -392,6 +409,22 @@ object FirewatchCore {
             doubleUpsWeekly = ins.doubleUpsPerWeek().map { NamedValue(it.first.toString(), it.second.toDouble()) },
             thenCurve = if (ins.baselineComplete && ins.fullDays.size > ins.baselineDays.size + 3) ins.typicalCurve(ins.baselineDays) else emptyList(),
             nowCurve = if (ins.baselineComplete && ins.fullDays.size > ins.baselineDays.size + 3) ins.typicalCurve(ins.lastDays(7)) else emptyList(),
+            clearAir = com.baastiklabs.firewatch.core.engine.ClearAir.let { CA ->
+                ClearAirDto(CA.active(d), CA.daysFree(d, now, tz), if (CA.active(d)) CA.receptorHealing(d, now, tz) else null, revealed && CA.offer(d, now, tz))
+            },
+            charts = ChartsDto(
+                gapSizes = ins.gapSizes().map { NamedValue(it.first, it.second.toDouble()) },
+                weekShape = ins.weekShape().map { NamedValue(it.first, it.second) },
+                firstPiece = ins.firstPieceWeekdaysVsWeekends().map { listOf(it.first.toString(), (it.second ?: -1.0).toString(), (it.third ?: -1.0).toString()) },
+                longestGaps = ins.longestGaps().map { NamedValue(it.first.toString(), it.second ?: 0.0) },
+                cravingWeekly = ins.cravingStrengthWeekly().map { NamedValue(it.first.toString(), it.second, it.third.toString()) },
+                netSplit = ins.netSplit().map { listOf(it.first.toString(), it.second.toString(), it.third.toString()) },
+                kindsByHour = ins.kindsByHour().mapKeys { it.key.name }.mapValues { it.value.toList() },
+                steadyByMonth = ins.steadyByMonth().map { NamedValue(it.first, it.second.toDouble()) },
+                paceVsPlan = ins.paceVsPlan().first.map { listOf(it.first.toString(), it.second?.toString() ?: "", it.third?.toString() ?: "") },
+                practiceRuns = com.baastiklabs.firewatch.core.engine.Practice.runs(d, now, tz).map { NamedValue(it.rung.tier.title, it.netMin, it.hours.toString()) },
+                daysFree = com.baastiklabs.firewatch.core.engine.ClearAir.daysFreeSeries(d, now, tz).map { NamedValue(it.first.toString(), it.second.toDouble()) },
+            ),
             unknownNote = com.baastiklabs.firewatch.core.Help.UNKNOWN_DAYS_NOTE,
             holdShortNote = com.baastiklabs.firewatch.core.Help.HOLD_SHORT_NOTE,
             steadyExplainer = com.baastiklabs.firewatch.core.Help.STEADY_EXPLAINER,
@@ -525,6 +558,12 @@ object FirewatchCore {
     fun feedbackBody(type: String, suggestion: String, details: String, name: String, appInfo: String): String =
         com.baastiklabs.firewatch.core.Feedback.encode(com.baastiklabs.firewatch.core.Feedback.fields(type, suggestion, details, name, appInfo))
     fun feedbackPrivacy(): String = com.baastiklabs.firewatch.core.Feedback.PRIVACY_NOTE
+
+    /** Colour themes (id, name, feel) and one palette (shared with Android). */
+    fun themes(): String = FirewatchJson.encodeToString(ListSerializer(com.baastiklabs.firewatch.core.Themes.Theme.serializer()), com.baastiklabs.firewatch.core.Themes.all)
+    fun palette(id: String, mode: String, systemDark: Boolean, trueBlack: Boolean, calm: Boolean, colourBlind: Boolean): String =
+        FirewatchJson.encodeToString(com.baastiklabs.firewatch.core.Themes.Palette.serializer(),
+            com.baastiklabs.firewatch.core.Themes.palette(id, mode, systemDark, trueBlack, calm, colourBlind))
 
     /** Help articles, the welcome tour and "Why Firewatch works this way" (shared with Android). */
     fun help(): String = FirewatchJson.encodeToString(

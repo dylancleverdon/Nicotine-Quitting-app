@@ -17,7 +17,8 @@ import kotlin.math.ceil
 
 /** Stretch, pull and net for one waking day, in minutes. */
 /** [paused]: a Relapse prevention mode day, where stretch and pull don't apply. */
-data class DayBattery(val date: LocalDate, val stretchMin: Double, val pullMin: Double, val paused: Boolean = false) {
+/** [sizeNetMin]: the part of net that comes from dose size (the rest is timing). */
+data class DayBattery(val date: LocalDate, val stretchMin: Double, val pullMin: Double, val paused: Boolean = false, val sizeNetMin: Double = 0.0) {
     val netMin: Double get() = stretchMin - pullMin
 }
 
@@ -39,7 +40,7 @@ object BatteryEngine {
     /** "Up right now" if the app was opened or something logged within this window. */
     private const val ACTIVE_WINDOW = 30 * MIN
 
-    private class Sim(val charge: Double, val stretch: Double, val pull: Double, val fullBeforeLast: Boolean?)
+    private class Sim(val charge: Double, val stretch: Double, val pull: Double, val fullBeforeLast: Boolean?, val sizeNet: Double = 0.0)
 
     fun intervalFor(pieces: Double) = Ladder.WAKING_MINUTES / pieces.coerceAtLeast(0.2)
 
@@ -83,6 +84,7 @@ object BatteryEngine {
         var stretch = 0.0
         var pull = 0.0
         var fullBeforeLast: Boolean? = null
+        var sizeNet = 0.0
         val awakeEnd = maxOf(day.sleepAt, awakeUntil)
         // Stretch only counts once there's a target to hold off against.
         val stretchFrom = data.rungChanges.firstOrNull()?.at ?: Long.MAX_VALUE
@@ -119,12 +121,13 @@ object BatteryEngine {
                 if (!full) pull += (1.0 - charge) * gap
                 val p = data.piecesOf(d)
                 if (p > 1.0) pull += (p - 1.0) * gap else stretch += (1.0 - p) * gap
+                sizeNet += (1.0 - p) * gap
             }
             fullBeforeLast = full
             charge = 0.0
         }
         advance(end)
-        return Sim(charge, stretch, pull, fullBeforeLast)
+        return Sim(charge, stretch, pull, fullBeforeLast, sizeNet)
     }
 
     /** The same rules stepped minute by minute (the reference the fast version is tested against). */
@@ -286,7 +289,7 @@ object BatteryEngine {
         val lateDose = dayDoses(data, day, nextWake).lastOrNull { it.at >= day.sleepAt }?.at ?: 0L
         val sim = simulate(data, day, nextWake, intervalFor(target), now, lateDose)
         if (Relapse.isModeDay(data, date, tz)) return DayBattery(date, 0.0, 0.0, paused = true)
-        return DayBattery(date, sim.stretch, sim.pull)
+        return DayBattery(date, sim.stretch, sim.pull, sizeNetMin = sim.sizeNet)
     }
 
     /**

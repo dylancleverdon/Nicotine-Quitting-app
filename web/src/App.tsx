@@ -4,12 +4,14 @@ import * as S from './store'
 import { persist } from './db'
 import { markActivity } from './core'
 import { setTimeFormat } from './ui/format'
+import { applyTheme, onSystemThemeChange } from './theme'
 import { Home } from './ui/Home'
 import { Calendar } from './ui/Calendar'
 import { Insights } from './ui/Insights'
 import { Settings } from './ui/Settings'
 import { Backfill, Onboarding } from './ui/Onboarding'
 import { Help, Tour, Why } from './ui/Help'
+import { Themes } from './ui/Themes'
 import changelog from '../CHANGELOG.md?raw'
 
 const TABS = [['home', 'Log'], ['insights', 'Insights'], ['calendar', 'Calendar'], ['settings', 'Settings']]
@@ -25,6 +27,7 @@ export function App() {
 
   useEffect(() => {
     S.load(); persist(); markActivity()
+    onSystemThemeChange(() => applyTheme(S.settings.value))
     const onVisible = () => document.visibilityState === 'visible' && (markActivity(), (S.tick.value = Date.now()))
     document.addEventListener('visibilitychange', onVisible)
     const t = setInterval(() => (S.tick.value = Date.now()), 15000)
@@ -35,6 +38,8 @@ export function App() {
   }, [])
 
   const show = (msg: string, undo?: () => void) => { setToast({ msg, undo }); setTimeout(() => setToast((t) => (t?.msg === msg ? null : t)), 5000) }
+  const s0 = S.settings.value
+  useEffect(() => { applyTheme(s0) }, [s0.theme, s0.themeMode, s0.trueBlack, s0.calmColours, s0.colourBlindCharts])
   if (!S.loaded.value || !S.snapshot.value) return <main><div class="muted">Loading…</div></main>
   setTimeFormat(S.settings.value.timeFormat ?? 'system')
   if (!S.settings.value.tourSeen && route !== 'why') return <Tour onDone={() => S.updateSettings({ tourSeen: true })} onWhy={() => setRoute('why')} />
@@ -48,6 +53,7 @@ export function App() {
       {route === 'calendar' && <Calendar toast={show} />}
       {route === 'settings' && <Settings toast={show} go={setRoute} updateInfo={checked} />}
       {route === 'help' && <Help go={setRoute} />}
+      {route === 'themes' && <Themes back={() => setRoute('settings')} />}
       {route === 'why' && <Why onBack={() => setRoute('help')} />}
       {route === 'tour' && <Tour onDone={() => setRoute('help')} onWhy={() => setRoute('why')} />}
       {route === 'backfill' && <Backfill onDone={() => setRoute('home')} onCancel={() => setRoute('home')} />}

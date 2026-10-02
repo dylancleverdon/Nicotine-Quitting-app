@@ -1,5 +1,12 @@
 # Firewatch web changelog
 
+## 0.11.0 · 2026-10-02
+- New: **Life at Clear Air.** Once you reach Clear Air, the Log tab shows your days nicotine-free and how far your receptors have come back, with craving logging front and centre. If you've had a nicotine-free week, Firewatch offers the switch.
+- New: 18 colour themes in Settings → Appearance → More themes, each in light and dark, plus options for colour-blind-safe charts and true black. Calmer colours, with no red, are now the default.
+- Easier to read: text follows your phone's size setting, and screen readers describe the charts and calendar days.
+- New Insights charts: gap sizes, week shape, first piece on weekdays vs weekends, longest gap each day, craving strength over time, where your net comes from, doses by product over the day, pace vs your plan, days nicotine-free, steady days by month and practice pace runs.
+- On iPhone, a one-time tip shows how to add Firewatch to your Home Screen. Settings → Your data now shows when you last exported a backup.
+
 ## 0.10.0 · 2026-10-02
 - Days with nothing logged now show a "?" on the calendar and are left out of your figures until you tap them: mark a clear day 🌿, add what you had, or leave the day out 👻. Clear days count as wins. Your steady days have been recounted once with this rule.
 - New: **Practice pace.** Try a lighter pace from Settings → Your plan, or from "Try it for a day". It never changes your level. Choose "Turn off at bedtime" or "Leave it on until I turn it off".

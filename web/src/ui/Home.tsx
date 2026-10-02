@@ -59,15 +59,34 @@ export function Home({ toast, go, backfill }: { toast: (msg: string, undo?: () =
     else toast(reason === 'up' ? `Stepped up to ${rung?.label}. Your level is more accurate now.` : `Starting at ${rung?.label}.`)
   }
   const pr = snap.practice
+  // iPhone Safari, not yet added to the Home Screen: a one-time tip.
+  const ios = /iPhone|iPad|iPod/.test(navigator.userAgent)
+  const standalone = (navigator as any).standalone === true || (typeof matchMedia === 'function' && matchMedia('(display-mode: standalone)').matches)
+  const showInstall = ios && !standalone && !settings.installCardSeen
+  const ca = snap.clearAir
+  const [hadSome, setHadSome] = useState(false)
+  const nextStep = ca.active ? snap.insights.clearAirSteps.find((st) => st.value > Date.now()) : null
   const checkedIn = S.live('checkin').some((c) => new Date(c.at).toDateString() === new Date().toDateString())
   const battery = snap.battery
 
   return (
     <main>
       <div class="row between"><h1 class="brand">Firewatch<small>by Baastik Labs</small></h1><button class="btn text help-btn" aria-label="Help" onClick={() => go('help')}>?</button></div>
+      {showInstall && <div class="card accent install-card">
+        <h2>Add Firewatch to your Home Screen</h2>
+        <div class="small">For the full app on iPhone: tap Share <span aria-hidden="true">⎋</span>, then Add to Home Screen. Your data stays in this browser either way.</div>
+        <div><button class="btn outline" onClick={() => S.updateSettings({ installCardSeen: true })}>Got it</button></div>
+      </div>}
       {rp.on && <div class="card soft relapse-on"><b>Relapse prevention mode is on</b>
         <div class="small">{rp.nextAt && !hidden ? `Next scheduled piece at ${time(rp.nextAt)}` : ''}{rp.productName ? ` · ${rp.productName}` : ''}</div>
         <div class="muted">Reminders are Android-only for now.</div></div>}
+      {ca.active ? <div class="card clear-air">
+        <p class="tier">Clear Air</p>
+        <div class="big-num"><b>{ca.daysFree}</b> {ca.daysFree === 1 ? 'day' : 'days'} nicotine-free</div>
+        {ca.healing != null && <><div class="small">Receptors heading back to typical: ≈ {Math.round(ca.healing * 100)}%</div><Meter value={ca.healing} /></>}
+        {nextStep && <div class="small">Next on the recovery timeline: {nextStep.label} (in about {duration(nextStep.value - Date.now())})</div>}
+        <div class="muted">A total that only goes up. Logging something just counts it.</div>
+      </div> : <>
       <div class="card">
         {showTier ? <>
           {(snap.target ?? snap.measured) && <>
@@ -127,6 +146,7 @@ export function Home({ toast, go, backfill }: { toast: (msg: string, undo?: () =
         {showTier && snap.wave.length > 2 && <Wave points={snap.wave} height={64} axes={false} now={Date.now()} shade={[[snap.wave[0][0], snap.wakeAt], [snap.sleepAt, snap.wave[snap.wave.length - 1][0]]]} />}
         {showTier && snap.wave.length > 2 && <div class="now-mg"><b>≈ {snap.nowMg.toFixed(1)} mg</b> in your system now</div>}
       </div>
+      </>}
 
       {snap.steadyMilestone && (settings.showSteadyDays ?? true) && <div class="card accent">
         <h2>{snap.steadyMilestone} steady days</h2>
@@ -152,6 +172,12 @@ export function Home({ toast, go, backfill }: { toast: (msg: string, undo?: () =
         <div class="row wrap"><button class="btn" onClick={async () => { await S.stopPractice(); await S.updateSettings({ practiceAnswered: pr.lastSessionId ?? '' }); await S.setTarget(pr.workFrom!.pieces, 'measured', 'from measured level'); toast(`Working from ${pr.workFrom!.label}.`) }}>Work from {pr.workFrom.tier}</button>
           <button class="btn outline" onClick={() => S.updateSettings({ workFromSnoozedAt: Date.now() })}>Keep practicing</button>
           <button class="btn outline" onClick={async () => { await S.stopPractice(); await S.updateSettings({ practiceAnswered: pr.lastSessionId ?? '', lighterSnoozedAt: Date.now() }) }}>Back to {snap.target.tier} pace</button></div>
+      </div>}
+      {ca.offer && <div class="card accent">
+        <h2>Your last 7 days were nicotine-free</h2>
+        <div class="small">Switch to Clear Air? The Log tab becomes your days nicotine-free, with craving logging up front. You can step back up any time.</div>
+        <div class="row"><button class="btn" onClick={() => moveTarget(0, 'down')}>Switch to Clear Air</button>
+          <button class="btn outline" onClick={() => S.updateSettings({ clearAirOfferSnoozedAt: Date.now() })}>Not now</button></div>
       </div>}
       {snap.welcomeBack && <div class="card accent">
         <h2>Welcome back</h2>
@@ -194,12 +220,14 @@ export function Home({ toast, go, backfill }: { toast: (msg: string, undo?: () =
       {settings.dailyCheckIn && !checkedIn && <button class="btn outline" onClick={() => setCheckIn(true)}>Daily check-in (3 taps)</button>}
 
       {snap.activeCraving ? <div class="muted craving-line">Craving logged at {time(snap.activeCraving.at)}. You've got this.</div> : null}
-      {<div class="grid2">
+      {ca.active ? <button class="btn craving-big" onClick={() => setCraving(true)}>Craving? Log it</button> : <div class="grid2">
         <button class="btn outline" style={{ height: 56 }} onClick={() => setCraving(true)}>Craving? Log it</button>
         <button class="btn outline" style={{ height: 56 }} onClick={() => setVape(true)}>Friend's vape</button>
       </div>}
+      {ca.active && !hadSome && <button class="btn text" onClick={() => setHadSome(true)}>I had some</button>}
 
-      <div><h2>Log a dose</h2><div class="muted">Tap to log it now · hold for time, amount and more</div></div>
+      {(!ca.active || hadSome) && <><div><h2>Log a dose</h2><div class="muted">Tap to log it now · hold for time, amount and more</div></div>
+      {ca.active && <button class="btn outline" onClick={() => setVape(true)}>Friend's vape</button>}
       <div class="grid2">
         {S.homeProducts.value.map((p) => (
           <button class="product" onPointerDown={() => down(p)} onPointerUp={() => up(p)} onPointerLeave={() => press.current && clearTimeout(press.current)} onContextMenu={(e) => e.preventDefault()}>
@@ -208,7 +236,7 @@ export function Home({ toast, go, backfill }: { toast: (msg: string, undo?: () =
             <span>{piecesLabel(Core.piecesOf(p, S.json()))}</span>
           </button>
         ))}
-      </div>
+      </div></>}
       <div class="grid2">
         {([['WAKE', 'Good morning'], ['SLEEP', 'Good night']] as ['WAKE' | 'SLEEP', string][]).map(([kind, label]) => (
           <button class="btn outline" onContextMenu={(e) => e.preventDefault()}

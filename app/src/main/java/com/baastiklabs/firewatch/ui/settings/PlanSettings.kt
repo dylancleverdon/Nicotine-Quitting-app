@@ -135,26 +135,6 @@ fun PlanSettings(vm: FirewatchViewModel, data: FirewatchData) {
         }
     }
 
-    SectionTitle("Reminders (optional)")
-    val context = androidx.compose.ui.platform.LocalContext.current
-    val permission = androidx.activity.compose.rememberLauncherForActivityResult(
-        androidx.activity.result.contract.ActivityResultContracts.RequestPermission(),
-    ) { }
-    fun remind(t: (Settings) -> Settings) {
-        if (android.os.Build.VERSION.SDK_INT >= 33) permission.launch(android.Manifest.permission.POST_NOTIFICATIONS)
-        scope.launch {
-            vm.repository.updateSettings(t)
-            com.baastiklabs.firewatch.reminders.Reminders.sync(context, vm.repository.data.value.settings)
-        }
-    }
-    Text(
-        "Neutral and off by default. Apart from Relapse prevention mode, Firewatch never sends \"time for your next piece\".",
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
-    ToggleRow("Check-in reminder", "An evening nudge if you haven't checked in", s.remindCheckIn) { v -> remind { it.copy(remindCheckIn = v, dailyCheckIn = it.dailyCheckIn || v) } }
-    ToggleRow("Backup reminder", "Weekly, only if no copy of your data has left the phone", s.remindBackup) { v -> remind { it.copy(remindBackup = v) } }
-
     SectionTitle("Money")
     var currency by remember(s.currency) { mutableStateOf(s.currency) }
     var reward by remember(s.rewardName) { mutableStateOf(s.rewardName) }

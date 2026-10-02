@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -141,6 +142,12 @@ fun HomeScreen(
     val lighterOffer = remember(data, minute) { if (revealed) com.baastiklabs.firewatch.core.engine.Practice.lighterOffer(data, now, tz) else null }
     val workFrom = remember(data, minute) { if (revealed) com.baastiklabs.firewatch.core.engine.Practice.workFromOffer(data, now, tz) else null }
     var practiceAsk by remember { mutableStateOf<Double?>(null) }
+    // Life at Clear Air: days nicotine-free, receptor healing, craving logging up front.
+    val clearAir = com.baastiklabs.firewatch.core.engine.ClearAir.active(data)
+    val daysFree = remember(data, minute / 30) { com.baastiklabs.firewatch.core.engine.ClearAir.daysFree(data, now, tz) }
+    val healing = remember(data, minute / 30) { if (clearAir) com.baastiklabs.firewatch.core.engine.ClearAir.receptorHealing(data, now, tz) else null }
+    val clearAirOffer = remember(data, minute) { revealed && com.baastiklabs.firewatch.core.engine.ClearAir.offer(data, now, tz) }
+    var hadSome by remember { mutableStateOf(false) }
     val heldTotal = remember(data, minute) {
         target?.let { com.baastiklabs.firewatch.core.engine.Control.heldByRung(data, now, tz)[it.pieces]?.first } ?: 0
     }
@@ -252,7 +259,9 @@ fun HomeScreen(
             }
         }
         if (data.relapseOn) item { com.baastiklabs.firewatch.ui.relapse.RelapseIndicator(if (timerHidden) null else relapseNext, relapseProduct) }
-        item {
+        if (clearAir) item {
+            ClearAirCard(daysFree, healing, remember(data) { Insights(data, tz, now).clearAirTimeline().second.firstOrNull { it.second > now } })
+        } else item {
             if (showTier) {
                 TierStatusCard(
                     measured = measured,
@@ -276,7 +285,17 @@ fun HomeScreen(
                 StatusCard(todaySummary, baseline, summaries, lastDoseAt, now, onBackfill)
             }
         }
-        if (showTier && battery != null && !data.relapseOn) {
+        if (clearAirOffer) item {
+            OfferCard(
+                title = "Your last 7 days were nicotine-free",
+                body = "Switch to Clear Air? The Log tab becomes your days nicotine-free, with craving logging up front. You can step back up any time.",
+                primary = "Switch to Clear Air",
+                onPrimary = { moveTarget(0.0, "down") },
+                secondary = "Not now",
+                onSecondary = { scope.launch { repo.updateSettings { it.copy(clearAirOfferSnoozedAt = repo.now()) } } },
+            )
+        }
+        if (showTier && battery != null && !data.relapseOn && !clearAir) {
             morningStretch?.takeIf { it >= 1 }?.let { m ->
                 item {
                     Text(
@@ -512,7 +531,15 @@ fun HomeScreen(
                     modifier = Modifier.padding(bottom = 8.dp),
                 )
             }
-            run {
+            if (clearAir) {
+                Button(
+                    onClick = { cravingSheet = true },
+                    modifier = Modifier.fillMaxWidth().height(72.dp),
+                    shape = RoundedCornerShape(20.dp),
+                ) { Text("Craving? Log it", style = MaterialTheme.typography.titleMedium) }
+                if (!hadSome) TextButton(onClick = { hadSome = true }) { Text("I had some") }
+                else OutlinedButton(onClick = { friendVape = true }, modifier = Modifier.padding(top = 4.dp)) { Text("Friend's vape") }
+            } else run {
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     OutlinedButton(
                         onClick = { cravingSheet = true },
@@ -532,7 +559,7 @@ fun HomeScreen(
             }
           }
         }
-        item {
+        if (!clearAir || hadSome) item {
             Column {
                 Text("Log a dose", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                 Text(
@@ -542,7 +569,7 @@ fun HomeScreen(
                 )
             }
         }
-        items(data.homeProducts.chunked(2)) { row ->
+        items(if (!clearAir || hadSome) data.homeProducts.chunked(2) else emptyList()) { row ->
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 row.forEach { product ->
                     ProductButton(
@@ -910,7 +937,7 @@ private fun ProductButton(
         contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
         shape = shape,
         modifier = modifier
-            .height(if (preview != null) 112.dp else 96.dp)
+            .heightIn(min = if (preview != null) 112.dp else 96.dp)
             .clip(shape)
             .combinedClickable(onClick = onTap, onLongClick = onLongPress),
     ) {
@@ -1015,6 +1042,28 @@ private fun LighterOfferCard(title: String, body: String, tryLabel: String, onTr
                 androidx.compose.material3.Checkbox(checked = dontAsk, onCheckedChange = { dontAsk = it })
                 Text("Don't ask me again", style = MaterialTheme.typography.bodySmall)
             }
+        }
+    }
+}
+
+/** Life at Clear Air: a total that only goes up, receptor healing and the next recovery step. */
+@Composable
+private fun ClearAirCard(daysFree: Int, healing: Double?, next: Pair<String, Long>?) {
+    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer), shape = RoundedCornerShape(24.dp)) {
+        Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Clear Air", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+            Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("$daysFree", style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                Text(if (daysFree == 1) "day nicotine-free" else "days nicotine-free", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(bottom = 6.dp))
+            }
+            healing?.let {
+                Text("Receptors heading back to typical: ≈ ${(it * 100).toInt()}%", style = MaterialTheme.typography.bodyMedium)
+                LinearProgressIndicator(progress = { it.toFloat() }, modifier = Modifier.fillMaxWidth())
+            }
+            next?.let { (label, at) ->
+                Text("Next on the recovery timeline: $label (in about ${Fmt.duration(at - System.currentTimeMillis())})", style = MaterialTheme.typography.bodySmall)
+            }
+            Text("A total that only goes up. Logging something just counts it.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }

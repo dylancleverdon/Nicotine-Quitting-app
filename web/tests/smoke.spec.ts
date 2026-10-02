@@ -113,6 +113,14 @@ test('back-dated start, logging and persistence', async ({ page }) => {
   await page.screenshot({ path: 'test-results/practice.png', fullPage: true })
   await page.getByRole('button', { name: 'Settings' }).click()
   await page.getByRole('button', { name: 'Back to my pace' }).click()
+  // Themes live on their own screen; switching changes the colours at once.
+  await page.getByRole('button', { name: /More themes/ }).click()
+  await expect(page.getByRole('heading', { name: 'More themes' })).toBeVisible()
+  const before = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--bg'))
+  await page.getByRole('button', { name: /^Forest theme/ }).click()
+  await expect.poll(() => page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--bg'))).not.toBe(before)
+  await page.screenshot({ path: 'test-results/themes.png', fullPage: true })
+  await page.getByRole('button', { name: '‹ Settings' }).click()
   await page.getByRole('button', { name: 'Log' }).click()
   await expect(page.getByText(/Practice pace · /)).toHaveCount(0)
 

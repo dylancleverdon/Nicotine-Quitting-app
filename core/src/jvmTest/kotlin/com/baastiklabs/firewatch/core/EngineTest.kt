@@ -1040,4 +1040,56 @@ class EngineTest {
         assertNull(C.swapTip(withTarget(zyn3), zyn3))
         assertNotNull(C.swapTip(withTarget(zyn3, settings = com.baastiklabs.firewatch.core.model.Settings(coachingTips = true)), zyn3))
     }
+
+    // ---- 0.14: Life at Clear Air and new charts ----
+
+    @Test
+    fun `clear air days count without marking and only go up`() {
+        val CA = com.baastiklabs.firewatch.core.engine.ClearAir
+        val data = FirewatchData(products = DefaultProducts.all(), doses = dosesOn(2..4, 1),
+            rungChanges = listOf(RungChange("r", at(1, 8), 1.0, "start"), RungChange("c", at(5, 8), 0.0, "down")))
+        assertTrue(CA.active(data))
+        // The 5th–9th are empty at Clear Air: clear without marking.
+        assertEquals(5, CA.daysFree(data, at(10, 12), tz))
+        // A dose at Clear Air is counted plainly; nothing resets.
+        val slip = data.copy(doses = data.doses + gum4.toDose("s", at(10, 13), 0))
+        assertEquals(5, CA.daysFree(slip, at(11, 12), tz))
+        assertEquals(6, CA.daysFree(slip, at(12, 12), tz))
+        // Steady days count clear days too.
+        assertTrue(com.baastiklabs.firewatch.core.engine.Control.steadyDays(data, at(10, 12), tz) >= 5)
+    }
+
+    @Test
+    fun `clear air is offered after a nicotine-free known week`() {
+        val CA = com.baastiklabs.firewatch.core.engine.ClearAir
+        val marks = (3..9).map { mark("2026-09-%02d".format(it), "clear") }
+        val data = FirewatchData(products = DefaultProducts.all(), doses = listOf(gum4.toDose("a", at(2, 9), 0)),
+            rungChanges = listOf(RungChange("r", at(1, 8), 1.0, "start")), dayMarkList = marks)
+        assertTrue(CA.offer(data, at(10, 12), tz))
+        assertTrue(!CA.offer(data.copy(dayMarkList = marks.drop(1)), at(10, 12), tz))
+        assertTrue(!CA.offer(data.copy(settings = com.baastiklabs.firewatch.core.model.Settings(clearAirOfferSnoozedAt = at(9, 12))), at(10, 12), tz))
+    }
+
+    @Test
+    fun `new charts on a fixed data set`() {
+        // Pieces at 8:00 and every 3.5 h (4 a day), 2nd–9th.
+        val data = withTarget(dosesOn(2..9, 4), 4.0)
+        val ins = Insights(data, tz, at(10, 12))
+        val gaps = ins.gapSizes().toMap()
+        assertEquals(24, gaps["2–4h"])
+        assertEquals(0, gaps["Under 1h"])
+        assertEquals(7, ins.weekShape().size)
+        assertTrue(ins.longestGaps().all { it.second == 210.0 })
+        // Net split: gum 4 mg is one piece, so dose size adds nothing.
+        assertTrue(ins.netSplit().all { kotlin.math.abs(it.third) < 1e-6 })
+        assertEquals(32.0, ins.kindsByHour()[ProductKind.GUM]!!.sum(), 1e-6)
+        assertTrue(ins.steadyByMonth().isNotEmpty() || com.baastiklabs.firewatch.core.engine.Control.steadyDays(data, at(10, 12), tz) == 0)
+        // Pace vs plan only after a first step down.
+        assertTrue(!ins.paceVsPlan().second)
+        val stepped = data.copy(rungChanges = data.rungChanges + RungChange("d", at(6, 8), 3.0, "down"))
+        assertTrue(Insights(stepped, tz, at(10, 12)).paceVsPlan().second)
+        // "?" days are left out of the charts.
+        val gap = withTarget(dosesOn(2..9, 4).filter { !it.id.startsWith("x5-") }, 4.0)
+        assertTrue(Insights(gap, tz, at(10, 12)).longestGaps().none { it.first.dayOfMonth == 5 })
+    }
 }

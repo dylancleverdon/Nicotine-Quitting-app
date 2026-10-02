@@ -48,6 +48,7 @@ import com.baastiklabs.firewatch.ui.EstimateNote
 import com.baastiklabs.firewatch.ui.Fmt
 import com.baastiklabs.firewatch.ui.Stat
 import com.baastiklabs.firewatch.ui.charts.AxisLabels
+import com.baastiklabs.firewatch.ui.charts.DivergingBars
 import com.baastiklabs.firewatch.ui.charts.Bar
 import com.baastiklabs.firewatch.ui.charts.BarChart
 import com.baastiklabs.firewatch.ui.charts.CravingForecastChart
@@ -355,6 +356,10 @@ private fun ReceptorSection(data: FirewatchData, now: Long, tz: TimeZone) = Col 
 
 @Composable
 private fun StretchSection(ins: Insights) = Col {
+    val split = ins.netSplit().win()
+    if (split.isNotEmpty()) ChartCard("Where your net comes from", "Each day's net, split into timing (orange: waiting for a full battery) and dose size (teal: pieces smaller or bigger than one).") {
+        DivergingBars(split.map { it.second }, split.map { it.third }, kdates(split.map { it.first }), { Fmt.signedMinutes(it) })
+    }
     val days = ins.stretchPull.win()
     if (days.isEmpty()) {
         ChartCard("Stretch & pull", "Starts once you're working at a target rung.") {}
@@ -462,6 +467,18 @@ private fun TrendsSection(ins: Insights, data: FirewatchData, now: Long, tz: Tim
 
 @Composable
 private fun PatternsSection(ins: Insights, data: FirewatchData, tz: TimeZone) = Col {
+    val gaps = ins.gapSizes()
+    if (gaps.any { it.second > 0 }) ChartCard("Gap sizes", "Time between pieces over your last 30 known days. Longer gaps are spacing at work.") {
+        BarChart(gaps.map { Bar(it.second.toDouble()) }, yFmt = num, xLabels = gaps.map { it.first })
+    }
+    val shape = ins.weekShape()
+    if (shape.any { it.second > 0 }) ChartCard("Week shape", "Average pieces by weekday, last 8 weeks.") {
+        BarChart(shape.map { Bar(it.second) }, yFmt = num, xLabels = shape.map { it.first })
+    }
+    val fp = ins.firstPieceWeekdaysVsWeekends()
+    if (fp.size > 1) ChartCard("First piece: weekdays vs weekends", "Minutes from waking to the first piece, week by week. Weekdays orange, weekends teal.") {
+        TrendLine(fp.map { it.second ?: 0.0 }, second = fp.map { it.third ?: 0.0 }, secondColor = MaterialTheme.colorScheme.tertiary, yFmt = { "${fmtNum(it)}m" }, xLabels = kdates(fp.map { it.first }))
+    }
     ChartCard("When it happens", "Hour of day across, Monday to Sunday down. Brighter = more.") { Heatmap(ins.heatmap()) }
     val endings = ins.cravingEndings()
     ChartCard(
@@ -515,6 +532,14 @@ private fun PatternsSection(ins: Insights, data: FirewatchData, tz: TimeZone) = 
 
 @Composable
 private fun GoingUpSection(ins: Insights, data: FirewatchData) = Col {
+    val lg = ins.longestGaps().win()
+    if (lg.size > 1) ChartCard("Longest gap each day", "The day's biggest stretch between pieces.") {
+        BarChart(lg.map { Bar((it.second ?: 0.0) / 60) }, yFmt = hrs, xLabels = kdates(lg.map { it.first }))
+    }
+    val cw = ins.cravingStrengthWeekly()
+    if (cw.size > 1) ChartCard("Craving strength over time", "Average strength of the cravings you logged, week by week (1–10). It usually fades as receptors settle.") {
+        TrendLine(cw.map { it.second }, color = MaterialTheme.colorScheme.tertiary, yFmt = num, top = 10.0, xLabels = kdates(cw.map { it.first }))
+    }
     val days = ins.fullDays.win()
     val tz = TimeZone.currentSystemDefault()
     val held = remember(data, ins.today) { com.baastiklabs.firewatch.core.engine.Control.heldSeries(data, System.currentTimeMillis(), tz).filter { it.third != null } }
@@ -629,6 +654,11 @@ private fun GoingDownSection(ins: Insights, data: FirewatchData, now: Long) = Co
 
 @Composable
 private fun MixSection(ins: Insights) = Col {
+    val byHour = ins.kindsByHour()
+    if (byHour.isNotEmpty()) ChartCard("Doses by product over the day", "Pieces by hour of day, last 30 known days, coloured by type.") {
+        StackedBars((0 until 24).map { h -> byHour.entries.mapNotNull { (k, v) -> v[h].takeIf { it > 0 }?.let { it to kindColor(k) } } })
+        AxisLabels(listOf("12 AM", "6 AM", "12 PM", "6 PM", "11 PM"))
+    }
     val weeks = ins.days.chunked(7)
     ChartCard("Product mix", "Nicotine by delivery method, week by week.") {
         StackedBars(weeks.map { w ->
@@ -661,6 +691,14 @@ private fun MixSection(ins: Insights) = Col {
 
 @Composable
 private fun ForecastSection(ins: Insights, data: FirewatchData, now: Long) = Col {
+    val (pvp, show) = remember(data, now / 3_600_000) { ins.paceVsPlan() }
+    if (show && pvp.isNotEmpty()) ChartCard("Pace vs your plan", "Your pieces each day (bars) against your level, then the plan if you take each step (line). Optional: staying steady is a win too.") {
+        BarChart(pvp.map { Bar(it.second ?: 0.0) }, line = pvp.map { it.third ?: 0.0 }, lineColor = MaterialTheme.colorScheme.tertiary, yFmt = num, xLabels = kdates(pvp.map { it.first }))
+    }
+    val free = remember(data, now / 3_600_000) { com.baastiklabs.firewatch.core.engine.ClearAir.daysFreeSeries(data, now, TimeZone.currentSystemDefault()) }
+    if (free.isNotEmpty()) ChartCard("Days nicotine-free", "A total that only goes up.") {
+        TrendLine(free.map { it.second.toDouble() }, stepped = true, color = MaterialTheme.colorScheme.tertiary, yFmt = num, xLabels = kdates(free.map { it.first }))
+    }
     val stepDown = remember(data, now / 3_600_000) {
         if (com.baastiklabs.firewatch.core.engine.Control.isEarly(data)) null
         else com.baastiklabs.firewatch.core.engine.Progress.stepDownProgress(data, now, TimeZone.currentSystemDefault())
@@ -727,6 +765,12 @@ private fun ForecastSection(ins: Insights, data: FirewatchData, now: Long) = Col
 
 @Composable
 private fun MilestonesSection(ins: Insights, now: Long) = Col {
+    val sm = ins.steadyByMonth()
+    if (sm.isNotEmpty()) ChartCard("Steady days by month", "A total for each month, never a streak.") {
+        BarChart(sm.map { Bar(it.second.toDouble()) }, yFmt = num, xLabels = sm.map { m ->
+            java.time.YearMonth.parse(m.first).month.getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.getDefault())
+        })
+    }
     val r = ins.records()
     ChartCard("Records") {
         Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
@@ -798,6 +842,11 @@ private fun MilestonesSection(ins: Insights, now: Long) = Col {
 
 @Composable
 private fun LadderSection(data: FirewatchData, now: Long, tz: TimeZone) = Col {
+    val runs = remember(data) { com.baastiklabs.firewatch.core.engine.Practice.runs(data, now, tz) }
+    if (runs.isNotEmpty()) ChartCard("Practice pace runs", "Each run's practice net (bars) and the waking hours it covered.") {
+        BarChart(runs.map { Bar((it.netMin / 60).coerceAtLeast(0.0)) }, yFmt = hrs, xLabels = runs.map { it.rung.tier.title })
+        runs.forEach { r -> Text("${r.rung.tier.title} pace · ${r.hours.toInt()} h · practice net ${Fmt.signedMinutes(r.netMin)}", style = MaterialTheme.typography.bodySmall) }
+    }
     val history = remember(data) {
         com.baastiklabs.firewatch.core.engine.Practice.history(data, now, tz) { Fmt.dayMonth(it) }
     }

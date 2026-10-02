@@ -1,6 +1,6 @@
 # Firewatch by Baastik Labs: design spec
 
-Baastik Labs · living spec, updated 28 Sep 2026 (Android 0.13 / web 0.10)
+Baastik Labs · living spec, updated 28 Sep 2026 (Android 0.14 / web 0.11)
 
 This describes what Firewatch does today and how it should feel. Read `docs/vision.md` first: the
 vision and principles there decide every trade-off here. The original 1.0 spec is kept in
@@ -112,6 +112,12 @@ as an estimate.
   never a button; always with "Stay here". **Try it for a day:** that waking day runs at the next
   rung's pace (battery, gap, preview); nothing else changes; next morning "Step down / Stay here".
 
+- **Life at Clear Air:** at Clear Air the Log tab shows days nicotine-free (a total that only
+  goes up), receptor healing and the next recovery step; "Craving? Log it" is the big button and the
+  product buttons sit behind "I had some". Empty days at Clear Air count as nicotine-free without
+  marking. A dose is counted plainly; nothing resets. Offered (never automatic) after a known
+  nicotine-free week at another level. No battery, stretch or pull at Clear Air.
+
 ## 9. Cravings
 
 - One tap to log strength (1–10). Then nothing to press: a single quiet line for 45 minutes.
@@ -164,10 +170,12 @@ missed day.
 
 ## 13. Settings
 
-Plan (step back up a rung, hold period, first-piece goal, time format, Hide next piece timer, wind
+Appearance (theme line → **More themes**: 18 themes with light/dark, follow phone / always light /
+always dark, calmer colours with no red (on by default), colour-blind-safe charts, true black; the
+widgets follow), Plan (step back up a rung, hold period, first-piece goal, time format, Hide next piece timer, wind
 down note, show steady days, Coaching tips (off; the pouch → gum swap tip is part of it), practice pace,
-lighter-level practice offers, hide stretch and pull on doses, detailed charts, daily check-in), Relapse prevention mode, optional reminders, money, data (export,
-import, automatic backups off the phone), products and the reference piece (change "from today on", or back-dated with a warning), sleep schedule,
+lighter-level practice offers, hide stretch and pull on doses, detailed charts, daily check-in), Relapse prevention mode, money, data (export,
+import, automatic backups off the phone, "Last backup: N days ago"), products and the reference piece (change "from today on", or back-dated with a warning), sleep schedule,
 unsent suggestions, Help, About, updates.
 
 ## 14. Help and feedback

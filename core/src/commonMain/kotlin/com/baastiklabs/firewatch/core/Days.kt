@@ -62,7 +62,9 @@ object Days {
         return when (data.dayMarks[date.toString()]) {
             com.baastiklabs.firewatch.core.model.DayMark.CLEAR -> DayState.CLEAR
             com.baastiklabs.firewatch.core.model.DayMark.GHOST -> DayState.GHOST
-            else -> DayState.UNKNOWN
+            // At Clear Air an empty day is the expected, nicotine-free day: D logs only when they
+            // had some, so it's clear without marking.
+            else -> if (data.rungChanges.lastOrNull { it.at < next }?.pieces == 0.0) DayState.CLEAR else DayState.UNKNOWN
         }
     }
 

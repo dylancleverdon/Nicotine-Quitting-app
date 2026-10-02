@@ -182,6 +182,18 @@ data class Settings(
     /** The practice session whose follow-up ("How was it?" / "Work from") was answered. */
     val practiceAnswered: String = "",
     val workFromSnoozedAt: Long = 0,
+    /** Appearance: theme id (see Themes), "system"/"light"/"dark", and the colour switches. */
+    val theme: String = "firewatch",
+    val themeMode: String = "system",
+    val trueBlack: Boolean = false,
+    val colourBlindCharts: Boolean = false,
+    val calmColours: Boolean = true,
+    /** Web: the "Add to Home Screen" card was dismissed. */
+    val installCardSeen: Boolean = false,
+    /** Web: when a backup file was last exported. */
+    val lastBackupAt: Long = 0,
+    /** "Your last 7 days were nicotine-free. Switch to Clear Air?" was answered "Not now". */
+    val clearAirOfferSnoozedAt: Long = 0,
 )
 
 /**

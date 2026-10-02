@@ -205,6 +205,14 @@ object Practice {
         return WorkFrom(measured, covered, net)
     }
 
+    /** Each practice session for the chart: start, rung, practice net (min) and waking hours covered. */
+    data class Run(val start: Long, val rung: Rung, val netMin: Double, val hours: Double)
+
+    fun runs(data: FirewatchData, now: Long, tz: TimeZone): List<Run> = data.practices.map { s ->
+        val end = effectiveEnd(data, s, tz)?.let { minOf(it, now) } ?: now
+        Run(s.start, Ladder.rung(s.pieces), runNet(data, listOf(s), end, tz), coverageMinutes(data, listOf(s), end, tz) / 60.0)
+    }
+
     // ---- Level history ----
 
     data class HistoryEntry(val at: Long, val text: String, val kind: String)

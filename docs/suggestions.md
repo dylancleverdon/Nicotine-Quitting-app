@@ -82,3 +82,11 @@ Ideas raised while reviewing the app, not sent through the form.
 | 2026-10-02 | Two-rung step down | Declined | Replaced by practice limits and "Work from your measured level" (`proposals/practice-pace-and-known-days.md` §8). |
 | 2026-10-02 | Note on short hold periods in Settings | Done (0.13.0) | `proposals/practice-pace-and-known-days.md` §9 |
 | 2026-10-02 | Web app caught up with Android (edit a logged dose's time or amount, calendar day summary and month figures, dose strip, double-ups, check-in chart, product mix, next step down, then vs now, product speed) | Done | web 0.10.0 |
+| 2026-10-02 | Life at Clear Air (days nicotine-free, receptor healing, craving logging up front) | Done | 0.14.0 |
+| 2026-10-02 | Colour themes (18, hidden in More themes) with calmer colours, colour-blind charts, true black | Done | 0.14.0 |
+| 2026-10-02 | Accessibility pass (text scaling, screen-reader labels, contrast) | Done | 0.14.0 |
+| 2026-10-02 | "Install on iPhone" card for the web app | Done | web 0.11.0 |
+| 2026-10-02 | Remove the Android backup and check-in reminders (notifications) | Done | 0.14.0 |
+| 2026-10-02 | Eleven new Insights charts | Done | 0.14.0 |
+| 2026-10-02 | 5-second undo after marking a day | Declined | "Back to ?" already covers it. |
+| 2026-10-02 | Running low on a tin; travel / time-zone handling; sleep vs late doses; hardest hour line; password-protected backups | Undecided | Ideas list, 2 Oct. |

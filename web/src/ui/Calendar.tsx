@@ -2,8 +2,9 @@ import { Backfill } from './Onboarding'
 import { useState } from 'preact/hooks'
 import { Core } from '../core'
 import * as S from '../store'
+import { heatColor, onHeatColor } from '../theme'
 import { EditDoseSheet, doseLine } from './Sheets'
-import { dayTitle, heat, isoToday, mg, pieces, piecesLabel, time } from './format'
+import { dayTitle, isoToday, mg, pieces, piecesLabel, time } from './format'
 
 export function Calendar({ toast }: { toast: (m: string, undo?: () => void) => void }) {
   const snap = S.snapshot.value!
@@ -41,12 +42,13 @@ export function Calendar({ toast }: { toast: (m: string, undo?: () => void) => v
         const leftOut = st === 'unknown' || st === 'ghost'
         const tracked = first && key >= first && key <= today && !leftOut
         const base = first && key >= first && (new Date(key).getTime() - new Date(first).getTime()) / 864e5 < 7
-        return <div class={`${key === today ? 'today' : ''} ${base ? 'base' : ''} ${modeDays.has(key) ? 'mode' : ''}`} style={{ background: tracked ? heat[day?.level ?? 0] : 'var(--surface)', opacity: day?.estimated ? 0.7 : 1, color: key > today ? 'var(--line)' : undefined }}
+        return <div class={`${key === today ? 'today' : ''} ${base ? 'base' : ''} ${modeDays.has(key) ? 'mode' : ''}`} style={{ background: tracked ? heatColor(day?.level ?? 0) : 'var(--surface)', opacity: day?.estimated ? 0.7 : 1, color: key > today ? 'var(--line)' : tracked ? onHeatColor(day?.level ?? 0) : undefined }}
+          role="button" aria-label={`${dayTitle(key)}${st === 'unknown' ? ', nothing logged' : st === 'clear' ? ', clear day' : st === 'ghost' ? ', left out' : day ? `, about ${pieces(day.pieces)} pieces` : ''}`}
           onClick={() => key <= today && setOpen(key)}>{d}
           {st === 'unknown' && <span class="cal-badge">?</span>}{st === 'ghost' && <span class="cal-badge" style={{ opacity: 0.6 }}>👻</span>}{st === 'clear' && <span class="cal-badge">🌿</span>}
           {snap.levelMarks[key] && <span class="cal-mark">{snap.levelMarks[key] === 'down' ? '▼' : '▲'}</span>}</div>
       })}</div>
-      <div class="row small">Clear {heat.map((c) => <span style={{ width: 16, height: 16, background: c, borderRadius: 4, display: 'inline-block' }} />)} Heavy</div>
+      <div class="row small">Clear {[0, 1, 2, 3, 4, 5, 6].map(heatColor).map((c) => <span style={{ width: 16, height: 16, background: c, borderRadius: 4, display: 'inline-block' }} />)} Heavy</div>
       {anyUnknown && <div class="small">{snap.unknownNote}</div>}
       <div class="muted">Colour = pieces that day: none, up to 1, 3, 5, 8, 12, more. 🌿 a clear day, ? nothing logged, 👻 left out. ▲ ▼ your level changed. A dot marks your baseline week; faded days are estimates; a ring marks Relapse prevention mode days.</div>
       {monthDays.length > 0 && <div class="card soft"><h3>This month</h3>

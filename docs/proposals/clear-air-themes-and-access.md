@@ -1,6 +1,6 @@
 # Proposed update: Life at Clear Air, themes, accessibility and new charts
 
-Status: **proposed, not built.** Dated 2 Oct 2026. Written against Android 0.13.0 / web 0.10.0.
+Status: **built in Android 0.14.0 / web 0.11.0.** At Clear Air an empty day counts as nicotine-free without marking (D logs only when they had some). Dated 2 Oct 2026. Written against Android 0.13.0 / web 0.10.0.
 Decisions below are D's (2 Oct). Both apps, one release.
 
 ## Summary

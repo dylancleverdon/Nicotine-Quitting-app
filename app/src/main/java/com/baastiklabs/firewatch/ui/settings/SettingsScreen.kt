@@ -93,6 +93,7 @@ fun SettingsScreen(
     onBackfill: () -> Unit = {},
     onOpenAbout: () -> Unit,
     onOpenHelp: () -> Unit = {},
+    onOpenThemes: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -208,6 +209,11 @@ fun SettingsScreen(
             }
         }
 
+        SectionTitle("Appearance")
+        OutlinedButton(onClick = onOpenThemes, modifier = Modifier.fillMaxWidth()) {
+            Text("Theme: ${com.baastiklabs.firewatch.core.Themes.all.firstOrNull { it.id == data.settings.theme }?.name ?: "Firewatch"} · More themes ›")
+        }
+
         PlanSettings(vm, data)
 
         // --- Data ---
@@ -216,6 +222,11 @@ fun SettingsScreen(
             "Everything stays on this phone. Export a copy now and then (save it to Google Drive or email it to yourself) so your history survives a lost or new phone.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        val lastBackup = remember(data) { com.baastiklabs.firewatch.data.BackupStore.lastOffPhone(context) }
+        Text(
+            "Last backup: " + if (lastBackup <= 0) "never" else ((System.currentTimeMillis() - lastBackup) / 86_400_000L).let { if (it == 0L) "today" else "$it days ago" },
+            style = MaterialTheme.typography.bodyMedium,
         )
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Button(onClick = { exportLauncher.launch("firewatch-backup-${LocalDate.now()}.json") }) { Text("Export") }

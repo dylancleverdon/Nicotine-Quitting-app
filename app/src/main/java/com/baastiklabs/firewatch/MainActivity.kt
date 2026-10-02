@@ -11,6 +11,8 @@ import com.baastiklabs.firewatch.ui.FirewatchRoot
 import com.baastiklabs.firewatch.ui.FirewatchViewModel
 import com.baastiklabs.firewatch.ui.Fmt
 import com.baastiklabs.firewatch.ui.theme.FirewatchTheme
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 
 class MainActivity : ComponentActivity() {
     private val vm: FirewatchViewModel by viewModels()
@@ -23,7 +25,8 @@ class MainActivity : ComponentActivity() {
         Fmt.use24h = Fmt.systemUse24h
         enableEdgeToEdge()
         setContent {
-            FirewatchTheme {
+            val data by vm.data.collectAsState()
+            FirewatchTheme(data.settings) {
                 FirewatchRoot(vm)
             }
         }

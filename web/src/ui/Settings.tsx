@@ -30,6 +30,7 @@ export function Settings({ toast, go, updateInfo }: { toast: (m: string) => void
     a.href = URL.createObjectURL(blob)
     a.download = `firewatch-backup-${new Date().toISOString().slice(0, 10)}.json`
     a.click()
+    S.updateSettings({ lastBackupAt: Date.now() })
   }
   const importFrom = async (file: File) => {
     try {
@@ -46,6 +47,9 @@ export function Settings({ toast, go, updateInfo }: { toast: (m: string) => void
       <h1>Settings</h1>
       <div class="card"><h3>Updates</h3><div class="small">Web version {__APP_VERSION__}</div><div class="muted">{updateInfo}</div>
         <div class="muted">Firewatch updates itself the next time you open it. Your data is never touched by an update.</div></div>
+
+      <h3 class="label">Appearance</h3>
+      <button class="btn outline" onClick={() => go('themes')}>Theme: {Core.themes().find((t) => t.id === (s.theme ?? 'firewatch'))?.name ?? 'Firewatch'} · More themes ›</button>
 
       <h3 class="label">Your plan</h3>
       <div class="small">{target ? `Working at ${target.label}` : 'Your target appears once your baseline is known.'}</div>
@@ -105,6 +109,7 @@ export function Settings({ toast, go, updateInfo }: { toast: (m: string) => void
 
       <h3 class="label">Your data</h3>
       <div class="muted">Everything stays in this browser. Export now and then (to Files, iCloud Drive or email). The same file works in the Android app.</div>
+      <div class="small">Last backup: {s.lastBackupAt ? `${Math.floor((Date.now() - s.lastBackupAt) / 864e5) === 0 ? 'today' : `${Math.floor((Date.now() - s.lastBackupAt) / 864e5)} days ago`}` : 'never'}</div>
       <div class="row"><button class="btn" onClick={exportNow}>Export</button>
         <label class="btn outline">Import<input type="file" accept="application/json,.json" style={{ display: 'none' }} onChange={(e) => { const f = (e.target as HTMLInputElement).files?.[0]; if (f) importFrom(f) }} /></label></div>
 

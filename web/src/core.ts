@@ -48,6 +48,11 @@ export interface Snapshot {
   morningStretch: number | null; tip: NamedValue | null; yesterday: Review | null; steadyExplainer: string; netExplainer: string
   practice: Practice; dayStates: Record<string, string>; levelMarks: Record<string, string>; history: NamedValue[]; recentStates: NamedValue[]; known7: number; heldTotal: number
   stepProgress: { held: number; needed: number; next: Rung; offered: boolean } | null; doubleUpsWeekly: NamedValue[]; thenCurve: number[]; nowCurve: number[]; unknownNote: string; holdShortNote: string
+  clearAir: { active: boolean; daysFree: number; healing: number | null; offer: boolean }
+  charts: {
+    gapSizes: NamedValue[]; weekShape: NamedValue[]; firstPiece: string[][]; longestGaps: NamedValue[]; cravingWeekly: NamedValue[]
+    netSplit: string[][]; kindsByHour: Record<string, number[]>; steadyByMonth: NamedValue[]; paceVsPlan: string[][]; practiceRuns: NamedValue[]; daysFree: NamedValue[]
+  }
   qualityScore: number | null; qualityLabel: string | null; swapTip: string | null; activeCraving: CravingView | null
   todayPieces: number; todayMg: number; todayCravings: number; todayRodeOut: number; lastDoseAt: number | null
   todayDoses: DoseView[]; todayCravingList: CravingView[]; wave: number[][]; wakeAt: number; sleepAt: number; typical: number[]
@@ -62,6 +67,9 @@ export const Core = {
   feedbackBody: (type: string, s: string, d: string, n: string, info: string): string => core.feedbackBody(type, s, d, n, info),
   feedbackPrivacy: (): string => core.feedbackPrivacy(),
   help: (): { tour: HelpPage[]; why: HelpPage[]; articles: HelpArticle[] } => JSON.parse(core.help()),
+  themes: (): { id: string; name: string; feel: string }[] => JSON.parse(core.themes()),
+  palette: (id: string, mode: string, systemDark: boolean, trueBlack: boolean, calm: boolean, colourBlind: boolean): any =>
+    JSON.parse(core.palette(id, mode, systemDark, trueBlack, calm, colourBlind)),
   defaultProducts: (): any[] => JSON.parse(core.defaultProducts()),
   cravingScale: (): NamedValue[] => JSON.parse(core.cravingScale()),
   newId: (): string => core.newId(Date.now()),

@@ -57,6 +57,8 @@ import java.time.YearMonth
 import java.time.format.TextStyle
 import java.time.temporal.WeekFields
 import java.util.Locale
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 
 /** Each day coloured by how much was used: the light spreads as use drops. */
 @Composable
@@ -189,6 +191,14 @@ private fun DayCell(
         else -> Heat.color(level, dark)
     }
     var cell = modifier.aspectRatio(1f).clip(shape).background(background)
+        .semantics {
+            contentDescription = "${date.dayOfMonth} ${date.month.getDisplayName(TextStyle.FULL, Locale.getDefault())}" + when (state) {
+                com.baastiklabs.firewatch.core.DayState.UNKNOWN -> ", nothing logged"
+                com.baastiklabs.firewatch.core.DayState.CLEAR -> ", clear day"
+                com.baastiklabs.firewatch.core.DayState.GHOST -> ", left out"
+                else -> if (tracked && pieces > 0) ", about ${Fmt.pieces(pieces)} pieces" else ""
+            }
+        }
     if (isToday) cell = cell.border(2.dp, MaterialTheme.colorScheme.primary, shape)
     else if (isModeDay && inMonth) cell = cell.border(2.dp, MaterialTheme.colorScheme.tertiary, shape)
     if (inMonth && !isFuture) cell = cell.clickable(onClick = onClick)

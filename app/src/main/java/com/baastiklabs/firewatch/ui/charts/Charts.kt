@@ -35,17 +35,11 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.baastiklabs.firewatch.core.model.ProductKind
 import kotlin.math.max
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 
 /** Colours per delivery method, used consistently across charts. */
-fun kindColor(kind: ProductKind): Color = when (kind) {
-    ProductKind.GUM -> Color(0xFF5FA893)
-    ProductKind.PATCH -> Color(0xFF6C9BD2)
-    ProductKind.LOZENGE -> Color(0xFF9C8FD0)
-    ProductKind.POUCH -> Color(0xFFFFB35C)
-    ProductKind.VAPE -> Color(0xFFE0443A)
-    ProductKind.CIGARETTE -> Color(0xFF8A6A5A)
-    ProductKind.OTHER -> Color(0xFFB0A49C)
-}
+fun kindColor(kind: ProductKind): Color = com.baastiklabs.firewatch.ui.theme.kindHex(kind.name)
 
 @Composable
 private fun chartColors() = Triple(
@@ -104,7 +98,9 @@ fun ChartFrame(
     content: @Composable () -> Unit,
 ) {
     val showY = ticks != null && fmt != null && ticks.isNotEmpty()
-    Column(modifier.fillMaxWidth()) {
+    // Screen readers get one line: the latest point.
+    val summary = "Chart. Latest: " + (readout?.invoke(0.999f) ?: "")
+    Column(modifier.fillMaxWidth().semantics(mergeDescendants = false) { contentDescription = summary }) {
         Row(Modifier.fillMaxWidth()) {
             if (showY) {
                 val top = ticks!!.last()
@@ -584,5 +580,29 @@ fun ReceptorChart(
         draw(history, 0, primary, dashed = false, width = 3.dp.toPx())
         drawLine(muted, Offset(x(todayIndex), 0f), Offset(x(todayIndex), size.height), strokeWidth = 1.5.dp.toPx())
     }
+    }
+}
+
+/** Two series per day around zero (net from timing and from dose size): up = ahead, down = behind. */
+@Composable
+fun DivergingBars(a: List<Double>, b: List<Double>, labels: List<String>, fmt: (Double) -> String, modifier: Modifier = Modifier, height: Dp = 120.dp) {
+    if (a.isEmpty()) return
+    val first = MaterialTheme.colorScheme.primary
+    val second = MaterialTheme.colorScheme.tertiary
+    val grid = MaterialTheme.colorScheme.outlineVariant
+    val max = (a.map { kotlin.math.abs(it) } + b.map { kotlin.math.abs(it) }).maxOrNull()?.coerceAtLeast(1.0) ?: 1.0
+    ChartFrame(null, null, height, indexTicks(labels, centred = true), modifier, readout = { p ->
+        val i = (p * a.size).toInt().coerceIn(0, a.lastIndex)
+        "${labels[i]} · timing ${fmt(a[i])} · dose size ${fmt(b[i])}"
+    }) {
+        Canvas(Modifier.fillMaxWidth().height(height)) {
+            val mid = size.height / 2
+            val slot = size.width / a.size
+            val w = slot * 0.35f
+            fun y(v: Double) = mid - (v / max).toFloat() * (mid - 2f)
+            drawLine(grid, Offset(0f, mid), Offset(size.width, mid))
+            a.forEachIndexed { i, v -> val top = minOf(mid, y(v)); drawRect(first, Offset(i * slot + slot * 0.1f, top), Size(w, kotlin.math.abs(y(v) - mid))) }
+            b.forEachIndexed { i, v -> val top = minOf(mid, y(v)); drawRect(second, Offset(i * slot + slot * 0.5f, top), Size(w, kotlin.math.abs(y(v) - mid))) }
+        }
     }
 }
