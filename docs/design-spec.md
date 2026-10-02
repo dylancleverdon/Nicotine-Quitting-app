@@ -1,6 +1,6 @@
 # Firewatch by Baastik Labs: design spec
 
-Baastik Labs · living spec, updated 28 Sep 2026 (Android 0.14 / web 0.11)
+Baastik Labs · living spec, updated 28 Sep 2026 (Android 0.15 / web 0.12)
 
 This describes what Firewatch does today and how it should feel. Read `docs/vision.md` first: the
 vision and principles there decide every trade-off here. The original 1.0 spec is kept in
@@ -108,9 +108,13 @@ as an estimate.
   A celebration, never a gate. Empty days count only when marked clear 🌿 (recalculated once in 0.13).
 - **Step down (taper, optional):** offered after the hold period (Settings): that many full days in
   a row at or under the rung since the last change ("Next step down" in Insights → Forecasts shows
-  "1 of 3 days held");
-  never a button; always with "Stay here". **Try it for a day:** that waking day runs at the next
-  rung's pace (battery, gap, preview); nothing else changes; next morning "Step down / Stay here".
+  "1 of 3 days held"; "?" and ghost days are skipped, not a reset); always with "Stay here".
+  **Unlocked stays unlocked:** once the count is reached, the Next step down card shows a
+  "Step down to …" button until it's taken or the level changes, even after "Stay here" or a
+  heavier day. **Try it for a day** starts practice pace at the next rung; next morning
+  "Step down / Stay here".
+- **No scaling:** every daily figure (level, tier, held days, steady days) counts exactly the pieces
+  had; short or long waking days are never scaled up or down (removed in 0.15; past days recounted).
 
 - **Life at Clear Air:** at Clear Air the Log tab shows days nicotine-free (a total that only
   goes up), receptor healing and the next recovery step; "Craving? Log it" is the big button and the

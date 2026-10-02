@@ -47,7 +47,7 @@ export interface Snapshot {
   stepDown: Rung | null; stepDownNote: string | null; stepUp: Rung | null; stepUpWhy: string | null; stepUpSameDay: boolean; cravingEndings: NamedValue[]; checks: NamedValue[]; checksToday: number; early: boolean; earlyUpdate: number | null; heldDays: number; held: string[][]; lighterThanStart: number | null; daysOffSmokeAndVape: number | null; welcomeBack: string[] | null; previews: Record<string, number>; steadyDays: number; wakingToday: string; steadyMilestone: number | null; practicing: boolean; practiceFollowUp: Rung | null; taperSteps: NamedValue[]; taperBasis: string | null; headsUps: string[]
   morningStretch: number | null; tip: NamedValue | null; yesterday: Review | null; steadyExplainer: string; netExplainer: string
   practice: Practice; dayStates: Record<string, string>; levelMarks: Record<string, string>; history: NamedValue[]; recentStates: NamedValue[]; known7: number; heldTotal: number
-  stepProgress: { held: number; needed: number; next: Rung; offered: boolean } | null; doubleUpsWeekly: NamedValue[]; thenCurve: number[]; nowCurve: number[]; unknownNote: string; holdShortNote: string
+  stepProgress: { held: number; needed: number; next: Rung; offered: boolean; unlocked: boolean } | null; doubleUpsWeekly: NamedValue[]; thenCurve: number[]; nowCurve: number[]; unknownNote: string; holdShortNote: string
   clearAir: { active: boolean; daysFree: number; healing: number | null; offer: boolean }
   charts: {
     gapSizes: NamedValue[]; weekShape: NamedValue[]; firstPiece: string[][]; longestGaps: NamedValue[]; cravingWeekly: NamedValue[]

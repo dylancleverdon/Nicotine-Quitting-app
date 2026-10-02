@@ -17,6 +17,7 @@ export function Insights() {
   const settings = S.settings.value
   const [sec, setSec] = useState('Today')
   const [recap, setRecap] = useState(0)
+  const [stepped, setStepped] = useState<string | null>(null)
   const tick = Math.floor(S.tick.value / 300000)
   const out = useMemo(() => (sec === 'Cravings ahead' || sec === 'Receptors' ? Core.outlooks(S.json()) : null), [sec, S.json(), tick])
   // Opt-in "Detailed charts": range choices and a stepper on multi-day charts (42 days otherwise).
@@ -233,9 +234,12 @@ export function Insights() {
         <Card title="Borrowed share"><b>{Math.round((snap.days.reduce((a, d) => a + d.borrowedPieces, 0) / Math.max(0.001, snap.days.reduce((a, d) => a + d.pieces, 0))) * 100)}%</b></Card>
       </>}
       {sec === 'Forecasts' && <>
-        {snap.stepProgress && <Card title="Next step down" sub="Full days in a row at or under your level, since your last change. Days with nothing logged are skipped. Today counts once it's over. Staying where you are is a win too.">
-          <b>{snap.stepProgress.offered ? `${snap.stepProgress.needed} of ${snap.stepProgress.needed} days held: ${snap.stepProgress.next.label} is offered on the Log tab` : `${snap.stepProgress.held} of ${snap.stepProgress.needed} days held`}</b>
-          <Meter value={snap.stepProgress.held / snap.stepProgress.needed} /></Card>}
+        {snap.stepProgress && <Card title="Next step down" sub="Full days in a row at or under your level, since your last change. Days with nothing logged are skipped. Today counts once it's over. Once unlocked, it stays unlocked until your level changes. Staying where you are is a win too.">
+          <b>{snap.stepProgress.unlocked ? `${snap.stepProgress.needed} of ${snap.stepProgress.needed} days held: unlocked` : `${snap.stepProgress.held} of ${snap.stepProgress.needed} days held`}</b>
+          <Meter value={snap.stepProgress.held / snap.stepProgress.needed} label="Days held toward the next step down" />
+          {snap.stepProgress.unlocked && <><button class="btn" onClick={() => { const p = snap.stepProgress!.next; S.setTarget(p.pieces, 'down'); setStepped(p.label) }}>Step down to {snap.stepProgress.next.label}</button>
+            <div class="muted">Whenever you're ready. Holding here a little longer is fine too; this stays here until you step down or your level changes.</div></>}
+          {stepped && <div class="small">New rung: {stepped}. That's real progress.</div>}</Card>}
         {snap.taperSteps.length > 0 && <Card title="If you take each step" sub={`Stepping down each time it's offered (every ${S.settings.value.holdDays} days). Optional: staying steady is a win too. ${snap.taperBasis ?? ''}.`}>
           {snap.taperSteps.map((t) => <div class="row small"><span class="grow">{t.label}</span>around {shortDate(t.extra)}</div>)}
         </Card>}

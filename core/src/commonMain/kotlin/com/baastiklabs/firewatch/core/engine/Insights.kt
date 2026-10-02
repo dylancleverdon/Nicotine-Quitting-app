@@ -136,7 +136,8 @@ class Insights(private val data: FirewatchData, private val tz: TimeZone, privat
             sleepAt = w.sleepAt,
             doses = sorted,
             pieces = pieces,
-            scaledPieces = if (awake > 0) pieces * Ladder.WAKING_MINUTES / awake else pieces,
+            // No scaling for short or long days: a day counts exactly what D had.
+            scaledPieces = pieces,
             absorbedMg = doses.sumOf { it.absorbedMg() },
             labelMg = doses.sumOf { it.labelMg * it.multiplier },
             spikeMg = doses.filter { it.speed == SpeedProfile.SPIKE }.sumOf { it.absorbedMg() },

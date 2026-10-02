@@ -99,7 +99,7 @@ external object JsJodaTimeZoneModule
     val practiceRuns: List<NamedValue>,
     val daysFree: List<NamedValue>,
 )
-@Serializable data class StepProgressDto(val held: Int, val needed: Int, val next: RungDto, val offered: Boolean)
+@Serializable data class StepProgressDto(val held: Int, val needed: Int, val next: RungDto, val offered: Boolean, val unlocked: Boolean = false)
 @Serializable data class ReviewDto(
     val date: String, val pieces: Double, val netMin: Double?, val volatility: Double, val mix: List<NamedValue>,
     val longestGapMin: Double?, val stacked: Int, val morningStretchMin: Double?, val tips: List<String>,
@@ -404,7 +404,7 @@ object FirewatchCore {
             known7 = Progress.knownDays(d, today, tz),
             heldTotal = target?.let { ctl.heldByRung(d, now, tz)[it.pieces]?.first } ?: 0,
             stepProgress = if (ctl.isEarly(d)) null else Progress.stepDownProgress(d, now, tz)?.let {
-                StepProgressDto(it.held, it.needed, it.next.dto(), it.ready && Progress.stepDownOffer(d, now, tz) != null)
+                StepProgressDto(it.held, it.needed, it.next.dto(), it.ready && Progress.stepDownOffer(d, now, tz) != null, it.unlocked)
             },
             doubleUpsWeekly = ins.doubleUpsPerWeek().map { NamedValue(it.first.toString(), it.second.toDouble()) },
             thenCurve = if (ins.baselineComplete && ins.fullDays.size > ins.baselineDays.size + 3) ins.typicalCurve(ins.baselineDays) else emptyList(),

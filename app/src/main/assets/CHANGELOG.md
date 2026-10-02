@@ -2,6 +2,10 @@
 
 Newest first. Each release is a "## <version>" heading; the app shows these notes in "What's new".
 
+## 0.15.0 · 2026-10-02
+- Fairer days: every day now counts exactly the pieces you had. Short or long days are no longer scaled up or down, so a disciplined day is always credited. Past days have been recounted.
+- Once a step down is unlocked, it stays unlocked: Insights → Forecasts → Next step down shows a "Step down to …" button until you take it. Dismissed the offer? Hold another day and step down from there whenever you're ready.
+
 ## 0.14.0 · 2026-10-02
 - New: **Life at Clear Air.** Once you reach Clear Air, the Log tab shows your days nicotine-free and how far your receptors have come back, with craving logging front and centre. If you've had a nicotine-free week, Firewatch offers the switch.
 - New: 18 colour themes in Settings → Appearance → More themes, each in light and dark, plus options for colour-blind-safe charts and true black. Calmer colours, with no red, are now the default.

@@ -90,3 +90,5 @@ Ideas raised while reviewing the app, not sent through the form.
 | 2026-10-02 | Eleven new Insights charts | Done | 0.14.0 |
 | 2026-10-02 | 5-second undo after marking a day | Declined | "Back to ?" already covers it. |
 | 2026-10-02 | Running low on a tin; travel / time-zone handling; sleep vs late doses; hardest hour line; password-protected backups | Undecided | Ideas list, 2 Oct. |
+| 2026-10-02 | Bug | Disciplined days counted as over the level (16-hour scaling of a 15-hour day; late starts scaled up) | Done | 0.15.0: scaling removed entirely, past days recounted. |
+| 2026-10-02 | Idea | Keep a step down unlocked with a button in Insights after dismissing the offer | Done | 0.15.0 |

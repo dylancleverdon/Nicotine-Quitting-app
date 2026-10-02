@@ -31,8 +31,9 @@ Every feature has to follow these.
 1. **Honest number first.** Where you really are beats where you'd like to be. Estimates are
    always labelled as estimates.
 2. **Control, not pressure.** Holding steady is a win. Tapering is offered ("or stay here, that's
-   fine too"), never pushed. There's no step-down button: a step down is offered once a level has
-   been held.
+   fine too"), never pushed. A step down is earned, not on demand: it unlocks once a level has
+   been held, and then it stays unlocked (a button in Insights) until you take it or your level
+   changes, so you can hold a little longer and step down when it suits you.
 3. **Never judge.**
    - Tone: plain and factual by default; a calm, encouraging coach for wins; neutral, like a tool,
      for misses.

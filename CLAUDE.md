@@ -58,7 +58,9 @@ non-technical: Claude Code builds, releases and maintains everything.
   New users start at an early estimate of 8 pieces a day (`Control.EARLY`); step-ups are offered the
   same day a day runs heavy. Never add a "just for today" step-up.
 - Holding steady is a win and gets celebrated. Tapering is offered, never pushed: step-down offers
-  always include "Stay here". Clear Air stays visible and within reach, never downplayed.
+  always include "Stay here". A step down unlocks after the hold and stays unlocked (Insights →
+  Forecasts button) until taken or the level changes. Days count exactly the pieces had: never
+  scale a day up or down for short or long waking hours. Clear Air stays visible and within reach, never downplayed.
 - Never judge. Tone: factual by default, calm coach for wins, neutral for misses. Never condescending,
   never spin a miss positively, never show a negative comparison ("last week you were lighter").
   Motivating figures (Log tab wins) only ever show positive facts.

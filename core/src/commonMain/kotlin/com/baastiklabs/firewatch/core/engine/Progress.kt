@@ -13,9 +13,12 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.minus
 import kotlinx.datetime.plus
 
-/** Pieces for one waking day, scaled to a 16-hour day so short/long days compare fairly. */
+/**
+ * Pieces for one waking day. No scaling for short or long days (removed in 0.15): a day counts
+ * exactly what D had. [scaled] is kept as a name only and equals [pieces].
+ */
 data class DayPace(val date: LocalDate, val pieces: Double, val awakeMinutes: Double) {
-    val scaled: Double get() = if (awakeMinutes <= 0) pieces else pieces * Ladder.WAKING_MINUTES / awakeMinutes
+    val scaled: Double get() = pieces
 }
 
 /** WIND_DOWN is no longer produced (0.9): wind-down is a note on the normal guidance ([Battery.closeToBed]). */
@@ -42,8 +45,13 @@ data class Battery(
 data class HeadsUp(val message: String)
 
 /** Full days in a row held at or under the target, toward the next step-down offer. */
-data class StepDownProgress(val held: Int, val needed: Int, val next: Rung) {
-    val ready: Boolean get() = held >= needed
+/**
+ * [unlocked]: the hold was reached at some point since the last level change. Once unlocked it
+ * stays unlocked (a step-down button in Insights) until the level changes, even after "Stay here"
+ * or a heavier day.
+ */
+data class StepDownProgress(val held: Int, val needed: Int, val next: Rung, val unlocked: Boolean = false) {
+    val ready: Boolean get() = unlocked || held >= needed
 }
 
 object Progress {
@@ -139,7 +147,19 @@ object Progress {
             }
             day = day.minus(1, DateTimeUnit.DAY)
         }
-        return StepDownProgress(held, hold, Ladder.nextDown(target))
+        // Unlocked: did any run since the level change reach the hold? (Forward scan, same rules.)
+        var run = 0
+        var unlocked = held >= hold
+        var d = sinceDate.plus(1, DateTimeUnit.DAY)
+        val yesterday = now.localDate(tz).minus(1, DateTimeUnit.DAY)
+        while (!unlocked && d <= yesterday) {
+            if (known(data, d, tz)) {
+                run = if (pace(data, d, tz).pieces > target + 0.25) 0 else run + 1
+                if (run >= hold) unlocked = true
+            }
+            d = d.plus(1, DateTimeUnit.DAY)
+        }
+        return StepDownProgress(if (unlocked) hold else held, hold, Ladder.nextDown(target), unlocked)
     }
 
     fun headsUps(data: FirewatchData, now: Long, tz: TimeZone): List<HeadsUp> {

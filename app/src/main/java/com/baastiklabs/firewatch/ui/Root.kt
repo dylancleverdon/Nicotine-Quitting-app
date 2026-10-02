@@ -138,7 +138,16 @@ fun FirewatchRoot(vm: FirewatchViewModel) {
                 route == "backfill" -> com.baastiklabs.firewatch.ui.onboarding.BackfillScreen(
                     vm, data, onDone = { route = "home" }, onCancel = { route = "home" },
                 )
-                route == "insights" -> com.baastiklabs.firewatch.ui.insights.InsightsScreen(data, now, onSettings = { f -> scope.launch { vm.repository.updateSettings(f) } }) {
+                route == "insights" -> com.baastiklabs.firewatch.ui.insights.InsightsScreen(
+                    data, now,
+                    onSettings = { f -> scope.launch { vm.repository.updateSettings(f) } },
+                    onStepDown = { p ->
+                        scope.launch {
+                            vm.repository.setTarget(p, "down")
+                            snackbar.showSnackbar("New rung: ${com.baastiklabs.firewatch.core.engine.Ladder.rung(p).label}. That's real progress.")
+                        }
+                    },
+                ) {
                     com.baastiklabs.firewatch.health.WatchOverlayCard(vm, data)
                 }
                 route == "calendar" -> CalendarScreen(data, now, onOpenDay = { route = "day/$it" })

@@ -73,6 +73,7 @@ fun InsightsScreen(
     data: FirewatchData,
     now: Long,
     onSettings: (transform: (com.baastiklabs.firewatch.core.model.Settings) -> com.baastiklabs.firewatch.core.model.Settings) -> Unit,
+    onStepDown: (pieces: Double) -> Unit = {},
     watch: @Composable () -> Unit,
 ) {
     val tz = TimeZone.currentSystemDefault()
@@ -127,7 +128,7 @@ fun InsightsScreen(
                 "Going up" -> item { GoingUpSection(ins, data) }
                 "Going down" -> item { GoingDownSection(ins, data, now) }
                 "Mix" -> item { MixSection(ins) }
-                "Forecasts" -> item { ForecastSection(ins, data, now) }
+                "Forecasts" -> item { ForecastSection(ins, data, now, onStepDown) }
                 "Milestones" -> item { MilestonesSection(ins, now) }
                 "Ladder" -> item { LadderSection(data, now, tz) }
             }
@@ -690,7 +691,7 @@ private fun MixSection(ins: Insights) = Col {
 }
 
 @Composable
-private fun ForecastSection(ins: Insights, data: FirewatchData, now: Long) = Col {
+private fun ForecastSection(ins: Insights, data: FirewatchData, now: Long, onStepDown: (Double) -> Unit = {}) = Col {
     val (pvp, show) = remember(data, now / 3_600_000) { ins.paceVsPlan() }
     if (show && pvp.isNotEmpty()) ChartCard("Pace vs your plan", "Your pieces each day (bars) against your level, then the plan if you take each step (line). Optional: staying steady is a win too.") {
         BarChart(pvp.map { Bar(it.second ?: 0.0) }, line = pvp.map { it.third ?: 0.0 }, lineColor = MaterialTheme.colorScheme.tertiary, yFmt = num, xLabels = kdates(pvp.map { it.first }))
@@ -706,12 +707,10 @@ private fun ForecastSection(ins: Insights, data: FirewatchData, now: Long) = Col
     if (stepDown != null) {
         ChartCard(
             "Next step down",
-            "Full days in a row at or under your level, since your last change. Today counts once it's over. Staying where you are is a win too.",
+            "Full days in a row at or under your level, since your last change. Today counts once it's over. Once unlocked, it stays unlocked until your level changes. Staying where you are is a win too.",
         ) {
-            val offered = stepDown.ready &&
-                com.baastiklabs.firewatch.core.engine.Progress.stepDownOffer(data, now, TimeZone.currentSystemDefault()) != null
             Text(
-                if (offered) "${stepDown.needed} of ${stepDown.needed} days held: ${stepDown.next.label} is offered on the Log tab"
+                if (stepDown.unlocked) "${stepDown.needed} of ${stepDown.needed} days held: unlocked"
                 else "${stepDown.held} of ${stepDown.needed} days held",
                 style = MaterialTheme.typography.titleMedium,
             )
@@ -719,6 +718,14 @@ private fun ForecastSection(ins: Insights, data: FirewatchData, now: Long) = Col
                 progress = { (stepDown.held.toFloat() / stepDown.needed).coerceIn(0f, 1f) },
                 modifier = Modifier.fillMaxWidth(),
             )
+            if (stepDown.unlocked) {
+                androidx.compose.material3.Button(onClick = { onStepDown(stepDown.next.pieces) }) { Text("Step down to ${stepDown.next.label}") }
+                Text(
+                    "Whenever you're ready. Holding here a little longer is fine too; this stays here until you step down or your level changes.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
     val plan = remember(data, now / 3_600_000) { com.baastiklabs.firewatch.core.engine.Control.taperPlan(data, now, TimeZone.currentSystemDefault()) }

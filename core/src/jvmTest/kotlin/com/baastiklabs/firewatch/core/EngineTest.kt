@@ -274,10 +274,20 @@ class EngineTest {
         assertEquals(7, ready.held)
         assertTrue(ready.ready)
         assertEquals(2.0, ready.next.pieces)
-        // A heavier day starts the count again from the day after it.
-        val heavy = data.copy(doses = doses + (0 until 2).map { gum4.toDose("x$it", at(13, 20 + it), 0) })
-        assertEquals(1, Progress.stepDownProgress(heavy, at(15, 10), tz)!!.held)
+        // A heavier day before the hold is reached starts the count again from the day after it.
+        val heavy = data.copy(doses = doses + (0 until 2).map { gum4.toDose("x$it", at(10, 20 + it), 0) })
+        assertEquals(4, Progress.stepDownProgress(heavy, at(15, 10), tz)!!.held)
         assertNull(Progress.stepDownOffer(heavy, at(15, 10), tz))
+        // Once unlocked it stays unlocked until the level changes, even after a heavier day.
+        val after = data.copy(doses = doses + (0 until 2).map { gum4.toDose("y$it", at(13, 20 + it), 0) })
+        val p = Progress.stepDownProgress(after, at(15, 10), tz)!!
+        assertTrue(p.unlocked && p.ready)
+        assertEquals(7, p.held)
+        assertNotNull(Progress.stepDownOffer(after, at(15, 10), tz))
+        // ...and after "Stay here" the offer pauses for a day, but stays unlocked.
+        val snoozed = after.copy(settings = after.settings.copy(stepDownSnoozedAt = at(15, 9)))
+        assertNull(Progress.stepDownOffer(snoozed, at(15, 10), tz))
+        assertTrue(Progress.stepDownProgress(snoozed, at(15, 10), tz)!!.unlocked)
     }
 
     @Test
@@ -1091,5 +1101,20 @@ class EngineTest {
         // "?" days are left out of the charts.
         val gap = withTarget(dosesOn(2..9, 4).filter { !it.id.startsWith("x5-") }, 4.0)
         assertTrue(Insights(gap, tz, at(10, 12)).longestGaps().none { it.first.dayOfMonth == 5 })
+    }
+
+    @Test
+    fun `days count exactly what was had, with no scaling for short or long days`() {
+        // Usual day 8 AM–11 PM (15 h). 7 pieces at level 7 is held; a late start doesn't inflate.
+        val s = com.baastiklabs.firewatch.core.model.Settings(wakeMinutes = 8 * 60, sleepMinutes = 23 * 60, holdDays = 3)
+        val doses = (10..12).flatMap { d -> (0 until 7).map { i -> gum4.toDose("p$d-$i", at(d, 12) + i * 60 * 60_000L, 0) } }
+        val late = listOf(com.baastiklabs.firewatch.core.model.SleepEvent("w", at(10, 11), com.baastiklabs.firewatch.core.model.SleepKind.WAKE))
+        val data = FirewatchData(products = DefaultProducts.all(), doses = doses, settings = s, sleepEvents = late,
+            rungChanges = listOf(RungChange("r", at(9, 20), 7.0, "start")))
+        assertEquals(7.0, Progress.pace(data, d10, tz).scaled, 1e-9)
+        val p = Progress.stepDownProgress(data, at(13, 12), tz)!!
+        assertEquals(3, p.held)
+        assertTrue(p.unlocked)
+        assertEquals(7.0, Progress.rollingAverage(data, kotlinx.datetime.LocalDate(2026, 9, 13), tz)!!, 1e-9)
     }
 }
