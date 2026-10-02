@@ -148,7 +148,11 @@ badges, recaps, day barcode), Ladder. Every chart has labelled axes; touch and d
 point. Day charts (wave, dose strip) have ‹ Today › to view any earlier day (no overlay, no
 comparison). Opt-in "Detailed charts" adds 7/30/90/all ranges and earlier/later on multi-day
 charts. Forecasts show "If you take each step" from day one (plan → plan + recent weeks → pace).
-Every figure is an estimate.
+New in 0.14: gap sizes, week shape and first piece weekdays vs weekends (Patterns); longest gap each
+day and craving strength over time (Going up); where your net comes from (Stretch & pull); doses by
+product over the day (Mix); pace vs your plan and days nicotine-free (Forecasts); steady days by
+month (Milestones); practice pace runs (Ladder). Charts have a spoken one-line summary for screen
+readers. Every figure is an estimate.
 
 ## 12. Calendar and back-dating
 
