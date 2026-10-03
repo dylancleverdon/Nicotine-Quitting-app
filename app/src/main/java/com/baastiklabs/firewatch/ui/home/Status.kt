@@ -229,9 +229,10 @@ private fun StepProgressBlock(p: com.baastiklabs.firewatch.core.engine.StepDownP
             p.unlocked -> androidx.compose.material3.Button(onClick = { onStepDown(p.next.pieces) }) { Text("Step down to ${p.next.label}") }
             p.todayOver -> Text("Today won't count toward this one; the count starts again tomorrow.", style = MaterialTheme.typography.bodySmall, color = muted)
             p.unlocksAt != null -> {
-                val day = if (java.time.Instant.ofEpochMilli(p.unlocksAt).atZone(java.time.ZoneId.systemDefault()).toLocalDate() == java.time.LocalDate.now().plusDays(1)) "tomorrow"
-                    else Fmt.dayTitle(java.time.Instant.ofEpochMilli(p.unlocksAt).atZone(java.time.ZoneId.systemDefault()).toLocalDate())
-                Text("Unlocks around $day, ${Fmt.time(p.unlocksAt)} if today stays at or under ${target?.label ?: "your level"}", style = MaterialTheme.typography.bodySmall, color = muted)
+                val at: Long = p.unlocksAt ?: 0L
+                val d = java.time.Instant.ofEpochMilli(at).atZone(java.time.ZoneId.systemDefault()).toLocalDate()
+                val day = if (d == java.time.LocalDate.now().plusDays(1)) "tomorrow" else Fmt.dayTitle(d)
+                Text("Unlocks around $day, ${Fmt.time(at)} if today stays at or under ${target?.label ?: "your level"}", style = MaterialTheme.typography.bodySmall, color = muted)
             }
         }
         if (!p.unlocked && p.restartedOn != null &&
