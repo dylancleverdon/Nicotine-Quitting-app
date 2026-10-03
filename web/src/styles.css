@@ -108,3 +108,4 @@ textarea { resize: vertical; }
 .btn, .chip { min-height: 48px; }
 .chip { min-height: 40px; }
 .product b, .item div { overflow-wrap: anywhere; }
+.step-progress { margin: 8px 0; }

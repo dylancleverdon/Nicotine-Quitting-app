@@ -357,6 +357,12 @@ class Insights(private val data: FirewatchData, private val tz: TimeZone, privat
 
     // ---- 0.14 charts ----
 
+    /** Daily peak: each known full day's highest estimated level over its waking day (mg). */
+    fun dailyPeaks(): List<Pair<LocalDate, Double>> = fullDays.map { d ->
+        val c = Kinetics.curve(data.doses.filter { it.at in (d.wakeAt - 24 * 60 * MIN)..d.sleepAt }, d.wakeAt, d.sleepAt, 5)
+        d.date to (c.maxOfOrNull { it.second } ?: 0.0)
+    }
+
     /** Gap sizes over the last [n] known full days: counts under 1h, 1–2h, 2–4h, 4h+ (timed doses, same day). */
     fun gapSizes(n: Int = 30): List<Pair<String, Int>> {
         val buckets = IntArray(4)

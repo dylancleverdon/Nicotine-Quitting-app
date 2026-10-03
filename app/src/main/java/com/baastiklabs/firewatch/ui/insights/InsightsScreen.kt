@@ -132,7 +132,7 @@ fun InsightsScreen(
                 "Milestones" -> item { MilestonesSection(ins, now) }
                 "Ladder" -> item { LadderSection(data, now, tz) }
             }
-            item { watch() }
+            if (data.settings.showWatch) item { watch() }
             item { EstimateNote() }
         }
         }
@@ -601,6 +601,11 @@ private fun GoingUpSection(ins: Insights, data: FirewatchData) = Col {
 
 @Composable
 private fun GoingDownSection(ins: Insights, data: FirewatchData, now: Long) = Col {
+    val peaks = remember(data, now / 600_000) { ins.dailyPeaks() }.win()
+    if (peaks.size > 1) ChartCard("Daily peak", "Each day's highest estimated nicotine level, with a 7-day average line. Lower peaks mean gentler highs.") {
+        val v = peaks.map { it.second }
+        BarChart(v.map { Bar(it) }, line = v.indices.map { i -> v.subList(maxOf(0, i - 6), i + 1).average() }, yFmt = mgs, xLabels = kdates(peaks.map { it.first }))
+    }
     val days = ins.fullDays.win()
     ChartCard("Average dose size", "Absorbed mg per dose. Catches moves like 6 mg to 3 mg.") {
         TrendLine(days.map { if (it.doses.isEmpty()) 0.0 else it.absorbedMg / it.doses.size }, yFmt = mgs, xLabels = dates(days))
@@ -709,13 +714,9 @@ private fun ForecastSection(ins: Insights, data: FirewatchData, now: Long, onSte
             "Next step down",
             "Full days in a row at or under your level, since your last change. Today counts once it's over. Once unlocked, it stays unlocked until your level changes. Staying where you are is a win too.",
         ) {
-            Text(
-                if (stepDown.unlocked) "${stepDown.needed} of ${stepDown.needed} days held: unlocked"
-                else "${stepDown.held} of ${stepDown.needed} days held",
-                style = MaterialTheme.typography.titleMedium,
-            )
+            Text(stepDown.text, style = MaterialTheme.typography.titleMedium)
             LinearProgressIndicator(
-                progress = { (stepDown.held.toFloat() / stepDown.needed).coerceIn(0f, 1f) },
+                progress = { stepDown.fraction.toFloat() },
                 modifier = Modifier.fillMaxWidth(),
             )
             if (stepDown.unlocked) {

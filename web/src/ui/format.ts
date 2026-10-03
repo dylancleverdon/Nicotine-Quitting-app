@@ -37,3 +37,12 @@ export const cravingColor = (level: number) => {
 }
 export const TAGS = ['Coffee', 'After food', 'Driving', 'Work', 'Stress', 'Drinking', 'Boredom']
 export const isoToday = () => { const d = new Date(); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10) }
+
+/** "2 days 6 hours of 3 days held toward Bonfire", from the step-down count. */
+export function stepText(p: { held: number; needed: number; heldHours: number; neededHours: number; unlocked: boolean; next: { tier: string } }) {
+  if (p.unlocked) return `${p.needed} of ${p.needed} days held: unlocked`
+  const per = p.neededHours / Math.max(1, p.needed)
+  const days = Math.floor(p.heldHours / per + 1e-9), hours = Math.round(p.heldHours - days * per)
+  const d = `${days} ${days === 1 ? 'day' : 'days'}`
+  return `${hours > 0 ? `${d} ${hours} ${hours === 1 ? 'hour' : 'hours'}` : d} of ${p.needed} days held toward ${p.next.tier}`
+}

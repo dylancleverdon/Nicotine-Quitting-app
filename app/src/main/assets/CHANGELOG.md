@@ -2,6 +2,15 @@
 
 Newest first. Each release is a "## <version>" heading; the app shows these notes in "What's new".
 
+## 0.16.0 · 2026-10-03
+- The step-down count now sits on the Log tab and fills by waking hours ("2 days 6 hours of 3 days held toward Bonfire"), with "Unlocks around …" when you're close and a Step down button once unlocked. It replaces the old "Next rung down" bar.
+- Travelling? When your time zone changes, Firewatch asks once whether to use your usual day in local time. Past days never move. Daylight-saving days are handled too.
+- New chart: Daily peak (Insights → Going down), each day's highest nicotine level.
+- Settings shows your hold period in waking hours.
+- The step-down count is on the Quick log widget too.
+- Watch data is now a switch in Settings (off unless you turn it on), so it no longer shows on every Insights page.
+- Fewer backup copies: one rolling copy in Downloads/Firewatch and the last 7 on the phone.
+
 ## 0.15.0 · 2026-10-02
 - Fairer days: every day now counts exactly the pieces you had. Short or long days are no longer scaled up or down, so a disciplined day is always credited. Past days have been recounted.
 - Once a step down is unlocked, it stays unlocked: Insights → Forecasts → Next step down shows a "Step down to …" button until you take it. Dismissed the offer? Hold another day and step down from there whenever you're ready.

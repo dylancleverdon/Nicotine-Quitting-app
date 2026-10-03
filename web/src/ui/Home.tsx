@@ -4,7 +4,7 @@ import { savedName, sendFeedback } from '../feedback'
 import * as S from '../store'
 import { Meter, Wave } from './Charts'
 import { CheckInSheet, CravingSheet, DoseSheet, EditDoseSheet, PracticeDurationSheet, VapeSheet, doseLine } from './Sheets'
-import { TAGS, cravingColor, duration, isoToday, mg, minutesOfDay, pieces, piecesLabel, signedDuration, time } from './format'
+import { TAGS, cravingColor, dayTitle, duration, stepText, isoToday, mg, minutesOfDay, pieces, piecesLabel, signedDuration, time } from './format'
 
 export function Home({ toast, go, backfill }: { toast: (msg: string, undo?: () => void) => void; go: (r: string) => void; backfill?: (days: string[]) => void }) {
   const snap = S.snapshot.value!
@@ -59,6 +59,8 @@ export function Home({ toast, go, backfill }: { toast: (msg: string, undo?: () =
     else toast(reason === 'up' ? `Stepped up to ${rung?.label}. Your level is more accurate now.` : `Starting at ${rung?.label}.`)
   }
   const pr = snap.practice
+  const sp = snap.target && snap.target.pieces > 0 ? snap.stepProgress : null
+  const travel = Core.travelPrompt(S.json())
   // iPhone Safari, not yet added to the Home Screen: a one-time tip.
   const ios = /iPhone|iPad|iPod/.test(navigator.userAgent)
   const standalone = (navigator as any).standalone === true || (typeof matchMedia === 'function' && matchMedia('(display-mode: standalone)').matches)
@@ -98,6 +100,14 @@ export function Home({ toast, go, backfill }: { toast: (msg: string, undo?: () =
               {practiceHelp && <div class="muted" style={{ whiteSpace: 'pre-line' }}>{pr.explainer}</div>}
             </div>}
             {snap.early && <div class="muted">Early estimate · firming up as you log your first week{snap.baselineState === 'progress' ? ` (day ${snap.baselineDay} of 7)` : ''}.</div>}
+            {sp && !snap.early && <div class="step-progress">
+              <Meter value={sp.fraction} label="Waking hours held toward the next step down" />
+              <div class="small">{stepText(sp)}</div>
+              {sp.unlocked ? <button class="btn" onClick={() => moveTarget(sp.next.pieces, 'down')}>Step down to {sp.next.label}</button>
+                : sp.todayOver ? <div class="muted">Today won't count toward this one; the count starts again tomorrow.</div>
+                : sp.unlocksAt ? <div class="muted">Unlocks around {new Date(sp.unlocksAt).toDateString() === new Date(Date.now() + 864e5).toDateString() ? 'tomorrow' : dayTitle(new Date(sp.unlocksAt).toISOString().slice(0, 10))}, {time(sp.unlocksAt)} if today stays at or under {snap.target?.label}</div> : null}
+              {!sp.unlocked && sp.restartedOn && sp.restartedOn === new Date(Date.now() - 864e5).toISOString().slice(0, 10) && <div class="muted">Count started again on {dayTitle(sp.restartedOn)}.</div>}
+            </div>}
             {snap.target && snap.measured && snap.measured.pieces !== snap.target.pieces &&
               <div class="muted">Working at {snap.target.label}. Your last 7 days measure {snap.measured.label}.</div>}
           </>}
@@ -172,6 +182,12 @@ export function Home({ toast, go, backfill }: { toast: (msg: string, undo?: () =
         <div class="row wrap"><button class="btn" onClick={async () => { await S.stopPractice(); await S.updateSettings({ practiceAnswered: pr.lastSessionId ?? '' }); await S.setTarget(pr.workFrom!.pieces, 'measured', 'from measured level'); toast(`Working from ${pr.workFrom!.label}.`) }}>Work from {pr.workFrom.tier}</button>
           <button class="btn outline" onClick={() => S.updateSettings({ workFromSnoozedAt: Date.now() })}>Keep practicing</button>
           <button class="btn outline" onClick={async () => { await S.stopPractice(); await S.updateSettings({ practiceAnswered: pr.lastSessionId ?? '', lighterSnoozedAt: Date.now() }) }}>Back to {snap.target.tier} pace</button></div>
+      </div>}
+      {travel && <div class="card accent">
+        <h2>Your time zone changed</h2>
+        <div class="small">You're {travel.extra}. Use your usual day ({minutesOfDay(settings.wakeMinutes)}–{minutesOfDay(settings.sleepMinutes)}) in local time here? It starts from your next wake-up; past days don't move.</div>
+        <div class="row wrap"><button class="btn" onClick={() => S.updateSettings(Core.travelAnswer(settings, 'local'))}>Yes, use local time</button>
+          <button class="btn outline" onClick={() => S.updateSettings(Core.travelAnswer(settings, 'keep'))}>Keep my home times</button></div>
       </div>}
       {ca.offer && <div class="card accent">
         <h2>Your last 7 days were nicotine-free</h2>

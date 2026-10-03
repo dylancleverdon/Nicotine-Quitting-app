@@ -105,6 +105,7 @@ class QuickLogWidget : GlanceAppWidget() {
                 BatteryState.ASLEEP -> "Sleeping hours · fresh start at wake-up"
             } to b.charge.coerceIn(0.0, 1.0)
         }
+        val step = data.targetPieces?.takeIf { it > 0 && !com.baastiklabs.firewatch.core.engine.Control.isEarly(data) }?.let { Progress.stepDownProgress(data, now, tz) }
         val products = data.homeProducts.filter { !(it.kind == ProductKind.VAPE && it.borrowedFrom != null) }.take(4)
         val puffs = Puffs.get(context)
         val wc = WidgetColors.of(context, app(context).graph.repository.data.value.settings)
@@ -121,6 +122,13 @@ class QuickLogWidget : GlanceAppWidget() {
                     Row(GlanceModifier.fillMaxWidth().height(6.dp).background(wc.track).cornerRadius(3.dp)) {
                         Spacer(GlanceModifier.height(6.dp).width((charge * 160).toInt().dp).background(wc.ember).cornerRadius(3.dp))
                     }
+                }
+                step?.let { p ->
+                    Spacer(GlanceModifier.height(4.dp))
+                    Row(GlanceModifier.fillMaxWidth().height(4.dp).background(wc.track).cornerRadius(2.dp)) {
+                        Spacer(GlanceModifier.height(4.dp).width((p.fraction * 160).toInt().dp).background(wc.ember).cornerRadius(2.dp))
+                    }
+                    Text(p.text, style = TextStyle(color = wc.muted, fontSize = 11.sp), maxLines = 1)
                 }
                 Spacer(GlanceModifier.height(6.dp))
                 products.chunked(2).forEach { row ->

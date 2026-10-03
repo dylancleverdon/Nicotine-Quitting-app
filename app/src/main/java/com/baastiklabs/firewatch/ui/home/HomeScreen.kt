@@ -33,6 +33,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -148,6 +149,15 @@ fun HomeScreen(
     val healing = remember(data, minute / 30) { if (clearAir) com.baastiklabs.firewatch.core.engine.ClearAir.receptorHealing(data, now, tz) else null }
     val clearAirOffer = remember(data, minute) { revealed && com.baastiklabs.firewatch.core.engine.ClearAir.offer(data, now, tz) }
     var hadSome by remember { mutableStateOf(false) }
+    val stepProgressNow = remember(data, minute) {
+        if (target == null || target.pieces <= 0 || early) null else Progress.stepDownProgress(data, now, tz)
+    }
+    // Travel: the time zone changed since it was last answered.
+    val zoneId = java.util.TimeZone.getDefault().id
+    val travel = remember(data, zoneId) { com.baastiklabs.firewatch.core.engine.Travel.prompt(data, zoneId, now) }
+    LaunchedEffect(data.settings.lastZone, data.settings.onboardingDone) {
+        if (data.settings.onboardingDone) com.baastiklabs.firewatch.core.engine.Travel.firstSeen(data.settings, zoneId, repo.now())?.let { f -> repo.updateSettings { f } }
+    }
     val heldTotal = remember(data, minute) {
         target?.let { com.baastiklabs.firewatch.core.engine.Control.heldByRung(data, now, tz)[it.pieces]?.first } ?: 0
     }
@@ -280,9 +290,23 @@ fun HomeScreen(
                         revealed30 = true
                         scope.launch { repo.logTimerCheck(charging = (battery?.charge ?: 1.0) < 0.999) }
                     },
+                    stepProgress = stepProgressNow,
+                    onStepDown = { p -> moveTarget(p, "down") },
                 )
             } else {
                 StatusCard(todaySummary, baseline, summaries, lastDoseAt, now, onBackfill)
+            }
+        }
+        travel?.let { tp ->
+            item {
+                OfferCard(
+                    title = "Your time zone changed",
+                    body = "You're ${com.baastiklabs.firewatch.core.engine.Travel.describe(tp)}. Use your usual day (${Fmt.minutesOfDay(data.settings.wakeMinutes)}–${Fmt.minutesOfDay(data.settings.sleepMinutes)}) in local time here? It starts from your next wake-up; past days don't move.",
+                    primary = "Yes, use local time",
+                    onPrimary = { scope.launch { repo.updateSettings { com.baastiklabs.firewatch.core.engine.Travel.useLocal(it, zoneId, repo.now()) } } },
+                    secondary = "Keep my home times",
+                    onSecondary = { scope.launch { repo.updateSettings { com.baastiklabs.firewatch.core.engine.Travel.keepHome(it, zoneId) } } },
+                )
             }
         }
         if (clearAirOffer) item {

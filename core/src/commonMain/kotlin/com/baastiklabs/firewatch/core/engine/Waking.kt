@@ -9,6 +9,7 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.atTime
 import kotlinx.datetime.plus
 import kotlinx.datetime.toInstant
+import kotlinx.datetime.toLocalDateTime
 
 /** A waking day: from getting up to going to sleep (which may be after midnight). */
 data class WakingDay(val date: LocalDate, val wakeAt: Long, val sleepAt: Long) {
@@ -25,6 +26,8 @@ object Waking {
 
     fun day(data: FirewatchData, date: LocalDate, tz: TimeZone): WakingDay {
         val s = data.settings
+        @Suppress("NAME_SHADOWING")
+        val tz = zoneFor(data, date, tz)
         val defaultWake = date.atTime(LocalTime(s.wakeMinutes / 60, s.wakeMinutes % 60)).toInstant(tz).toEpochMilliseconds()
         val sleepDate = if (s.sleepMinutes <= s.wakeMinutes) date.plus(1, DateTimeUnit.DAY) else date
         val defaultSleep = sleepDate.atTime(LocalTime((s.sleepMinutes / 60) % 24, s.sleepMinutes % 60)).toInstant(tz).toEpochMilliseconds()
@@ -37,6 +40,35 @@ object Waking {
             .minByOrNull { kotlin.math.abs(it.at - defaultSleep) }?.at ?: defaultSleep
         return WakingDay(date, wake, maxOf(sleep, wake + H))
     }
+
+    /**
+     * The time zone the usual day is in on [date] (travel): the latest switch made before that
+     * day, else [fallback] (the phone's zone).
+     */
+    fun zoneFor(data: FirewatchData, date: LocalDate, fallback: TimeZone): TimeZone {
+        val h = data.settings.zoneHistory
+        if (h.isEmpty()) return fallback
+        var zone: TimeZone? = null
+        for (e in h) {
+            val parts = e.split("|")
+            val from = parts.getOrNull(0)?.toLongOrNull() ?: continue
+            val z = runCatching { TimeZone.of(parts.getOrNull(1) ?: "") }.getOrNull() ?: continue
+            val fromDate = kotlinx.datetime.Instant.fromEpochMilliseconds(from).toLocalDateTime(z).date
+            // The first entry covers everything before it; later ones apply from the next day.
+            if (zone == null || date > fromDate) zone = z
+        }
+        return zone ?: fallback
+    }
+
+    /** "<now>|<zone>" to append when D chooses local times (or the first zone ever seen). */
+    fun zoneEntry(now: Long, zone: String) = "$now|$zone"
+
+    /** Hours between two zones right now (+ = [to] is ahead), for "now 3 hours ahead". */
+    fun offsetHours(from: String, to: String, now: Long): Double = runCatching {
+        val i = kotlinx.datetime.Instant.fromEpochMilliseconds(now)
+        fun off(z: String) = with(TimeZone.of(z)) { i.toLocalDateTime(this) }.let { lt -> lt.toInstant(TimeZone.UTC).toEpochMilliseconds() - now }
+        (off(to) - off(from)) / 3_600_000.0
+    }.getOrDefault(0.0)
 
     fun isAwake(days: List<WakingDay>, t: Long): Boolean = days.any { t in it }
 }

@@ -51,6 +51,8 @@ fun TierStatusCard(
     relapseNext: Long? = null,
     timerHidden: Boolean = false,
     onReveal: () -> Unit = {},
+    stepProgress: com.baastiklabs.firewatch.core.engine.StepDownProgress? = null,
+    onStepDown: (Double) -> Unit = {},
 ) {
     Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
@@ -68,14 +70,8 @@ fun TierStatusCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                // Progress toward the next rung down, from the measured pace.
-                if (measured != null && shown.pieces > 0) {
-                    val next = Ladder.nextDown(shown.pieces)
-                    val span = (shown.pieces - next.pieces).coerceAtLeast(0.01)
-                    val progress = ((shown.pieces - measured.pieces.coerceAtMost(shown.pieces)) / span).toFloat().coerceIn(0f, 1f)
-                    LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth())
-                    Text("Next rung down: ${next.label}", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
+                // The step-down count, filling by waking hours (same as Insights and the widget).
+                stepProgress?.let { p -> StepProgressBlock(p, target, onStepDown) }
             }
             battery?.let {
                 if (timerHidden) HiddenBatteryRow(it, onReveal) else BatteryRow(it, now, relapseNext)
@@ -220,5 +216,26 @@ private fun ScaleRow(label: String, options: List<String>, selected: Int, onSele
                 FilterChip(selected = selected == i + 1, onClick = { onSelect(i + 1) }, label = { Text(o) })
             }
         }
+    }
+}
+
+@Composable
+private fun StepProgressBlock(p: com.baastiklabs.firewatch.core.engine.StepDownProgress, target: Rung?, onStepDown: (Double) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        LinearProgressIndicator(progress = { p.fraction.toFloat() }, modifier = Modifier.fillMaxWidth())
+        Text(p.text, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        val muted = MaterialTheme.colorScheme.onSurfaceVariant
+        when {
+            p.unlocked -> androidx.compose.material3.Button(onClick = { onStepDown(p.next.pieces) }) { Text("Step down to ${p.next.label}") }
+            p.todayOver -> Text("Today won't count toward this one; the count starts again tomorrow.", style = MaterialTheme.typography.bodySmall, color = muted)
+            p.unlocksAt != null -> {
+                val day = if (java.time.Instant.ofEpochMilli(p.unlocksAt).atZone(java.time.ZoneId.systemDefault()).toLocalDate() == java.time.LocalDate.now().plusDays(1)) "tomorrow"
+                    else Fmt.dayTitle(java.time.Instant.ofEpochMilli(p.unlocksAt).atZone(java.time.ZoneId.systemDefault()).toLocalDate())
+                Text("Unlocks around $day, ${Fmt.time(p.unlocksAt)} if today stays at or under ${target?.label ?: "your level"}", style = MaterialTheme.typography.bodySmall, color = muted)
+            }
+        }
+        if (!p.unlocked && p.restartedOn != null &&
+            p.restartedOn == kotlinx.datetime.LocalDate.parse(java.time.LocalDate.now().minusDays(1).toString())
+        ) Text("Count started again on ${Fmt.dayMonth(p.restartedOn!!)}.", style = MaterialTheme.typography.bodySmall, color = muted)
     }
 }

@@ -3,7 +3,7 @@ import { Core } from '../core'
 import * as S from '../store'
 import { kindColor } from '../theme'
 import { Barcode, Bars, Diverging, DoseStrip, ForecastChart, Heatmap, KIND_ORDER, Line, Meter, ReceptorChart, StackedBars, Wave, dateLabels } from './Charts'
-import { dayTitle, duration, pieces, shortDate, signedDuration, time } from './format'
+import { dayTitle, duration, stepText, pieces, shortDate, signedDuration, time } from './format'
 
 const SECTIONS = ['Today', 'Cravings ahead', 'Receptors', 'Stretch & pull', 'Trends', 'Patterns', 'Going up', 'Going down', 'Mix', 'Forecasts', 'Milestones', 'Ladder']
 const Card = ({ title, sub, children }: { title: string; sub?: string; children?: any }) => (
@@ -210,6 +210,8 @@ export function Insights() {
         <Card title="What you can ride out"><div class="small">{ins.coachConfident ? `You reliably ride out cravings up to about ${ins.capacity} out of 10.` : 'Log a few more cravings (and whether they passed) to personalise this.'}</div>
           {ins.coachLevels.map((l) => <div class="row small"><span class="grow">{l.label}</span>{l.extra}</div>)}{ins.honest && <div class="muted">Honest level: {ins.honest}</div>}</Card>
         <Card title="Heaviness score" sub="From time-to-first-use and amount (0–6)."><b>{ins.heaviness?.toFixed(1) ?? '–'} of 6</b></Card>
+        {ch.dailyPeaks.length > 1 && <Card title="Daily peak" sub="Each day's highest estimated nicotine level, with a 7-day average line. Lower peaks mean gentler highs.">
+          {(() => { const pk = win(ch.dailyPeaks).map((p) => p.value); const avg = pk.map((_, i) => { const s = pk.slice(Math.max(0, i - 6), i + 1); return s.reduce((a, b) => a + b, 0) / s.length }); return <Bars values={pk} line={avg} fmt={(v) => `${v} mg`} x={dateLabels(win(ch.dailyPeaks).map((p) => p.label))} /> })()}</Card>}
         {snap.doubleUpsWeekly.length > 1 && <Card title="Double-ups" sub="Doses stacked while the last one was still peaking, per week."><Line values={snap.doubleUpsWeekly.map((d) => d.value)} fmt={n} x={dateLabels(snap.doubleUpsWeekly.map((d) => d.label))} /></Card>}
         {ins.checkIns.length >= 2 && <Card title="Daily check-in" sub="Craving strength (orange) and mood (teal), 1–5."><Line values={win(ins.checkIns).map((c) => c.value)} second={win(ins.checkIns).map((c) => Number(c.extra))} fmt={n} top={5} /></Card>}
       </>}
@@ -235,8 +237,8 @@ export function Insights() {
       </>}
       {sec === 'Forecasts' && <>
         {snap.stepProgress && <Card title="Next step down" sub="Full days in a row at or under your level, since your last change. Days with nothing logged are skipped. Today counts once it's over. Once unlocked, it stays unlocked until your level changes. Staying where you are is a win too.">
-          <b>{snap.stepProgress.unlocked ? `${snap.stepProgress.needed} of ${snap.stepProgress.needed} days held: unlocked` : `${snap.stepProgress.held} of ${snap.stepProgress.needed} days held`}</b>
-          <Meter value={snap.stepProgress.held / snap.stepProgress.needed} label="Days held toward the next step down" />
+          <b>{stepText(snap.stepProgress)}</b>
+          <Meter value={snap.stepProgress.fraction} label="Waking hours held toward the next step down" />
           {snap.stepProgress.unlocked && <><button class="btn" onClick={() => { const p = snap.stepProgress!.next; S.setTarget(p.pieces, 'down'); setStepped(p.label) }}>Step down to {snap.stepProgress.next.label}</button>
             <div class="muted">Whenever you're ready. Holding here a little longer is fine too; this stays here until you step down or your level changes.</div></>}
           {stepped && <div class="small">New rung: {stepped}. That's real progress.</div>}</Card>}

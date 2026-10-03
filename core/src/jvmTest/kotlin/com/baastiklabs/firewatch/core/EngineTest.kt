@@ -1117,4 +1117,81 @@ class EngineTest {
         assertTrue(p.unlocked)
         assertEquals(7.0, Progress.rollingAverage(data, kotlinx.datetime.LocalDate(2026, 9, 13), tz)!!, 1e-9)
     }
+
+    // ---- 0.16: step down by waking hours, travel, daylight saving, daily peak ----
+
+    @Test
+    fun `step down count fills by waking hours and says when it unlocks`() {
+        // Usual day 8 AM–11 PM (15 h), hold 3, level 4, 3 a day from the 2nd.
+        val s = com.baastiklabs.firewatch.core.model.Settings(wakeMinutes = 8 * 60, sleepMinutes = 23 * 60, holdDays = 3)
+        val doses = (2..9).flatMap { d -> (0 until 3).map { i -> gum4.toDose("h$d-$i", at(d, 9) + i * 3 * 3_600_000L, 0) } }
+        val data = FirewatchData(products = DefaultProducts.all(), doses = doses, settings = s,
+            rungChanges = listOf(RungChange("r", at(1, 20), 4.0, "start")))
+        // On the 3rd at 2 PM: 1 held day (the 2nd) + 6 h of today = 21 h of 45.
+        val p = Progress.stepDownProgress(data, at(3, 14), tz)!!
+        assertEquals(1, p.held)
+        assertEquals(45 * 60.0, p.neededMinutes, 1e-6)
+        assertEquals(21 * 60.0, p.heldMinutes, 1e-6)
+        assertNull(p.unlocksAt)
+        // On the 4th, 2 held: unlocks at the next wake-up if today stays at or under.
+        val q = Progress.stepDownProgress(data, at(4, 12), tz)!!
+        assertEquals(at(5, 8), q.unlocksAt)
+        // After bedtime today is capped at one usual day.
+        assertEquals(45 * 60.0, Progress.stepDownProgress(data, at(4, 23, 30), tz)!!.heldMinutes, 1e-6)
+        // Today over the level: it stops filling and says so.
+        val heavy = data.copy(doses = data.doses + (0 until 3).map { gum4.toDose("x$it", at(4, 10) + it * 60_000L, 0) })
+        val o = Progress.stepDownProgress(heavy, at(4, 14), tz)!!
+        assertTrue(o.todayOver)
+        assertEquals(2 * 15 * 60.0, o.heldMinutes, 1e-6)
+        assertNull(o.unlocksAt)
+        // The next morning the count has started again, and says from when.
+        val r = Progress.stepDownProgress(heavy, at(5, 9), tz)!!
+        assertEquals(0, r.held)
+        assertEquals(kotlinx.datetime.LocalDate(2026, 9, 4), r.restartedOn)
+        // Unlocked: full.
+        assertEquals(1.0, Progress.stepDownProgress(data, at(5, 9), tz)!!.fraction, 1e-9)
+    }
+
+    @Test
+    fun `travel asks once and switches from the next day without moving past days`() {
+        val T = com.baastiklabs.firewatch.core.engine.Travel
+        val home = "America/Los_Angeles"; val away = "America/New_York"
+        val la = TimeZone.of(home); val ny = TimeZone.of(away)
+        fun t(z: TimeZone, d: Int, h: Int) = LocalDateTime(2026, 9, d, h, 0).toInstant(z).toEpochMilliseconds()
+        var s = com.baastiklabs.firewatch.core.model.Settings(wakeMinutes = 8 * 60, sleepMinutes = 23 * 60)
+        s = T.firstSeen(s, home, t(la, 1, 9))!!
+        assertNull(T.firstSeen(s, home, t(la, 2, 9)))
+        val data = FirewatchData(settings = s)
+        assertNull(T.prompt(data, home, t(la, 3, 9)))
+        val p = T.prompt(data, away, t(ny, 5, 9))!!
+        assertEquals("now 3 hours ahead", T.describe(p))
+        // Before answering (and with "Keep my home times") the day stays at home clock times.
+        val homeWake = t(la, 5, 8)
+        assertEquals(homeWake, com.baastiklabs.firewatch.core.engine.Waking.day(data, kotlinx.datetime.LocalDate(2026, 9, 5), ny).wakeAt)
+        val kept = data.copy(settings = T.keepHome(s, away))
+        assertNull(T.prompt(kept, away, t(ny, 5, 10)))
+        // "Yes": local times from the next day; earlier days don't move.
+        val local = data.copy(settings = T.useLocal(s, away, t(ny, 5, 10)))
+        val W = com.baastiklabs.firewatch.core.engine.Waking
+        assertEquals(homeWake, W.day(local, kotlinx.datetime.LocalDate(2026, 9, 5), ny).wakeAt)
+        assertEquals(t(la, 2, 8), W.day(local, kotlinx.datetime.LocalDate(2026, 9, 2), ny).wakeAt)
+        assertEquals(t(ny, 6, 8), W.day(local, kotlinx.datetime.LocalDate(2026, 9, 6), ny).wakeAt)
+    }
+
+    @Test
+    fun `daylight saving days keep the usual clock times`() {
+        val la = TimeZone.of("America/Los_Angeles")
+        val data = FirewatchData(settings = com.baastiklabs.firewatch.core.model.Settings(wakeMinutes = 8 * 60, sleepMinutes = 23 * 60))
+        // Clocks go back on 1 Nov 2026: wake-up is still 8 AM local, and the day is 16 h long.
+        val d = com.baastiklabs.firewatch.core.engine.Waking.day(data, kotlinx.datetime.LocalDate(2026, 11, 1), la)
+        assertEquals(LocalDateTime(2026, 11, 1, 8, 0).toInstant(la).toEpochMilliseconds(), d.wakeAt)
+        assertEquals(15 * 60.0, d.awakeMinutes, 1e-6)
+    }
+
+    @Test
+    fun `daily peak is each day's highest level`() {
+        val data = withTarget(listOf(gum4.toDose("a", at(9, 10), 0), gum4.toDose("b", at(10, 10), 0), gum4.toDose("c", at(10, 11), 0)))
+        val peaks = Insights(data, tz, at(11, 12)).dailyPeaks().toMap()
+        assertTrue(peaks[kotlinx.datetime.LocalDate(2026, 9, 10)]!! > peaks[kotlinx.datetime.LocalDate(2026, 9, 9)]!!)
+    }
 }

@@ -60,6 +60,11 @@ fun PlanSettings(vm: FirewatchViewModel, data: FirewatchData) {
                 FilterChip(selected = s.holdDays == d, onClick = { update { it.copy(holdDays = d) } }, label = { Text(label) })
             }
         }
+        Text(
+            "≈ ${s.holdDays * ((((s.sleepMinutes - s.wakeMinutes) % 1440) + 1440) % 1440).let { if (it == 0) 960 else it } / 60} waking hours",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
         if (s.holdDays < 7) Text(
             com.baastiklabs.firewatch.core.Help.HOLD_SHORT_NOTE,
             style = MaterialTheme.typography.bodySmall,
@@ -110,6 +115,7 @@ fun PlanSettings(vm: FirewatchViewModel, data: FirewatchData) {
         ToggleRow("Show steady days", "\"✓ N steady days\" on the home card", s.showSteadyDays) { v -> update { it.copy(showSteadyDays = v) } }
         ToggleRow("Coaching tips", "Practical tips based on your own logs. Off means Firewatch just measures.", s.coachingTips) { v -> update { it.copy(coachingTips = v) } }
         ToggleRow("Hide stretch and pull on doses", "The \"+38m pull\" line on each product button", s.hideDosePreview) { v -> update { it.copy(hideDosePreview = v) } }
+        ToggleRow("Show watch data", "Heart rate from your watch in Insights (off unless you turn it on)", s.showWatch) { v -> update { it.copy(showWatch = v) } }
         ToggleRow("Detailed charts", "Range choices and earlier/later on Insights charts", s.detailedCharts) { v -> update { it.copy(detailedCharts = v) } }
         ToggleRow("Daily check-in", "Three quick taps: craving strength, mood and sleep", s.dailyCheckIn) { v -> update { it.copy(dailyCheckIn = v) } }
     }

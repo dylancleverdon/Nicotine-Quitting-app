@@ -50,8 +50,31 @@ data class HeadsUp(val message: String)
  * stays unlocked (a step-down button in Insights) until the level changes, even after "Stay here"
  * or a heavier day.
  */
-data class StepDownProgress(val held: Int, val needed: Int, val next: Rung, val unlocked: Boolean = false) {
+data class StepDownProgress(
+    val held: Int, val needed: Int, val next: Rung, val unlocked: Boolean = false,
+    /** Waking minutes toward the step down: held days count a whole usual day, today fills as it goes. */
+    val heldMinutes: Double = 0.0, val neededMinutes: Double = 0.0,
+    /** Minutes of today counted so far (0 once today is over the level). */
+    val todayMinutes: Double = 0.0,
+    /** Today is already over the level: it won't count toward this one. */
+    val todayOver: Boolean = false,
+    /** When it unlocks if today stays at or under the level (the next wake-up), else null. */
+    val unlocksAt: Long? = null,
+    /** The most recent day that started the count again (over the level), if any. */
+    val restartedOn: LocalDate? = null,
+) {
     val ready: Boolean get() = unlocked || held >= needed
+
+    /** "2 days 6 hours of 3 days held toward Bonfire" / "3 of 3 days held: unlocked" (same everywhere). */
+    val text: String get() {
+        if (unlocked) return "$needed of $needed days held: unlocked"
+        val per = if (needed > 0) neededMinutes / needed else 1.0
+        val days = kotlin.math.floor(heldMinutes / per + 1e-9).toInt()
+        val hours = kotlin.math.round((heldMinutes - days * per) / 60).toInt()
+        val d = "$days ${if (days == 1) "day" else "days"}"
+        return (if (hours > 0) "$d $hours ${if (hours == 1) "hour" else "hours"}" else d) + " of $needed days held toward ${next.tier.title}"
+    }
+    val fraction: Double get() = if (unlocked) 1.0 else if (neededMinutes <= 0) 0.0 else (heldMinutes / neededMinutes).coerceIn(0.0, 1.0)
 }
 
 object Progress {
@@ -137,12 +160,16 @@ object Progress {
         val since = data.rungChanges.lastOrNull()?.at ?: return null
         val hold = data.settings.holdDays.coerceAtLeast(1)
         val sinceDate = since.localDate(tz)
-        var day = now.localDate(tz).minus(1, DateTimeUnit.DAY)
+        // "Today" is the waking day (before wake-up it's still last night).
+        val (todayW, nextWake) = BatteryEngine.currentDay(data, now, tz)
+        val today = todayW.date
+        fun over(d: LocalDate) = pace(data, d, tz).pieces > target + 0.25
+        var day = today.minus(1, DateTimeUnit.DAY)
         var held = 0
         // "?" and ghost days are skipped, not counted and not a reset: people have off days.
         while (held < hold && day > sinceDate) {
             if (known(data, day, tz)) {
-                if (pace(data, day, tz).scaled > target + 0.25) break
+                if (over(day)) break
                 held++
             }
             day = day.minus(1, DateTimeUnit.DAY)
@@ -150,16 +177,29 @@ object Progress {
         // Unlocked: did any run since the level change reach the hold? (Forward scan, same rules.)
         var run = 0
         var unlocked = held >= hold
+        var restartedOn: LocalDate? = null
         var d = sinceDate.plus(1, DateTimeUnit.DAY)
-        val yesterday = now.localDate(tz).minus(1, DateTimeUnit.DAY)
-        while (!unlocked && d <= yesterday) {
+        while (d < today) {
             if (known(data, d, tz)) {
-                run = if (pace(data, d, tz).pieces > target + 0.25) 0 else run + 1
+                if (over(d)) { run = 0; restartedOn = d } else run++
                 if (run >= hold) unlocked = true
             }
             d = d.plus(1, DateTimeUnit.DAY)
         }
-        return StepDownProgress(if (unlocked) hold else held, hold, Ladder.nextDown(target), unlocked)
+        // Waking hours: a held day is one usual day; today fills hour by hour (bedtime caps it).
+        val s = data.settings
+        val usual = (((s.sleepMinutes - s.wakeMinutes) % 1440 + 1440) % 1440).toDouble().takeIf { it > 0 } ?: Ladder.WAKING_MINUTES
+        val todayCounts = today > sinceDate && !unlocked
+        val todayOver = todayCounts && over(today)
+        val todayMin = if (!todayCounts || todayOver) 0.0
+            else ((minOf(now, todayW.sleepAt) - todayW.wakeAt) / MIN.toDouble()).coerceIn(0.0, usual)
+        val shownHeld = if (unlocked) hold else held
+        val unlocksAt = if (!unlocked && todayCounts && !todayOver && held + 1 >= hold) nextWake else null
+        return StepDownProgress(
+            shownHeld, hold, Ladder.nextDown(target), unlocked,
+            heldMinutes = if (unlocked) hold * usual else held * usual + todayMin, neededMinutes = hold * usual,
+            todayMinutes = todayMin, todayOver = todayOver, unlocksAt = unlocksAt, restartedOn = restartedOn,
+        )
     }
 
     fun headsUps(data: FirewatchData, now: Long, tz: TimeZone): List<HeadsUp> {

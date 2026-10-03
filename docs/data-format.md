@@ -19,6 +19,8 @@ That schema is frozen at version 1.
 
 Dose field `estimated: true` marks back-dated rough entries (no real time): counted in totals and the tier, left out of timing stats.
 
+Added in 0.16.0: settings `showWatch` (false), `lastZone` (""), `zoneHistory` (list of "<epoch ms>|<zone id>": which zone the usual wake/sleep times are in from the next day on).
+
 Added in 0.14.0: settings `theme` ("firewatch"), `themeMode` ("system"), `trueBlack` (false), `colourBlindCharts` (false), `calmColours` (true), `installCardSeen` (false), `lastBackupAt` (0), `clearAirOfferSnoozedAt` (0). The old `remindCheckIn` / `remindBackup` settings are no longer read (those reminders were removed).
 
 Added in 0.13.0: record types `daymark` (an empty day marked by D: `id` "daymark-<date>", `date` ISO, `state` "clear" or "ghost", `at`; un-marking is a tombstone; "?" is never stored, it's worked out from the logs) and `practice` (practice pace: `id`, `start`, `pieces`, `end` null while on, `untilBedtime`); field `detail` on `rung` (the reason, e.g. the step-up reason, default ""; `reason` "measured" = working from the measured level); settings `practiceUntilBedtime` (true), `lighterOffers` (true), `lighterSnoozedAt`, `practiceAnswered`, `workFromSnoozedAt` (0/""). The old `practiceDate`/`practicePieces` settings are no longer read.

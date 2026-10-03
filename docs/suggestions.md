@@ -92,3 +92,8 @@ Ideas raised while reviewing the app, not sent through the form.
 | 2026-10-02 | Running low on a tin; travel / time-zone handling; sleep vs late doses; hardest hour line; password-protected backups | Undecided | Ideas list, 2 Oct. |
 | 2026-10-02 | Bug | Disciplined days counted as over the level (16-hour scaling of a 15-hour day; late starts scaled up) | Done | 0.15.0: scaling removed entirely, past days recounted. |
 | 2026-10-02 | Idea | Keep a step down unlocked with a button in Insights after dismissing the offer | Done | 0.15.0 |
+| 2026-10-01 | Idea | Watch as a toggle in Settings, not on every Insights page | Done | 0.16.0 (off by default) |
+| 2026-10-02 | Idea | Less clutter from backups | Done | 0.16.0: 7 private, 1 in Downloads, 7 in a chosen folder |
+| 2026-10-02 | Idea | Replace "progress toward next rung down" with the step-down count | Done | 0.16.0, filling by waking hours |
+| 2026-10-02 | Idea | Daily peak chart (highest point of each day's wave) | Done | 0.16.0 |
+| 2026-10-03 | Idea | Travel / time-zone handling | Done | 0.16.0 |

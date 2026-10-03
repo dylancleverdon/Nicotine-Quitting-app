@@ -28,6 +28,8 @@ test('back-dated start, logging and persistence', async ({ page }) => {
   await page.getByRole('button', { name: 'Start here' }).click()
   await expect(page.locator('.tier')).toHaveText('Flicker')
   await expect(page.getByText(/Stretch .* · Pull .* · Net/)).toBeVisible()
+  // The step-down count sits on the top card, filling by waking hours.
+  await expect(page.locator('.step-progress')).toContainText(/held toward Embers|unlocked/)
   // Dose preview under the product buttons.
   await expect(page.locator('.product .preview').first()).toBeVisible()
   // One-time net explainer.

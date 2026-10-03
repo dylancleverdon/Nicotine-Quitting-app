@@ -47,10 +47,10 @@ export interface Snapshot {
   stepDown: Rung | null; stepDownNote: string | null; stepUp: Rung | null; stepUpWhy: string | null; stepUpSameDay: boolean; cravingEndings: NamedValue[]; checks: NamedValue[]; checksToday: number; early: boolean; earlyUpdate: number | null; heldDays: number; held: string[][]; lighterThanStart: number | null; daysOffSmokeAndVape: number | null; welcomeBack: string[] | null; previews: Record<string, number>; steadyDays: number; wakingToday: string; steadyMilestone: number | null; practicing: boolean; practiceFollowUp: Rung | null; taperSteps: NamedValue[]; taperBasis: string | null; headsUps: string[]
   morningStretch: number | null; tip: NamedValue | null; yesterday: Review | null; steadyExplainer: string; netExplainer: string
   practice: Practice; dayStates: Record<string, string>; levelMarks: Record<string, string>; history: NamedValue[]; recentStates: NamedValue[]; known7: number; heldTotal: number
-  stepProgress: { held: number; needed: number; next: Rung; offered: boolean; unlocked: boolean } | null; doubleUpsWeekly: NamedValue[]; thenCurve: number[]; nowCurve: number[]; unknownNote: string; holdShortNote: string
+  stepProgress: { held: number; needed: number; next: Rung; offered: boolean; unlocked: boolean; fraction: number; heldHours: number; neededHours: number; todayOver: boolean; unlocksAt: number | null; restartedOn: string | null } | null; doubleUpsWeekly: NamedValue[]; thenCurve: number[]; nowCurve: number[]; unknownNote: string; holdShortNote: string
   clearAir: { active: boolean; daysFree: number; healing: number | null; offer: boolean }
   charts: {
-    gapSizes: NamedValue[]; weekShape: NamedValue[]; firstPiece: string[][]; longestGaps: NamedValue[]; cravingWeekly: NamedValue[]
+    gapSizes: NamedValue[]; weekShape: NamedValue[]; dailyPeaks: NamedValue[]; firstPiece: string[][]; longestGaps: NamedValue[]; cravingWeekly: NamedValue[]
     netSplit: string[][]; kindsByHour: Record<string, number[]>; steadyByMonth: NamedValue[]; paceVsPlan: string[][]; practiceRuns: NamedValue[]; daysFree: NamedValue[]
   }
   qualityScore: number | null; qualityLabel: string | null; swapTip: string | null; activeCraving: CravingView | null
@@ -67,6 +67,8 @@ export const Core = {
   feedbackBody: (type: string, s: string, d: string, n: string, info: string): string => core.feedbackBody(type, s, d, n, info),
   feedbackPrivacy: (): string => core.feedbackPrivacy(),
   help: (): { tour: HelpPage[]; why: HelpPage[]; articles: HelpArticle[] } => JSON.parse(core.help()),
+  travelPrompt: (records: string): NamedValue | null => JSON.parse(core.travelPrompt(records, Intl.DateTimeFormat().resolvedOptions().timeZone, Date.now())),
+  travelAnswer: (settings: any, answer: 'first' | 'local' | 'keep'): any => JSON.parse(core.travelAnswer(JSON.stringify(settings), Intl.DateTimeFormat().resolvedOptions().timeZone, Date.now(), answer)),
   themes: (): { id: string; name: string; feel: string }[] => JSON.parse(core.themes()),
   palette: (id: string, mode: string, systemDark: boolean, trueBlack: boolean, calm: boolean, colourBlind: boolean): any =>
     JSON.parse(core.palette(id, mode, systemDark, trueBlack, calm, colourBlind)),

@@ -1,6 +1,6 @@
 # Firewatch by Baastik Labs: design spec
 
-Baastik Labs · living spec, updated 28 Sep 2026 (Android 0.15 / web 0.12)
+Baastik Labs · living spec, updated 28 Sep 2026 (Android 0.16 / web 0.13)
 
 This describes what Firewatch does today and how it should feel. Read `docs/vision.md` first: the
 vision and principles there decide every trade-off here. The original 1.0 spec is kept in
@@ -109,6 +109,12 @@ as an estimate.
 - **Step down (taper, optional):** offered after the hold period (Settings): that many full days in
   a row at or under the rung since the last change ("Next step down" in Insights → Forecasts shows
   "1 of 3 days held"; "?" and ghost days are skipped, not a reset); always with "Stay here".
+  The count fills by **waking hours** (held days count a usual day each; today fills hour by hour,
+  capped at bedtime): "2 days 6 hours of 3 days held toward Bonfire" on the Log tab top card (replacing
+  the old "Next rung down" bar), in Insights and on the Quick log widget, with "Unlocks around
+  tomorrow, 8 AM if today stays at or under …"; a day over the level stops filling ("Today won't
+  count toward this one; the count starts again tomorrow") and the next morning says "Count started
+  again on …". Settings shows the hold as "≈ 45 waking hours".
   **Unlocked stays unlocked:** once the count is reached, the Next step down card shows a
   "Step down to …" button until it's taken or the level changes, even after "Stay here" or a
   heavier day. **Try it for a day** starts practice pace at the next rung; next morning
@@ -164,6 +170,10 @@ readers. Every figure is an estimate.
 it on the calendar: "I had none" (clear 🌿: counts as 0, a win), "Add what you had", or "Don't log
 this day" (ghost 👻). "?" and ghost days are left out of every figure (level, tier, Insights, steady
 days, step-down count, wins, the calendar's month figures). Calendar shows ▲ / ▼ on level changes.
+
+**Travel:** when the phone's time zone changes, the Log tab asks once: use the usual day in local
+time (from the next wake-up; past days never move, via a zone history) or keep home times. Daylight
+saving days keep the usual clock times.
 
 **One day everywhere:** daily counts (pieces today, calendar, daily Insights bars, tiers, stretch and
 pull, steady days) use the waking day (wake-up to the next wake-up), so a 1 AM piece counts toward

@@ -60,6 +60,7 @@ export function Settings({ toast, go, updateInfo }: { toast: (m: string) => void
       <div class="small">Hold each rung for</div>
       <div class="row wrap">{[[3, '3 days'], [7, '1 week'], [14, '2 weeks'], [21, '3 weeks']].map(([d, l]) =>
         <button class={`chip ${s.holdDays === d ? 'on' : ''}`} onClick={() => S.updateSettings({ holdDays: d })}>{l}</button>)}</div>
+      <div class="muted">≈ {Math.round(s.holdDays * ((((s.sleepMinutes - s.wakeMinutes) % 1440) + 1440) % 1440 || 960) / 60)} waking hours</div>
       {s.holdDays < 7 && <div class="muted">{snap.holdShortNote}</div>}
       {target && target.pieces > 0 && <PracticePace />}
       <div class="small">First-piece goal</div>

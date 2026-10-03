@@ -23,11 +23,13 @@ import java.time.format.DateTimeFormatter
  * Downloads/Firewatch so they survive even an uninstall.
  */
 object BackupStore {
-    private const val KEEP = 10
-    private const val PUBLIC_KEEP = 5
+    // Fewer copies, less clutter: 7 private copies, one rolling copy in Downloads/Firewatch,
+    // 7 in a chosen folder.
+    private const val KEEP = 7
+    private const val PUBLIC_KEEP = 1
     private const val PUBLIC_DIR = "Firewatch"
     private const val DAILY_MS = 24 * 60 * 60_000L
-    private const val FOLDER_KEEP = 30
+    private const val FOLDER_KEEP = 7
 
     fun dir(context: Context): File = File(context.filesDir, "backups").apply { mkdirs() }
 

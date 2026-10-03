@@ -86,7 +86,7 @@ external object JsJodaTimeZoneModule
 )
 @Serializable data class ClearAirDto(val active: Boolean, val daysFree: Int, val healing: Double?, val offer: Boolean)
 @Serializable data class ChartsDto(
-    val gapSizes: List<NamedValue>, val weekShape: List<NamedValue>,
+    val gapSizes: List<NamedValue>, val weekShape: List<NamedValue>, val dailyPeaks: List<NamedValue> = emptyList(),
     /** [week start, weekdays min or -1, weekends min or -1]. */
     val firstPiece: List<List<String>>,
     val longestGaps: List<NamedValue>, val cravingWeekly: List<NamedValue>,
@@ -99,7 +99,11 @@ external object JsJodaTimeZoneModule
     val practiceRuns: List<NamedValue>,
     val daysFree: List<NamedValue>,
 )
-@Serializable data class StepProgressDto(val held: Int, val needed: Int, val next: RungDto, val offered: Boolean, val unlocked: Boolean = false)
+@Serializable data class StepProgressDto(
+    val held: Int, val needed: Int, val next: RungDto, val offered: Boolean, val unlocked: Boolean = false,
+    val fraction: Double = 0.0, val heldHours: Double = 0.0, val neededHours: Double = 0.0, val todayOver: Boolean = false,
+    val unlocksAt: Double? = null, val restartedOn: String? = null,
+)
 @Serializable data class ReviewDto(
     val date: String, val pieces: Double, val netMin: Double?, val volatility: Double, val mix: List<NamedValue>,
     val longestGapMin: Double?, val stacked: Int, val morningStretchMin: Double?, val tips: List<String>,
@@ -404,7 +408,7 @@ object FirewatchCore {
             known7 = Progress.knownDays(d, today, tz),
             heldTotal = target?.let { ctl.heldByRung(d, now, tz)[it.pieces]?.first } ?: 0,
             stepProgress = if (ctl.isEarly(d)) null else Progress.stepDownProgress(d, now, tz)?.let {
-                StepProgressDto(it.held, it.needed, it.next.dto(), it.ready && Progress.stepDownOffer(d, now, tz) != null, it.unlocked)
+                StepProgressDto(it.held, it.needed, it.next.dto(), it.ready && Progress.stepDownOffer(d, now, tz) != null, it.unlocked, it.fraction, it.heldMinutes / 60, it.neededMinutes / 60, it.todayOver, it.unlocksAt?.toDouble(), it.restartedOn?.toString())
             },
             doubleUpsWeekly = ins.doubleUpsPerWeek().map { NamedValue(it.first.toString(), it.second.toDouble()) },
             thenCurve = if (ins.baselineComplete && ins.fullDays.size > ins.baselineDays.size + 3) ins.typicalCurve(ins.baselineDays) else emptyList(),
@@ -414,6 +418,7 @@ object FirewatchCore {
             },
             charts = ChartsDto(
                 gapSizes = ins.gapSizes().map { NamedValue(it.first, it.second.toDouble()) },
+                dailyPeaks = ins.dailyPeaks().map { NamedValue(it.first.toString(), it.second) },
                 weekShape = ins.weekShape().map { NamedValue(it.first, it.second) },
                 firstPiece = ins.firstPieceWeekdaysVsWeekends().map { listOf(it.first.toString(), (it.second ?: -1.0).toString(), (it.third ?: -1.0).toString()) },
                 longestGaps = ins.longestGaps().map { NamedValue(it.first.toString(), it.second ?: 0.0) },
@@ -558,6 +563,24 @@ object FirewatchCore {
     fun feedbackBody(type: String, suggestion: String, details: String, name: String, appInfo: String): String =
         com.baastiklabs.firewatch.core.Feedback.encode(com.baastiklabs.firewatch.core.Feedback.fields(type, suggestion, details, name, appInfo))
     fun feedbackPrivacy(): String = com.baastiklabs.firewatch.core.Feedback.PRIVACY_NOTE
+
+    /** Travel: the question to ask for the browser's current zone, as JSON (or "null"). */
+    fun travelPrompt(recordsJson: String, zone: String, nowMs: Double): String {
+        val p = com.baastiklabs.firewatch.core.engine.Travel.prompt(data(recordsJson), zone, nowMs.toLong()) ?: return "null"
+        return FirewatchJson.encodeToString(NamedValue.serializer(), NamedValue(p.to, p.hoursAhead, com.baastiklabs.firewatch.core.engine.Travel.describe(p)))
+    }
+
+    /** Travel: settings after "first seen" / "use local" / "keep home" (JSON settings in and out; "null" = no change). */
+    fun travelAnswer(settingsJson: String, zone: String, nowMs: Double, answer: String): String {
+        val s = FirewatchJson.decodeFromString(com.baastiklabs.firewatch.core.model.Settings.serializer(), settingsJson)
+        val T = com.baastiklabs.firewatch.core.engine.Travel
+        val out = when (answer) {
+            "first" -> T.firstSeen(s, zone, nowMs.toLong())
+            "local" -> T.useLocal(s, zone, nowMs.toLong())
+            else -> T.keepHome(s, zone)
+        } ?: return "null"
+        return FirewatchJson.encodeToString(com.baastiklabs.firewatch.core.model.Settings.serializer(), out)
+    }
 
     /** Colour themes (id, name, feel) and one palette (shared with Android). */
     fun themes(): String = FirewatchJson.encodeToString(ListSerializer(com.baastiklabs.firewatch.core.Themes.Theme.serializer()), com.baastiklabs.firewatch.core.Themes.all)

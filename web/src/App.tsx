@@ -2,7 +2,7 @@ import { useEffect, useState } from 'preact/hooks'
 import { useRegisterSW } from 'virtual:pwa-register/preact'
 import * as S from './store'
 import { persist } from './db'
-import { markActivity } from './core'
+import { Core, markActivity } from './core'
 import { setTimeFormat } from './ui/format'
 import { applyTheme, onSystemThemeChange } from './theme'
 import { Home } from './ui/Home'
@@ -40,6 +40,10 @@ export function App() {
   const show = (msg: string, undo?: () => void) => { setToast({ msg, undo }); setTimeout(() => setToast((t) => (t?.msg === msg ? null : t)), 5000) }
   const s0 = S.settings.value
   useEffect(() => { applyTheme(s0) }, [s0.theme, s0.themeMode, s0.trueBlack, s0.calmColours, s0.colourBlindCharts])
+  // Travel: record the first time zone silently.
+  useEffect(() => {
+    if (S.loaded.value && s0.onboardingDone && !s0.lastZone) { const f = Core.travelAnswer(s0, 'first'); if (f) S.updateSettings(f) }
+  }, [S.loaded.value, s0.onboardingDone, s0.lastZone])
   if (!S.loaded.value || !S.snapshot.value) return <main><div class="muted">Loading…</div></main>
   setTimeFormat(S.settings.value.timeFormat ?? 'system')
   if (!S.settings.value.tourSeen && route !== 'why') return <Tour onDone={() => S.updateSettings({ tourSeen: true })} onWhy={() => setRoute('why')} />

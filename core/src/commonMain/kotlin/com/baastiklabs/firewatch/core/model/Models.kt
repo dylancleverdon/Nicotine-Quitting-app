@@ -194,6 +194,16 @@ data class Settings(
     val lastBackupAt: Long = 0,
     /** "Your last 7 days were nicotine-free. Switch to Clear Air?" was answered "Not now". */
     val clearAirOfferSnoozedAt: Long = 0,
+    /** Show the watch card in Insights (off by default). */
+    val showWatch: Boolean = false,
+    /** Travel: the time zone last seen and answered ("" = not yet). */
+    val lastZone: String = "",
+    /**
+     * Travel: which time zone the usual wake and sleep times are in, from which day on, as
+     * "<epoch ms>|<zone id>" (oldest first). Empty = the phone's zone. A switch applies from the
+     * next waking day, so past days never move.
+     */
+    val zoneHistory: List<String> = emptyList(),
 )
 
 /**
