@@ -45,7 +45,7 @@ as an estimate.
 
 ## 5. First run
 
-- **Welcome tour** (5 short screens, skippable, reopenable from Help).
+- **Welcome tour** (6 short screens, fresh installs only, skippable, reopenable from Help): what Firewatch does (find → control → optional taper), logging is one tap and the extra details are optional, the battery and net, your level, the step-down bar at the top, and Insights to explore.
 - **Setup:** usual wake and sleep times, products for the home screen, then how to start:
   - **Establish a baseline:** start at an early estimate of 8 pieces a day that firms up each day
     toward the measured level (blend of 8 and the days logged so far). Guidance works from day one.
@@ -146,25 +146,39 @@ pause on mode days.
 
 ## 11. Insights
 
-Yesterday in review (facts only: pieces, net, volatility, mix, longest gap, stacked doses, morning
-stretch; up to two tips with Coaching tips on), Today (wave with optional volatility line, off by
-default; daily nicotine volatility in mg/h = root-mean-square of the rate of change over the waking
-day, the line uses the last 30 minutes; dose strip), Trends (with "27 of 30 days known" and "(6 of 7
-days known)" on the measured level), Ladder (with Level history), Cravings ahead, Receptors (estimated healing, following the plan vs
-staying), Stretch & pull, Trends, Patterns (heatmap, how cravings ended, checking, triggers),
-Going up (holding steady, clear hours, wins, money), Going down (quality, dose size, spike share,
-background level), Mix, Forecasts (Journey to Clear Air, arrival dates), Milestones (records,
-badges, recaps, day barcode), Ladder. Every chart has labelled axes; touch and drag reads any
-point. Day charts (wave, dose strip) have ‹ Today › to view any earlier day (no overlay, no
-comparison). Opt-in "Detailed charts" adds 7/30/90/all ranges and earlier/later on multi-day
-charts. Forecasts show "If you take each step" from day one (plan → plan + recent weeks → pace).
-New in 0.14: gap sizes, week shape and first piece weekdays vs weekends (Patterns); longest gap each
-day and craving strength over time (Going up); where your net comes from (Stretch & pull); doses by
-product over the day (Mix); pace vs your plan and days nicotine-free (Forecasts); steady days by
-month (Milestones); practice pace runs (Ladder). Charts have a spoken one-line summary for screen
-readers. Every figure is an estimate.
+Sections (0.17): **Favourites** (opens first once anything is starred: a card of one plain fact per
+starred chart, then the starred charts; "Tap ☆ on any chart to add it here" when empty), Today
+(Yesterday in review, blood-level wave with optional volatility line, nicotine volatility, dose
+strip), Cravings ahead, Receptors (receptor load; background level), Stretch & pull (stretch & pull;
+where your net comes from), Trends (days known, daily totals, tier staircase, gap between pieces),
+Patterns (heatmap, checking, wake to first piece), Gaps & spacing (longest gap each day, holding
+steady, clear hours, overnight gap), Amounts & peaks (daily peak, nicotine quality), Mix (doses by
+product over the day, product mix), Forecasts (next step down, if you take each step, pace vs your
+plan, days nicotine-free, Journey to Clear Air, taper speed, arrival dates), Milestones (steady days
+by month, insights, badges, monthly recap, Clear Air countdown), Ladder (practice pace runs, level
+history, the ladder). Section names describe content, never a direction.
+
+Every chart card has a ☆ to star it (`Settings.favouriteCharts`, ids in `core/.../Favourites.kt`).
+Favourite facts are facts only, never a comparison with the past.
+
+Journey to Clear Air counts rungs: rungs stepped down from the heaviest level D has worked at, out
+of all the rungs from there to Clear Air. It moves only when the level changes. Arrival dates say
+"not unlocked yet" for a tier the current pace doesn't reach.
+
+Removed in 0.17 after D's chart review: today so far, gap sizes, week shape, first piece weekdays vs
+weekends, how cravings ended, triggers, comparisons, craving strength over time, wins, money saved,
+beaten triggers, average dose size, spike share, heaviness score, double-ups, cravings vs doses, what
+you can ride out, daily check-in, label vs absorbed, borrowed share, then vs now, records, day
+barcode, silly conversions. (Their data is still recorded; only the charts are gone.)
+
+Every chart has labelled axes; touch and drag reads any point. Day charts (wave, dose strip) have
+‹ Today › to view any earlier day (no overlay, no comparison). Opt-in "Detailed charts" adds
+7/30/90/all ranges and earlier/later on multi-day charts. Charts have a spoken one-line summary for
+screen readers. Every figure is an estimate.
 
 ## 12. Calendar and back-dating
+
+**Each past day** shows "In review": the same facts as Yesterday in review. The calendar keeps the month being viewed for 10 minutes after it was last used.
 
 **Days that count:** a full day with nothing logged is "?" (once its waking day is over) until D marks
 it on the calendar: "I had none" (clear 🌿: counts as 0, a win), "Add what you had", or "Don't log

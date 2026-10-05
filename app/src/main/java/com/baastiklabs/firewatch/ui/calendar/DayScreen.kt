@@ -133,6 +133,10 @@ fun DayScreen(
                     Stat("${summary.cravingsRodeOut} of ${summary.cravings}", "cravings ridden out")
                 }
             }
+            // The same facts as "Yesterday in review", for any past day.
+            val review = if (kDate < com.baastiklabs.firewatch.core.engine.BatteryEngine.currentDay(data, now, tz).first.date)
+                com.baastiklabs.firewatch.core.engine.Coaching.review(data, kDate, now, tz) else null
+            if (review != null) item { com.baastiklabs.firewatch.ui.insights.DayReviewCard("In review", review) }
             val state = Days.state(data, kDate, tz, now)
             // Level changes that day: "Level: Blaze 7 → 6".
             data.rungChanges.withIndex().filter { (i, rc) ->

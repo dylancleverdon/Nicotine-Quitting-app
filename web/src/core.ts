@@ -29,7 +29,7 @@ export interface Practice {
   workFrom: Rung | null; workFromHours: number; workFromNet: number; lastSessionId: string | null; followUpId: string | null
   explainer: string; stopNote: string; relapseNote: string
 }
-export interface DayDetail { doses: DoseView[]; cravings: CravingView[]; wave: number[][]; volatility: number[][]; wakeAt: number; sleepAt: number; sleeps: NamedValue[]; levels: string[]; state: string; pieces: number; mg: number }
+export interface DayDetail { doses: DoseView[]; cravings: CravingView[]; wave: number[][]; volatility: number[][]; wakeAt: number; sleepAt: number; sleeps: NamedValue[]; levels: string[]; state: string; pieces: number; mg: number; review: Review | null }
 export interface NamedValue { label: string; value: number; extra: string }
 export interface Recap { key: string; title: string; pieces: number; drop: number | null; longestGapMin: number; trigger: string | null; rungs: string[]; cravings: number }
 export interface InsightsData {
@@ -45,7 +45,7 @@ export interface Snapshot {
   today: string; baselineState: 'none' | 'progress' | 'complete'; baselineDay: number; baselineAverage: number | null
   revealed: boolean; measured: Rung | null; target: Rung | null; battery: Battery | null
   stepDown: Rung | null; stepDownNote: string | null; stepUp: Rung | null; stepUpWhy: string | null; stepUpSameDay: boolean; cravingEndings: NamedValue[]; checks: NamedValue[]; checksToday: number; early: boolean; earlyUpdate: number | null; heldDays: number; held: string[][]; lighterThanStart: number | null; daysOffSmokeAndVape: number | null; welcomeBack: string[] | null; previews: Record<string, number>; steadyDays: number; wakingToday: string; steadyMilestone: number | null; practicing: boolean; practiceFollowUp: Rung | null; taperSteps: NamedValue[]; taperBasis: string | null; headsUps: string[]
-  morningStretch: number | null; tip: NamedValue | null; yesterday: Review | null; steadyExplainer: string; netExplainer: string
+  morningStretch: number | null; tip: NamedValue | null; yesterday: Review | null; favourites: NamedValue[]; steadyExplainer: string; netExplainer: string
   practice: Practice; dayStates: Record<string, string>; levelMarks: Record<string, string>; history: NamedValue[]; recentStates: NamedValue[]; known7: number; heldTotal: number
   stepProgress: { held: number; needed: number; next: Rung; offered: boolean; unlocked: boolean; fraction: number; heldHours: number; neededHours: number; todayOver: boolean; unlocksAt: number | null; restartedOn: string | null } | null; doubleUpsWeekly: NamedValue[]; thenCurve: number[]; nowCurve: number[]; unknownNote: string; holdShortNote: string
   clearAir: { active: boolean; daysFree: number; healing: number | null; offer: boolean }
@@ -77,6 +77,7 @@ export const Core = {
   newId: (): string => core.newId(Date.now()),
   compute: (records: string): Snapshot => JSON.parse(core.compute(records, Date.now(), lastActivity())),
   waitedForFull: (records: string, doseId: string): boolean => core.waitedForFull(records, doseId),
+  favouriteCharts: (): string => core.favouriteCharts(),
   day: (records: string, iso: string): DayDetail => JSON.parse(core.day(records, iso, Date.now())),
   piecesOf: (product: any, records: string): number => core.absorbedPieces(JSON.stringify(product), records),
   doseFor: (product: any, at: number, opts: { multiplier?: number; duration?: string; acidic?: boolean; tags?: string[] } = {}): any =>

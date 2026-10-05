@@ -97,3 +97,13 @@ Ideas raised while reviewing the app, not sent through the form.
 | 2026-10-02 | Idea | Replace "progress toward next rung down" with the step-down count | Done | 0.16.0, filling by waking hours |
 | 2026-10-02 | Idea | Daily peak chart (highest point of each day's wave) | Done | 0.16.0 |
 | 2026-10-03 | Idea | Travel / time-zone handling | Done | 0.16.0 |
+| 2026-10-04 | Idea | Measured level mismatch with hold period | Declined | D: the level lagging behind the taper is closer to how it feels. |
+| 2026-10-04 | Idea | Journey to Clear Air doesn't work | Done | 0.17.0: counts rungs stepped down from the heaviest level. |
+| 2026-10-04 | Idea | Calendar keeps the month when going back from a day (10 minutes) | Done | 0.17.0 |
+| 2026-10-04 | Idea | More info per calendar day (everything in Yesterday in review) | Done | 0.17.0 |
+| 2026-10-04 | Idea | Rename Going up / Going down | Done | 0.17.0: Gaps & spacing, Amounts & peaks. |
+| 2026-10-04 | Idea | Review all the small grey text, one by one | Later | Incomplete: postponed by D to the next update (checklist page, keep / reword / remove). |
+| 2026-10-04 | Idea | Arrival dates: "not unlocked yet" instead of "not at this pace" | Done | 0.17.0 |
+| 2026-10-04 | Idea | Make the app more accessible; a mini tutorial | Done | 0.17.0: new 6-screen tour for fresh installs. |
+| 2026-10-04 | Idea | Go through all the graphs and keep only the ones D likes | Done | 0.17.0: 25 removed after D's checklist review. |
+| 2026-10-04 | Idea | Favourites in Insights, with a daily facts card | Done | 0.17.0 |

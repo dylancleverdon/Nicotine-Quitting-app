@@ -60,12 +60,28 @@ import java.util.Locale
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 
+/**
+ * The month D was looking at, kept for 10 minutes after they last used the calendar, so opening a
+ * day and coming back doesn't jump to the current month.
+ */
+private object CalendarMemory {
+    const val KEEP_MS = 10 * 60_000L
+    var month: String? = null
+    var at: Long = 0L
+}
+
 /** Each day coloured by how much was used: the light spreads as use drops. */
 @Composable
 fun CalendarScreen(data: FirewatchData, now: Long, onOpenDay: (LocalDate) -> Unit) {
+    androidx.compose.runtime.DisposableEffect(Unit) { onDispose { CalendarMemory.at = System.currentTimeMillis() } }
     val tz = TimeZone.currentSystemDefault()
     val today = LocalDate.now()
-    var monthText by rememberSaveable { mutableStateOf(YearMonth.from(today).toString()) }
+    var monthText by rememberSaveable {
+        val kept = CalendarMemory.month?.takeIf { System.currentTimeMillis() - CalendarMemory.at < CalendarMemory.KEEP_MS }
+        mutableStateOf(kept ?: YearMonth.from(today).toString())
+    }
+    CalendarMemory.month = monthText
+    CalendarMemory.at = System.currentTimeMillis()
     val month = YearMonth.parse(monthText)
     val minute = now / 60_000
     val summaries: Map<LocalDate, DaySummary> = remember(data, minute) {

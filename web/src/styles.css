@@ -109,3 +109,7 @@ textarea { resize: vertical; }
 .chip { min-height: 40px; }
 .product b, .item div { overflow-wrap: anywhere; }
 .step-progress { margin: 8px 0; }
+
+/* Favourites star on each Insights card */
+.star { background: none; border: 0; font-size: 1.4rem; line-height: 1; min-width: 44px; min-height: 44px; color: var(--muted); cursor: pointer; }
+.star[aria-pressed="true"] { color: var(--primary); }

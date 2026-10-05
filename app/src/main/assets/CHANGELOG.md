@@ -2,6 +2,14 @@
 
 Newest first. Each release is a "## <version>" heading; the app shows these notes in "What's new".
 
+## 0.17.0 · 2026-10-05
+- **Favourites in Insights.** Tap ☆ on any chart to add it. Favourites opens first, with a card of one plain fact for each favourite at the top.
+- **Fewer, clearer charts.** 25 charts you didn't need are gone. "Going up" and "Going down" are now **Gaps & spacing** and **Amounts & peaks**, and Background level has moved to Receptors. "When it happens" is now called Heatmap.
+- **Journey to Clear Air works again.** It now counts the rungs you've stepped down from the heaviest level you've worked at, so it moves every time you step down.
+- **Calendar:** each past day now shows "In review", the same facts as Yesterday in review (volatility, longest gap, mix and more). The calendar also remembers the month you were looking at for 10 minutes, so going back from a day doesn't jump to this month.
+- Arrival dates say "not unlocked yet" instead of "not at this pace yet".
+- A new welcome tour for new users explains what Firewatch does, that logging is one tap, the battery and net, your level, and the step-down bar.
+
 ## 0.16.0 · 2026-10-03
 - The step-down count now sits on the Log tab and fills by waking hours ("2 days 6 hours of 3 days held toward Bonfire"), with "Unlocks around …" when you're close and a Step down button once unlocked. It replaces the old "Next rung down" bar.
 - Travelling? When your time zone changes, Firewatch asks once whether to use your usual day in local time. Past days never move. Daylight-saving days are handled too.

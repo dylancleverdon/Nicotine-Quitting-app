@@ -20,6 +20,7 @@ That schema is frozen at version 1.
 Dose field `estimated: true` marks back-dated rough entries (no real time): counted in totals and the tier, left out of timing stats.
 
 Added in 0.16.0: settings `showWatch` (false), `lastZone` (""), `zoneHistory` (list of "<epoch ms>|<zone id>": which zone the usual wake/sleep times are in from the next day on).
+Added in 0.17.0: setting `favouriteCharts` (empty list): starred Insights chart ids (`core/.../engine/Favourites.kt`); unknown ids are ignored.
 
 Added in 0.14.0: settings `theme` ("firewatch"), `themeMode` ("system"), `trueBlack` (false), `colourBlindCharts` (false), `calmColours` (true), `installCardSeen` (false), `lastBackupAt` (0), `clearAirOfferSnoozedAt` (0). The old `remindCheckIn` / `remindBackup` settings are no longer read (those reminders were removed).
 

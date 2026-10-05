@@ -32,6 +32,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.baastiklabs.firewatch.core.engine.Coach
@@ -66,7 +68,18 @@ import kotlinx.datetime.TimeZone
 import java.util.Locale
 import kotlin.math.roundToInt
 
-private val sections = listOf("Today", "Cravings ahead", "Receptors", "Stretch & pull", "Trends", "Patterns", "Going up", "Going down", "Mix", "Forecasts", "Milestones", "Ladder")
+private val sections = listOf(
+    com.baastiklabs.firewatch.core.engine.Favourites.SECTION, "Today", "Cravings ahead", "Receptors", "Stretch & pull", "Trends", "Patterns",
+    "Gaps & spacing", "Amounts & peaks", "Mix", "Forecasts", "Milestones", "Ladder",
+)
+
+/** Favourites: which charts are starred, how to star one, and (inside Favourites) which to show. */
+private class FavState(val starred: Set<String>, val toggle: (String) -> Unit, val only: Set<String>? = null)
+private val LocalFav = androidx.compose.runtime.compositionLocalOf { FavState(emptySet(), {}) }
+
+/** Inside Favourites only starred charts show; everywhere else, everything does. */
+@Composable
+private fun shown(vararg ids: String): Boolean = LocalFav.current.only?.let { only -> ids.any { it in only } } ?: true
 
 @Composable
 fun InsightsScreen(
@@ -79,7 +92,11 @@ fun InsightsScreen(
     val tz = TimeZone.currentSystemDefault()
     val minute = now / 60_000 / 5
     val ins = remember(data, minute) { Insights(data, tz, now) }
-    var section by rememberSaveable { mutableStateOf(sections.first()) }
+    val favIds = com.baastiklabs.firewatch.core.engine.Favourites.ids(data)
+    var section by rememberSaveable { mutableStateOf(if (favIds.isNotEmpty()) sections.first() else "Today") }
+    val fav = FavState(favIds.toSet(), { id ->
+        onSettings { it.copy(favouriteCharts = com.baastiklabs.firewatch.core.engine.Favourites.toggle(it.favouriteCharts, id)) }
+    })
 
     Column(Modifier.fillMaxSize().statusBarsPadding()) {
         Text(
@@ -100,7 +117,7 @@ fun InsightsScreen(
         }
         var range by rememberSaveable { mutableStateOf(42) }
         var endOff by rememberSaveable { mutableStateOf(0) }
-        val detailed = data.settings.detailedCharts && section !in listOf("Today", "Cravings ahead", "Receptors", "Ladder")
+        val detailed = data.settings.detailedCharts && section !in listOf("Favourites", "Today", "Cravings ahead", "Receptors", "Ladder")
         if (detailed) {
             Row(
                 Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp),
@@ -116,23 +133,20 @@ fun InsightsScreen(
                 }
             }
         }
-        androidx.compose.runtime.CompositionLocalProvider(LocalWindow provides (if (detailed) range to endOff else 42 to 0)) {
+        androidx.compose.runtime.CompositionLocalProvider(LocalWindow provides (if (detailed) range to endOff else 42 to 0), LocalFav provides fav) {
         LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            when (section) {
-                "Today" -> item { TodaySection(ins, data, now, onSettings) }
-                "Cravings ahead" -> item { CravingsAheadSection(data, now, tz) }
-                "Receptors" -> item { ReceptorSection(data, now, tz) }
-                "Stretch & pull" -> item { StretchSection(ins) }
-                "Trends" -> item { TrendsSection(ins, data, now, tz) }
-                "Patterns" -> item { PatternsSection(ins, data, tz) }
-                "Going up" -> item { GoingUpSection(ins, data) }
-                "Going down" -> item { GoingDownSection(ins, data, now) }
-                "Mix" -> item { MixSection(ins) }
-                "Forecasts" -> item { ForecastSection(ins, data, now, onStepDown) }
-                "Milestones" -> item { MilestonesSection(ins, now) }
-                "Ladder" -> item { LadderSection(data, now, tz) }
-            }
-            if (data.settings.showWatch) item { watch() }
+            if (section == "Favourites") {
+                item { FavouritesFacts(data, now, tz) }
+                sections.drop(1).forEach { sec ->
+                    val ids = com.baastiklabs.firewatch.core.engine.Favourites.charts.filter { it.section == sec && it.id in fav.starred }.map { it.id }.toSet()
+                    if (ids.isNotEmpty()) item {
+                        androidx.compose.runtime.CompositionLocalProvider(LocalFav provides FavState(fav.starred, fav.toggle, ids)) {
+                            SectionContent(sec, ins, data, now, tz, onSettings, onStepDown)
+                        }
+                    }
+                }
+            } else item { SectionContent(section, ins, data, now, tz, onSettings, onStepDown) }
+            if (data.settings.showWatch && section != "Favourites") item { watch() }
             item { EstimateNote() }
         }
         }
@@ -140,10 +154,66 @@ fun InsightsScreen(
 }
 
 @Composable
-fun ChartCard(title: String, subtitle: String? = null, content: @Composable () -> Unit) {
+private fun SectionContent(
+    section: String,
+    ins: Insights,
+    data: FirewatchData,
+    now: Long,
+    tz: TimeZone,
+    onSettings: (transform: (com.baastiklabs.firewatch.core.model.Settings) -> com.baastiklabs.firewatch.core.model.Settings) -> Unit,
+    onStepDown: (Double) -> Unit,
+) {
+            when (section) {
+                "Today" -> TodaySection(ins, data, now, onSettings)
+                "Cravings ahead" -> CravingsAheadSection(data, now, tz)
+                "Receptors" -> ReceptorSection(ins, data, now, tz)
+                "Stretch & pull" -> StretchSection(ins)
+                "Trends" -> TrendsSection(ins, data, now, tz)
+                "Patterns" -> PatternsSection(ins, data, tz)
+                "Gaps & spacing" -> GapsSection(ins, data)
+                "Amounts & peaks" -> AmountsSection(ins, data, now)
+                "Mix" -> MixSection(ins)
+                "Forecasts" -> ForecastSection(ins, data, now, onStepDown)
+                "Milestones" -> MilestonesSection(ins, now)
+                "Ladder" -> LadderSection(data, now, tz)
+            }
+}
+
+/** The card at the top of Favourites: one plain fact per starred chart. */
+@Composable
+private fun FavouritesFacts(data: FirewatchData, now: Long, tz: TimeZone) {
+    val facts = remember(data, now / 600_000) { com.baastiklabs.firewatch.core.engine.Favourites.facts(data, now, tz) }
+    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer), shape = RoundedCornerShape(20.dp)) {
+        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text("Your favourites", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            if (com.baastiklabs.firewatch.core.engine.Favourites.ids(data).isEmpty()) {
+                Text("Tap ☆ on any chart to add it here.", style = MaterialTheme.typography.bodyMedium)
+            } else if (facts.isEmpty()) {
+                Text("Facts appear here once there's a full day logged.", style = MaterialTheme.typography.bodyMedium)
+            } else facts.forEach { Text(it.text, style = MaterialTheme.typography.bodyMedium) }
+        }
+    }
+}
+
+@Composable
+fun ChartCard(title: String, subtitle: String? = null, favId: String? = null, content: @Composable () -> Unit) {
+    val id = (favId ?: com.baastiklabs.firewatch.core.engine.Favourites.charts.firstOrNull { it.title == title }?.id)?.takeIf { it.isNotEmpty() }
+    val fav = LocalFav.current
+    if (fav.only != null && (id == null || id !in fav.only)) return
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer), shape = RoundedCornerShape(20.dp)) {
         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                if (id != null) {
+                    val on = id in fav.starred
+                    androidx.compose.material3.IconButton(
+                        onClick = { fav.toggle(id) },
+                        modifier = Modifier.semantics { contentDescription = if (on) "Remove $title from favourites" else "Add $title to favourites" },
+                    ) {
+                        Text(if (on) "★" else "☆", style = MaterialTheme.typography.titleLarge, color = if (on) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
             subtitle?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
             content()
         }
@@ -187,7 +257,7 @@ private fun TodaySection(
     val date = today.minus(back, kotlinx.datetime.DateTimeUnit.DAY)
     val w = remember(ins, date) { ins.days.firstOrNull { it.date == date } ?: ins.dayStat(date) }
     val oldest = ins.days.first().date
-    Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+    if (shown("wave", "strip")) Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
         androidx.compose.material3.TextButton(onClick = { back++ }, enabled = date > oldest) { Text("‹") }
         Text(
             when (back) { 0 -> "Today"; 1 -> "Yesterday"; else -> Fmt.dayTitle(java.time.LocalDate.of(date.year, date.monthNumber, date.dayOfMonth)) },
@@ -239,13 +309,6 @@ private fun TodaySection(
             Triple((t.hour * 60 + t.minute) / 1440f, data.piecesOf(d), kindColor(d.kind))
         })
     }
-    ChartCard(if (back == 0) "Today so far" else "That day") {
-        Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
-            Stat("≈ ${Fmt.pieces(w.pieces)}", "pieces")
-            Stat(fmt1(w.clearHours) + " h", "clear hours")
-            Stat("${w.doses.size}", if (w.doses.size == 1) "dose" else "doses")
-        }
-    }
 }
 
 /** Yesterday's waking day in facts only; up to two tips with Coaching tips on. */
@@ -253,7 +316,13 @@ private fun TodaySection(
 private fun YesterdayCard(data: FirewatchData, now: Long) {
     val tz = TimeZone.currentSystemDefault()
     val r = remember(data, now / 600_000) { com.baastiklabs.firewatch.core.engine.Coaching.yesterday(data, now, tz) } ?: return
-    ChartCard("Yesterday in review", "Facts only · every figure is an estimate") {
+    DayReviewCard("Yesterday in review", r)
+}
+
+/** A day's facts (Insights → Yesterday in review, and each past day in the calendar). */
+@Composable
+fun DayReviewCard(title: String, r: com.baastiklabs.firewatch.core.engine.DayReview) {
+    ChartCard(title, "Facts only · every figure is an estimate", favId = if (title == "Yesterday in review") "review" else "") {
         Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
             Stat("≈ ${Fmt.pieces(r.pieces)}", "pieces")
             r.netMin?.let { Stat(Fmt.signedMinutes(it), "net") }
@@ -312,11 +381,12 @@ private fun CravingsAheadSection(data: FirewatchData, now: Long, tz: TimeZone) =
 }
 
 @Composable
-private fun ReceptorSection(data: FirewatchData, now: Long, tz: TimeZone) = Col {
+private fun ReceptorSection(ins: Insights, data: FirewatchData, now: Long, tz: TimeZone) = Col {
     val day = now / 86_400_000L
     val o = remember(data, day) { com.baastiklabs.firewatch.core.engine.Receptors.outlook(data, now, tz) }
     if (o == null) {
         ChartCard("Receptors", "Appears after your first full day of logging.") {}
+        BackgroundCard(ins)
         return@Col
     }
     val history = o.history.takeLast(90)
@@ -352,6 +422,16 @@ private fun ReceptorSection(data: FirewatchData, now: Long, tz: TimeZone) = Col 
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+    }
+    BackgroundCard(ins)
+}
+
+@Composable
+private fun BackgroundCard(ins: Insights) {
+    val bg = ins.backgroundSeries().takeLast(90)
+    if (bg.size < 2) return
+    ChartCard("Background level", "A slow line modelled on cotinine, nicotine's breakdown product. It drifts down even through messy days.") {
+        TrendLine(bg.map { it.second }, yFmt = mgs, xLabels = kdates(bg.map { it.first }))
     }
 }
 
@@ -404,7 +484,7 @@ private fun TrendsSection(ins: Insights, data: FirewatchData, now: Long, tz: Tim
         val known = states.count { it.second.known }
         val measured = Progress.measuredRung(data, now.localDate(tz), tz)
         val known7 = Progress.knownDays(data, now.localDate(tz), tz)
-        ChartCard("$known of ${states.size} days known", "One dot per day: filled = logged, 🌿 = clear, ? = nothing logged, 👻 = left out. Only known days count in your figures.") {
+        ChartCard("$known of ${states.size} days known", favId = "known", subtitle = "One dot per day: filled = logged, 🌿 = clear, ? = nothing logged, 👻 = left out. Only known days count in your figures.") {
             Row(horizontalArrangement = Arrangement.spacedBy(2.dp), modifier = Modifier.fillMaxWidth()) {
                 states.forEach { (_, st) ->
                     Text(
@@ -468,32 +548,7 @@ private fun TrendsSection(ins: Insights, data: FirewatchData, now: Long, tz: Tim
 
 @Composable
 private fun PatternsSection(ins: Insights, data: FirewatchData, tz: TimeZone) = Col {
-    val gaps = ins.gapSizes()
-    if (gaps.any { it.second > 0 }) ChartCard("Gap sizes", "Time between pieces over your last 30 known days. Longer gaps are spacing at work.") {
-        BarChart(gaps.map { Bar(it.second.toDouble()) }, yFmt = num, xLabels = gaps.map { it.first })
-    }
-    val shape = ins.weekShape()
-    if (shape.any { it.second > 0 }) ChartCard("Week shape", "Average pieces by weekday, last 8 weeks.") {
-        BarChart(shape.map { Bar(it.second) }, yFmt = num, xLabels = shape.map { it.first })
-    }
-    val fp = ins.firstPieceWeekdaysVsWeekends()
-    if (fp.size > 1) ChartCard("First piece: weekdays vs weekends", "Minutes from waking to the first piece, week by week. Weekdays orange, weekends teal.") {
-        TrendLine(fp.map { it.second ?: 0.0 }, second = fp.map { it.third ?: 0.0 }, secondColor = MaterialTheme.colorScheme.tertiary, yFmt = { "${fmtNum(it)}m" }, xLabels = kdates(fp.map { it.first }))
-    }
-    ChartCard("When it happens", "Hour of day across, Monday to Sunday down. Brighter = more.") { Heatmap(ins.heatmap()) }
-    val endings = ins.cravingEndings()
-    ChartCard(
-        "How cravings ended",
-        "Last 2 weeks. Riding it out and waiting for the right time both count as wins. Worked out from your logs: a piece within 45 minutes is linked to the craving.",
-    ) {
-        if (endings.isEmpty()) Text("Log cravings with \"Craving? Log it\" and this fills in.", style = MaterialTheme.typography.bodySmall)
-        else {
-            val max = endings.values.max()
-            endings.entries.sortedBy { it.key.ordinal }.forEach { (r, n) ->
-                BarRow((if (r.win) "✓ " else "") + r.title, n.toFloat() / max, "$n")
-            }
-        }
-    }
+    ChartCard("Heatmap", "When you use nicotine: hour of day across, Monday to Sunday down. Brighter = more.") { Heatmap(ins.heatmap()) }
     if (data.settings.hideTimer || data.timerChecks.isNotEmpty()) {
         val today = ins.today
         val h = com.baastiklabs.firewatch.core.engine.Checks.history(data, today, tz, 42)
@@ -518,28 +573,13 @@ private fun PatternsSection(ins: Insights, data: FirewatchData, tz: TimeZone) = 
             Text("Latest: ${Fmt.duration((ttf.last() * 60_000).toLong())}", style = MaterialTheme.typography.bodySmall)
         }
     }
-    val triggers = ins.triggerCounts()
-    ChartCard("Triggers", "Tags that show up most around doses.") {
-        if (triggers.isEmpty()) Text("Hold a product button to tag what was going on.", style = MaterialTheme.typography.bodySmall)
-        val max = triggers.maxOfOrNull { it.second } ?: 1
-        triggers.forEach { (tag, n) -> BarRow(tag, n.toFloat() / max, "$n") }
-    }
-    ChartCard("Comparisons") {
-        val cs = ins.comparisons()
-        if (cs.isEmpty()) Text("Needs two weeks of logs.", style = MaterialTheme.typography.bodySmall)
-        cs.forEach { c -> Text("${c.label}: ≈ ${Fmt.pieces(c.a)} vs ${Fmt.pieces(c.b)}", style = MaterialTheme.typography.bodyMedium) }
-    }
 }
 
 @Composable
-private fun GoingUpSection(ins: Insights, data: FirewatchData) = Col {
+private fun GapsSection(ins: Insights, data: FirewatchData) = Col {
     val lg = ins.longestGaps().win()
     if (lg.size > 1) ChartCard("Longest gap each day", "The day's biggest stretch between pieces.") {
         BarChart(lg.map { Bar((it.second ?: 0.0) / 60) }, yFmt = hrs, xLabels = kdates(lg.map { it.first }))
-    }
-    val cw = ins.cravingStrengthWeekly()
-    if (cw.size > 1) ChartCard("Craving strength over time", "Average strength of the cravings you logged, week by week (1–10). It usually fades as receptors settle.") {
-        TrendLine(cw.map { it.second }, color = MaterialTheme.colorScheme.tertiary, yFmt = num, top = 10.0, xLabels = kdates(cw.map { it.first }))
     }
     val days = ins.fullDays.win()
     val tz = TimeZone.currentSystemDefault()
@@ -572,47 +612,16 @@ private fun GoingUpSection(ins: Insights, data: FirewatchData) = Col {
             Text("Latest: ${Fmt.duration((overnight.last().second * 60_000).toLong())}", style = MaterialTheme.typography.bodySmall)
         }
     }
-    ChartCard("Wins") {
-        Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
-            Stat("≈ ${Fmt.pieces(ins.piecesAvoided())}", "pieces avoided")
-            Stat("≈ ${fmt1(ins.mgAvoided())} mg", "nicotine avoided")
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
-            Stat(ins.cravingWinRate()?.let { "${(it * 100).roundToInt()}%" } ?: "–", "craving win rate")
-        }
-        if (!ins.baselineComplete) Text("Avoided figures start after your baseline week.", style = MaterialTheme.typography.bodySmall)
-    }
-    val saved = ins.moneySaved()
-    val s = data.settings
-    ChartCard("Money saved", "Compared with your baseline spending. Set prices in Settings → Products.") {
-        Text("${s.currency}${String.format(Locale.getDefault(), "%.2f", saved)}", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-        ins.packsNotBought()?.let { (packs, name) -> Text("≈ ${fmt1(packs)} packs of $name not bought", style = MaterialTheme.typography.bodySmall) }
-        if (s.rewardCost > 0) {
-            LinearProgressIndicator(progress = { (saved / s.rewardCost).toFloat().coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth())
-            Text("Toward ${s.rewardName.ifBlank { "your reward" }}: ${(saved / s.rewardCost * 100).roundToInt().coerceAtMost(100)}%", style = MaterialTheme.typography.bodySmall)
-        }
-    }
-    val beaten = ins.beatenTriggers()
-    ChartCard("Beaten triggers", "Of each trigger's last 10 appearances, how many passed without nicotine (from tagged cravings).") {
-        if (beaten.isEmpty()) Text("Tag a craving (coffee, stress…) while riding it out to fill this in.", style = MaterialTheme.typography.bodySmall)
-        beaten.forEach { (tag, won, total) -> BarRow(tag, won.toFloat() / total, "$won of $total without") }
-    }
 }
 
 @Composable
-private fun GoingDownSection(ins: Insights, data: FirewatchData, now: Long) = Col {
+private fun AmountsSection(ins: Insights, data: FirewatchData, now: Long) = Col {
     val peaks = remember(data, now / 600_000) { ins.dailyPeaks() }.win()
     if (peaks.size > 1) ChartCard("Daily peak", "Each day's highest estimated nicotine level, with a 7-day average line. Lower peaks mean gentler highs.") {
         val v = peaks.map { it.second }
         BarChart(v.map { Bar(it) }, line = v.indices.map { i -> v.subList(maxOf(0, i - 6), i + 1).average() }, yFmt = mgs, xLabels = kdates(peaks.map { it.first }))
     }
     val days = ins.fullDays.win()
-    ChartCard("Average dose size", "Absorbed mg per dose. Catches moves like 6 mg to 3 mg.") {
-        TrendLine(days.map { if (it.doses.isEmpty()) 0.0 else it.absorbedMg / it.doses.size }, yFmt = mgs, xLabels = dates(days))
-    }
-    ChartCard("Spike share", "Share of nicotine arriving as fast spikes (vapes). Shrinking is real progress.") {
-        TrendLine(days.map { if (it.absorbedMg > 0) it.spikeMg / it.absorbedMg * 100 else 0.0 }, yFmt = pct, top = 100.0, xLabels = dates(days))
-    }
     val quality = days.map { it.quality ?: 100.0 }
     ChartCard("Nicotine quality", "How you use nicotine, on a food scale. Gum, lozenges and patches are broccoli; smoke is burger and fries. Switching method raises it; using a vape less doesn't.") {
         TrendLine(quality, color = MaterialTheme.colorScheme.tertiary, yFmt = num, top = 100.0, xLabels = dates(days))
@@ -621,40 +630,6 @@ private fun GoingDownSection(ins: Insights, data: FirewatchData, now: Long) = Co
         Quality.Food.entries.forEach { f -> Text("${f.emoji} ${f.title}: ${f.min}+", style = MaterialTheme.typography.bodySmall) }
         Text("Per dose: gum, lozenge, patch 100 · pouch 60 · vape 25 · cigarette 5 (max 10). Minus points for a big single dose and for stacking doses.",
             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    }
-    ChartCard("Heaviness score", "From how soon after waking you use and how much per day, the two things dependence tests weight most (0–6).") {
-        val weekly = ins.fullDays.chunked(7).mapNotNull { ins.heaviness(it) }
-        TrendLine(weekly, yFmt = num, top = 6.0, xLabels = weekly.indices.map { "Wk ${it + 1}" })
-        ins.heaviness()?.let { Text("Last 7 days: ${fmt1(it)} of 6", style = MaterialTheme.typography.bodyMedium) }
-    }
-    ChartCard("Background level", "A slow line modelled on cotinine, nicotine's breakdown product. It drifts down even through messy days.") {
-        val bg = ins.backgroundSeries().win()
-        TrendLine(bg.map { it.second }, yFmt = mgs, xLabels = kdates(bg.map { it.first }))
-    }
-    ChartCard("Double-ups", "Doses stacked while the last one was still peaking, per week.") {
-        val du = ins.doubleUpsPerWeek()
-        TrendLine(du.map { it.second.toDouble() }, yFmt = num, xLabels = kdates(du.map { it.first }))
-    }
-    ChartCard("Cravings vs doses", "Urges (teal) and doses (orange) per day. Ideally urges fade as doses drop.") {
-        TrendLine(days.map { it.doses.size.toDouble() }, second = days.map { it.cravings.toDouble() }, secondColor = MaterialTheme.colorScheme.tertiary, yFmt = num, xLabels = dates(days))
-    }
-    val coach = remember(data) { Coach.profile(data, now) }
-    ChartCard("What you can ride out", "Personal: the strongest craving level you usually beat, learned from your logs.") {
-        Text(
-            if (coach.confident) "You reliably ride out cravings up to about ${coach.capacity} out of 10."
-            else "Log about ${8 - coach.cravingsCounted.coerceAtMost(8)} more cravings (and whether they passed) to personalise this.",
-            style = MaterialTheme.typography.bodyMedium,
-        )
-        coach.levels.filter { it.total > 0 }.forEach { BarRow("Level ${it.level}", it.rate.toFloat(), "${it.rodeOut} of ${it.total} beaten") }
-        Coach.honestPieces(data, now, TimeZone.currentSystemDefault())?.let {
-            Text("Honest level (use + strong unmet cravings): ${Ladder.measured(it).label}", style = MaterialTheme.typography.bodySmall)
-        }
-    }
-    if (data.checkIns.size >= 2) {
-        ChartCard("Daily check-in", "Craving strength (orange) and mood (teal), 1–5.") {
-            val last = data.checkIns.win()
-            TrendLine(last.map { it.craving.toDouble() }, second = last.map { it.mood.toDouble() }, secondColor = MaterialTheme.colorScheme.tertiary, yFmt = num, top = 5.0)
-        }
     }
 }
 
@@ -678,20 +653,6 @@ private fun MixSection(ins: Insights) = Col {
                 }
             }
         }
-    }
-    val label = ins.days.sumOf { it.labelMg }
-    val absorbed = ins.days.sumOf { it.absorbedMg }
-    ChartCard("Label vs absorbed", "What the packaging says versus what reached your blood (est.).") {
-        Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
-            Stat("${label.roundToInt()} mg", "on the labels")
-            Stat("≈ ${absorbed.roundToInt()} mg", "absorbed")
-        }
-        TrendLine(ins.days.win().map { it.labelMg }, second = ins.days.win().map { it.absorbedMg }, yFmt = mgs, xLabels = dates(ins.days.win()))
-    }
-    val borrowed = ins.days.sumOf { it.borrowedPieces }
-    val total = ins.days.sumOf { it.pieces }.coerceAtLeast(0.001)
-    ChartCard("Borrowed share", "Nicotine from other people's products.") {
-        Text("${(borrowed / total * 100).roundToInt()}% (≈ ${Fmt.pieces(borrowed)} pieces)", style = MaterialTheme.typography.titleMedium)
     }
 }
 
@@ -743,9 +704,9 @@ private fun ForecastSection(ins: Insights, data: FirewatchData, now: Long, onSte
             }
         }
     }
-    ChartCard("Journey to Clear Air", "From your baseline to nicotine-free.") {
+    ChartCard("Journey to Clear Air", "Rungs stepped down from the heaviest level you've worked at, out of all the rungs to Clear Air.") {
         val j = ins.journey()
-        if (j == null) Text("Starts after your baseline week.", style = MaterialTheme.typography.bodySmall)
+        if (j == null) Text("Starts once you have a level.", style = MaterialTheme.typography.bodySmall)
         else {
             Text("${(j * 100).roundToInt()}%", style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
             LinearProgressIndicator(progress = { j.toFloat() }, modifier = Modifier.fillMaxWidth())
@@ -759,14 +720,7 @@ private fun ForecastSection(ins: Insights, data: FirewatchData, now: Long, onSte
         val arrivals = ins.arrivals()
         if (arrivals.isEmpty()) Text("Needs a steady trend first.", style = MaterialTheme.typography.bodySmall)
         arrivals.forEach { f ->
-            Text("${f.rung.tier.title}: ${f.date?.let { if (it <= ins.today) "reached" else Fmt.shortDateK(it) } ?: "not at this pace yet"}", style = MaterialTheme.typography.bodyMedium)
-        }
-    }
-    if (ins.baselineComplete && ins.fullDays.size > ins.baselineDays.size + 3) {
-        val then = ins.typicalCurve(ins.baselineDays)
-        val nowC = ins.typicalCurve(ins.lastDays(7))
-        ChartCard("Then vs now", "Your average baseline day (grey) over your average day now.") {
-            TrendLine(nowC, second = then, yFmt = mgs, xLabels = (0 until 48).map { Fmt.hourLabel(it / 2) })
+            Text("${f.rung.tier.title}: ${f.date?.let { if (it <= ins.today) "reached" else Fmt.shortDateK(it) } ?: "not unlocked yet"}", style = MaterialTheme.typography.bodyMedium)
         }
     }
 }
@@ -779,17 +733,6 @@ private fun MilestonesSection(ins: Insights, now: Long) = Col {
             java.time.YearMonth.parse(m.first).month.getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.getDefault())
         })
     }
-    val r = ins.records()
-    ChartCard("Records") {
-        Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
-            Stat(Fmt.duration((r.longestGapMin * 60_000).toLong()), "longest gap")
-            Stat(r.lightestDay?.let { "≈ ${Fmt.pieces(it.pieces)}" } ?: "–", "lightest day")
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
-            Stat(Fmt.duration((r.totalStretchMin * 60_000).toLong()), "total stretch time")
-            Stat("${r.daysAtCurrentRung}", "days at this rung")
-        }
-    }
     ChartCard("Insights") {
         ins.insightCards().forEach { Text("• $it", style = MaterialTheme.typography.bodyMedium) }
     }
@@ -800,7 +743,7 @@ private fun MilestonesSection(ins: Insights, now: Long) = Col {
     }
     var recapKey by rememberSaveable { mutableStateOf("") }
     val months = ins.months()
-    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+    if (shown("recap")) Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         months.forEachIndexed { i, (y, m) ->
             val key = "$y-$m"
             FilterChip(selected = recapKey == key || (recapKey.isEmpty() && i == 0), onClick = { recapKey = key },
@@ -816,7 +759,7 @@ private fun MilestonesSection(ins: Insights, now: Long) = Col {
         else -> months.firstOrNull()?.let { ins.monthlyRecap(it.first, it.second) }
     }
     recap?.let { rc ->
-        ChartCard(if (rc.month.contains("review")) rc.month else "${rc.month} recap") {
+        ChartCard(if (rc.month.contains("review")) rc.month else "${rc.month} recap", favId = "recap") {
             Text("≈ ${Fmt.pieces(rc.pieces)} pieces", style = MaterialTheme.typography.bodyMedium)
             rc.biggestWeeklyDropPct?.let { Text("Biggest weekly drop: ${it.roundToInt()}%", style = MaterialTheme.typography.bodyMedium) }
             Text("Longest gap: ${Fmt.duration((rc.longestGapMin * 60_000).toLong())}", style = MaterialTheme.typography.bodyMedium)
@@ -824,19 +767,6 @@ private fun MilestonesSection(ins: Insights, now: Long) = Col {
             Text("Cravings ridden out: ${rc.cravingsRidden}", style = MaterialTheme.typography.bodyMedium)
             if (rc.rungsReached.isNotEmpty()) Text("Rungs reached: ${rc.rungsReached.joinToString()}", style = MaterialTheme.typography.bodyMedium)
         }
-    }
-    ChartCard("Day barcode", "Each day a strip, stacked by month: dark where nicotine was in your system, light where clear. Watch the light spread.") {
-        ins.days.groupBy { it.date.year to it.date.monthNumber }.entries.toList().takeLast(4).forEach { (ym, ds) ->
-            Text(java.time.Month.of(ym.second).getDisplayName(java.time.format.TextStyle.FULL, Locale.getDefault()) + " ${ym.first}",
-                style = MaterialTheme.typography.labelMedium)
-            DayBarcode(ds.map { it.barcode })
-        }
-    }
-    val silly = ins.silly()
-    ChartCard("Silly conversions") {
-        Text("≈ ${silly.pouchesSkipped.roundToInt()} pouches skipped, ${fmt1(silly.pouchLengthMetres)} m laid end to end", style = MaterialTheme.typography.bodyMedium)
-        Text("≈ ${fmt1(silly.chewingHoursAvoided)} hours of chewing avoided", style = MaterialTheme.typography.bodyMedium)
-        Text("≈ ${silly.cigarettesNotSmoked.roundToInt()} cigarettes' worth of nicotine not taken in", style = MaterialTheme.typography.bodyMedium)
     }
     val (last, steps) = ins.clearAirTimeline()
     if (last != null && now - last > 6 * 3_600_000L) {

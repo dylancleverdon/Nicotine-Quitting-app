@@ -53,6 +53,11 @@ object Coaching {
         val (day, _) = BatteryEngine.currentDay(data, now, tz)
         val date = day.date.minus(1, DateTimeUnit.DAY)
         if (data.doses.none { it.at < day.wakeAt }) return null
+        return review(data, date, now, tz)
+    }
+
+    /** The same facts for any past day (the calendar's day screen). Null with no doses that day. */
+    fun review(data: FirewatchData, date: LocalDate, now: Long, tz: TimeZone): DayReview? {
         val stat = Insights(data, tz, now).dayStat(date)
         if (stat.doses.isEmpty()) return null
         val total = stat.kindPieces.values.sum()

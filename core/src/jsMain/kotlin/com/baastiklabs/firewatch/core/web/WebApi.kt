@@ -184,6 +184,8 @@ external object JsJodaTimeZoneModule
     /** Coaching tip for the Log tab (id, text), or null. */
     val tip: NamedValue?,
     val yesterday: ReviewDto?,
+    /** Insights → Favourites card: label = chart id, extra = the fact. */
+    val favourites: List<NamedValue> = emptyList(),
     val steadyExplainer: String,
     val netExplainer: String,
     val practice: PracticeDto,
@@ -373,10 +375,8 @@ object FirewatchCore {
             steadyDays = steady,
             morningStretch = com.baastiklabs.firewatch.core.engine.BatteryEngine.morningStretch(d, now, tz)?.takeIf { target != null },
             tip = com.baastiklabs.firewatch.core.engine.Coaching.bridgeTip(d, target?.pieces?.let { if (it > 0) it else 1.0 / 3.0 }, now, tz, lastActivityMs.toLong())?.let { NamedValue(it.id, 0.0, it.text) },
-            yesterday = com.baastiklabs.firewatch.core.engine.Coaching.yesterday(d, now, tz)?.let { r ->
-                ReviewDto(r.date.toString(), r.pieces, r.netMin, r.volatility, r.mix.map { NamedValue(com.baastiklabs.firewatch.core.engine.Coaching.kindName(it.first), it.second) },
-                    r.longestGapMin, r.stacked, r.morningStretchMin, r.tips)
-            },
+            yesterday = com.baastiklabs.firewatch.core.engine.Coaching.yesterday(d, now, tz)?.let { reviewDto(it) },
+            favourites = com.baastiklabs.firewatch.core.engine.Favourites.facts(d, now, tz).map { NamedValue(it.id, 0.0, it.text) },
             practice = run {
                 val P = com.baastiklabs.firewatch.core.engine.Practice
                 val st = P.status(d, now, tz)
@@ -492,6 +492,14 @@ object FirewatchCore {
         return FirewatchJson.encodeToString(Snapshot.serializer(), snapshot)
     }
 
+    private fun reviewDto(r: com.baastiklabs.firewatch.core.engine.DayReview) =
+        ReviewDto(r.date.toString(), r.pieces, r.netMin, r.volatility, r.mix.map { NamedValue(com.baastiklabs.firewatch.core.engine.Coaching.kindName(it.first), it.second) },
+            r.longestGapMin, r.stacked, r.morningStretchMin, r.tips)
+
+    /** Charts that can be starred: label = id, extra = "title|section". */
+    fun favouriteCharts(): String = FirewatchJson.encodeToString(ListSerializer(NamedValue.serializer()),
+        com.baastiklabs.firewatch.core.engine.Favourites.charts.map { NamedValue(it.id, 0.0, it.title + "|" + it.section) })
+
     /** Full day details for the calendar's day view. */
     fun day(recordsJson: String, dayIso: String, nowMs: Double): String {
         val d = data(recordsJson)
@@ -520,10 +528,11 @@ object FirewatchCore {
         @Serializable data class DayDetail(
             val doses: List<DoseView>, val cravings: List<CravingView>, val wave: List<List<Double>>, val volatility: List<List<Double>>,
             val wakeAt: Double, val sleepAt: Double, val sleeps: List<NamedValue>, val levels: List<String>, val state: String,
-            val pieces: Double, val mg: Double,
+            val pieces: Double, val mg: Double, val review: ReviewDto?,
         )
         return FirewatchJson.encodeToString(DayDetail.serializer(), DayDetail(doses, cravings, wave, vol, w.wakeAt.toDouble(), w.sleepAt.toDouble(),
-            sleeps, levels, state, doses.sumOf { it.pieces }, doses.sumOf { it.mg }))
+            sleeps, levels, state, doses.sumOf { it.pieces }, doses.sumOf { it.mg },
+            if (date < dayIns.today) com.baastiklabs.firewatch.core.engine.Coaching.review(d, date, nowMs.toLong(), tz)?.let { reviewDto(it) } else null))
     }
 
     /** The cheer: was this dose taken with a full battery (and not the day's first)? */

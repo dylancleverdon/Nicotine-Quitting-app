@@ -1194,4 +1194,29 @@ class EngineTest {
         val peaks = Insights(data, tz, at(11, 12)).dailyPeaks().toMap()
         assertTrue(peaks[kotlinx.datetime.LocalDate(2026, 9, 10)]!! > peaks[kotlinx.datetime.LocalDate(2026, 9, 9)]!!)
     }
+
+    @Test
+    fun journeyCountsRungsSteppedDownFromHeaviestLevel() {
+        val d = FirewatchData(products = DefaultProducts.all(), rungChanges = listOf(
+            RungChange("a", at(1, 8), 8.0, "start"), RungChange("b", at(3, 8), 9.0, "up"),
+            RungChange("c", at(6, 8), 8.0, "down"), RungChange("e", at(9, 8), 7.0, "down"),
+        ))
+        val j = Insights(d, tz, at(10, 12)).journey()!!
+        // Heaviest 9 a day; 9 → 7 is 2 of the 9 rungs (8..1, ½, ⅓ and Clear Air = 11 steps).
+        val span = Ladder.rungs.size - Ladder.rungs.indexOfFirst { it.pieces == 9.0 }
+        assertEquals(2.0 / span, j, 1e-9)
+        assertEquals(null, Insights(FirewatchData(products = DefaultProducts.all()), tz, at(10, 12)).journey())
+    }
+
+    @Test
+    fun favouritesFactsFollowStarredChartsInOrder() {
+        val doses = dosesOn(2..8, 4)
+        val base = withTarget(doses)
+        assertEquals(emptyList<Any>(), com.baastiklabs.firewatch.core.engine.Favourites.facts(base, at(9, 12), tz))
+        val starred = base.copy(settings = base.settings.copy(favouriteCharts = listOf("longestgap", "nope", "strip")))
+        val facts = com.baastiklabs.firewatch.core.engine.Favourites.facts(starred, at(9, 12), tz)
+        assertEquals(listOf("strip", "longestgap"), facts.map { it.id })
+        assertEquals("Doses yesterday: 4", facts[0].text)
+        assertEquals(listOf("a"), com.baastiklabs.firewatch.core.engine.Favourites.toggle(listOf("a", "b"), "b"))
+    }
 }

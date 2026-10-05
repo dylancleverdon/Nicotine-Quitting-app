@@ -151,6 +151,8 @@ data class Settings(
     val movingOnDismissedAt: Long = 0,
     /** The first-launch welcome tour has been seen. */
     val tourSeen: Boolean = false,
+    /** Insights → Favourites: starred chart ids (see engine/Favourites.kt). */
+    val favouriteCharts: List<String> = emptyList(),
     /** Opt-in "Hide next piece timer": the time shows only on a tap, and each tap is counted. */
     val hideTimer: Boolean = false,
     /** "Welcome back" was answered (back-dated or "Not now") at this time. */

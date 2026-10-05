@@ -1,7 +1,7 @@
 {
   "name": "firewatch-web",
   "private": true,
-  "version": "0.13.0",
+  "version": "0.14.0",
   "type": "module",
   "description": "Firewatch by Baastik Labs: web app (iPhone and computers). Logs stay on the device.",
   "scripts": {

@@ -4,12 +4,16 @@ import { Core } from '../core'
 import * as S from '../store'
 import { heatColor, onHeatColor } from '../theme'
 import { EditDoseSheet, doseLine } from './Sheets'
-import { dayTitle, isoToday, mg, pieces, piecesLabel, time } from './format'
+import { dayTitle, duration, isoToday, mg, pieces, piecesLabel, signedDuration, time } from './format'
+
+// The month being viewed, kept for 10 minutes after the calendar was last used.
+const memory = { month: null as string | null, at: 0 }
 
 export function Calendar({ toast }: { toast: (m: string, undo?: () => void) => void }) {
   const snap = S.snapshot.value!
   const today = isoToday()
-  const [month, setMonth] = useState(today.slice(0, 7))
+  const [month, setMonth] = useState(memory.month && Date.now() - memory.at < 600000 ? memory.month : today.slice(0, 7))
+  memory.month = month; memory.at = Date.now()
   const [open, setOpen] = useState<string | null>(null)
   const byDate = new Map(snap.days.map((d) => [d.date, d]))
   const first = snap.days[0]?.date
@@ -72,6 +76,14 @@ function DayView({ iso, back, toast }: { iso: string; back: () => void; toast: (
       <div class="row"><button class="btn text" onClick={back}>‹ Back</button><h2>{dayTitle(iso)}</h2></div>
       <div class="stats"><div class="stat"><b>≈ {pieces(detail.pieces)}</b><span>pieces</span></div><div class="stat"><b>≈ {mg(detail.mg)}</b><span>absorbed</span></div>
         <div class="stat small"><b>{detail.doses.length}</b><span>doses</span></div><div class="stat small"><b>{detail.cravings.filter((c) => c.outcome === 'RODE_OUT').length} of {detail.cravings.length}</b><span>cravings ridden out</span></div></div>
+      {detail.review && (() => { const r = detail.review; return <div class="card soft"><h3>In review</h3><div class="muted">Facts only · every figure is an estimate</div>
+        <div class="stats">{r.netMin != null && <div class="stat small"><b>{signedDuration(r.netMin)}</b><span>net</span></div>}<div class="stat small"><b>≈ {r.volatility.toFixed(1)} mg/h</b><span>volatility</span></div></div>
+        <div class="small">
+          {r.mix.length > 0 && <div>Mix: {r.mix.map((m) => `${Math.round(m.value * 100)}% ${m.label}`).join(', ')}</div>}
+          {r.longestGapMin != null && <div>Longest gap between pieces: {duration(r.longestGapMin * 60000)}</div>}
+          <div>Doses stacked while the last one was still peaking: {r.stacked}</div>
+          {r.morningStretchMin != null && <div>Morning stretch: {duration(r.morningStretchMin * 60000)}</div>}
+        </div>{r.tips.map((t) => <div class="small tip">💡 {t}</div>)}</div> })()}
       {detail.levels.map((l) => <div class="small" style={{ color: 'var(--primary)' }}>Level: {l}</div>)}
       <div class="list">
         {detail.doses.map((d) => <div class="item" onClick={() => setEditing(d.id)}><div>{d.name}<br /><span>{doseLine(d)}</span></div><b>{piecesLabel(d.pieces)}</b></div>)}

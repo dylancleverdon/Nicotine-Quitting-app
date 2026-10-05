@@ -462,12 +462,21 @@ class Insights(private val data: FirewatchData, private val tz: TimeZone, privat
         }
     }
 
-    /** 0..1 from baseline to Clear Air. */
+    /**
+     * 0..1 down the ladder: rungs stepped down from the heaviest level D has worked at, out of the
+     * rungs between that level and Clear Air. Moves only when the level changes, so it always
+     * agrees with the step-down count. Null before any level is set.
+     */
     fun journey(): Double? {
-        val base = baselineAverage ?: return null
-        val current = lastDays(7).map { it.scaledPieces }.average().takeIf { !it.isNaN() } ?: return null
-        if (base <= 0) return 1.0
-        return ((base - current) / base).coerceIn(0.0, 1.0)
+        val changes = data.rungChanges
+        if (changes.isEmpty()) return null
+        fun index(p: Double): Int = if (p <= 0) Ladder.rungs.size
+            else Ladder.rungs.indexOfFirst { kotlin.math.abs(it.pieces - p) < 1e-6 }.let { if (it < 0) Ladder.rungs.indexOf(Ladder.rung(p)) else it }
+        val start = index(changes.maxOf { it.pieces })
+        val current = index(changes.last().pieces)
+        val span = Ladder.rungs.size - start
+        if (span <= 0) return 1.0
+        return ((current - start).toDouble() / span).coerceIn(0.0, 1.0)
     }
 
     // ---- Stretch & pull ----

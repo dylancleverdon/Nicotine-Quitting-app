@@ -20,29 +20,45 @@ object Help {
     val tour: List<Page> = listOf(
         Page(
             "Take control of your nicotine",
-            "Firewatch shows you where your nicotine use really is, helps keep it from creeping up, and, if you want, helps you cut down.\n\n" +
-                "Holding steady is a win. Cutting down is up to you.",
+            "Firewatch does three things, in this order:\n\n" +
+                "1. Finds where your nicotine use really is.\n" +
+                "2. Helps you keep it there, so it doesn't creep up.\n" +
+                "3. If you want, helps you taper down, one small step at a time.\n\n" +
+                "Holding steady is a win. Tapering is always your choice.",
         ),
         Page(
-            "Everything counts in pieces",
-            "One piece is what a 4 mg nicotine gum delivers. Pouches, vapes and cigarettes are converted into pieces, " +
-                "so everything adds up in one clear number.\n\nEvery number is an estimate, and it's labelled that way.",
+            "Logging takes one tap",
+            "Tap a product's button on the Log tab and it's logged at the current time. That's all most logs ever need.\n\n" +
+                "Holding a button opens extra details (time, amount, notes). You don't have to fill those in: " +
+                "they're only for the rare times something was different, like a dose you forgot to log earlier.\n\n" +
+                "Everything counts in pieces: one piece is about what a 4 mg nicotine gum delivers.",
         ),
         Page(
-            "Your real level, fast",
-            "You start at an early estimate of 8 pieces a day. As you log, it firms up to the level you're really at. " +
-                "If a day runs heavier, Firewatch offers a step up the same day: knowing where you really are comes first.",
+            "The battery: spacing your pieces",
+            "The battery under your level shows when your next piece fits your pace. When it's full, a piece fits. " +
+                "It's a guide, not a rule, and it starts fresh every morning.\n\n" +
+                "Waiting past a full battery earns stretch. A piece before it's full adds pull. " +
+                "Net is stretch minus pull.\n\n" +
+                "Aim for a net of zero or better. That's the key: it's how you keep control, and it's what makes tapering possible later.",
         ),
         Page(
-            "Your two tools",
-            "Spacing: the battery shows when your next piece fits your pace. It's a suggestion, not an order, and it starts fresh every morning.\n\n" +
-                "Net: whether you're ahead of or behind that pace today, counting both timing and dose size. " +
-                "Holding net at zero or better is how you stay in control.",
+            "Your level",
+            "You start at an early estimate of 8 pieces a day. As you log, Firewatch firms up the level you're really at. " +
+                "If a day runs heavier, it offers a step up the same day: knowing where you really are comes first.\n\n" +
+                "Levels are rungs on a ladder, one piece a day apart, with fire-themed names down to Clear Air (nicotine-free).",
         ),
         Page(
-            "A tool, not a judge",
-            "No red screens, no streaks that reset, no telling you off. Miss a few days? Just pick up where you left off.\n\n" +
-                "Clear Air (nicotine-free) is always within reach whenever you want it.",
+            "The bar at the top: tapering",
+            "The bar in the level card fills as you hold your level, counted in waking hours. " +
+                "When it's full, a step down to the next rung unlocks. It stays unlocked until you take it, " +
+                "and \"Stay here\" is always an option.\n\n" +
+                "Clear Air is always within reach whenever you want it.",
+        ),
+        Page(
+            "Explore when you like",
+            "Insights has charts and figures to look through in your own time. Star the ones you like and they gather in Favourites.\n\n" +
+                "No red screens, no streaks that reset, no telling you off. Every figure is an estimate. " +
+                "The ? button on the Log tab opens Help, which explains everything.",
         ),
     )
 
@@ -69,7 +85,7 @@ object Help {
         Article("sleep", HOW, "Use Good morning / Good night", "Tap Good morning when you get up and Good night when you go to bed. It's optional: without them, Firewatch uses your usual times from Settings. They make the battery and the day's figures more accurate."),
         Article("stepup", HOW, "Step up your taper", "In Settings, under your plan, tap \"Step back up a rung\". It's always allowed, and there's no penalty.\n\nThe Log tab also offers a step up, and says why, when today looks rough: pull reaching one full gap, several strong cravings (or two close together), more than a piece over today's target, lots of timer checks while the battery refills, or a craving that ended with a cigarette or vape. It also offers one when two or more of those have been building over the last 5 days. The point is to catch a rough patch before it becomes a relapse, and to find the level you're really at. \"I'm OK\" hides it until tomorrow."),
         Article("hidetimer", HOW, "Hide next piece timer", "Settings → Your plan → \"Hide next piece timer\" (off unless you turn it on). The Log tab then shows the battery bar with \"Tap to see your next piece time\"; a tap shows the time for 30 seconds.\n\nEach tap is counted. How often you check, especially while the battery is still refilling, is a useful signal: Insights → Patterns shows it, and it helps decide when to offer a step up or a step down."),
-        Article("cravingended", MEANS, "How cravings ended", "Log a craving with one tap, then put the app down: there's nothing to press afterwards. Firewatch works out how it ended from what you log in the next 45 minutes:\n\n✓ Rode it out: no piece.\n✓ Waited for the right time: a piece, but only once the battery was full (or on schedule in Relapse prevention mode).\nEarly: gum, a pouch or another product before the battery was full.\nRelapse: a cigarette or vape.\n\nThe first two count as wins. Insights → Patterns shows the last 2 weeks."),
+        Article("cravingended", MEANS, "How cravings ended", "Log a craving with one tap, then put the app down: there's nothing to press afterwards. Firewatch works out how it ended from what you log in the next 45 minutes:\n\n✓ Rode it out: no piece.\n✓ Waited for the right time: a piece, but only once the battery was full (or on schedule in Relapse prevention mode).\nEarly: gum, a pouch or another product before the battery was full.\nRelapse: a cigarette or vape.\n\nThe first two count as wins. Each day in the calendar lists its cravings and how they ended."),
         Article("backdate", HOW, "Add days you didn't log", "Calendar → pick the day → \"Add what you had\". Tap each thing you used that day, once per use. No times needed: Firewatch spreads them across your usual waking day. Want more accuracy? \"Add one at an exact time\" is there too.\n\nAfter a break of a couple of days or more, the Log tab says \"Welcome back\" and offers the same thing for each missed day. Back-dated doses count in your totals and level, not in timing stats."),
         Article("unknowndays", MEANS, "Days with nothing logged: ?, 🌿 and 👻", "Once a day is over, a day with nothing logged shows \"?\" on the calendar: Firewatch can't tell whether you had none or just didn't log. Until you say, it's left out of your figures (your level, Insights, steady days and the step-down count), so a forgotten day never flatters or hurts your numbers.\n\nTap the day on the calendar to choose: \"I had none\" makes it a clear day 🌿 (it counts as 0, and as a win), \"Add what you had\" back-dates it, and \"Don't log this day\" leaves it out for good 👻. Opening the app or logging a craving doesn't make a day clear: only \"I had none\" does."),
         Article("lighter", MEANS, "\"Your logs measure…\" and working from your measured level", "When your last 7 days measure two or more levels lighter than the one you're working at, Firewatch may offer to practice that pace (only a hold period after your last level change, with at least 6 of the last 7 days known). Practicing is just practice: you can stop any time and go back to your usual pace, with no step down.\n\nOnce practice pace at that level has covered at least 75% of your hold period's waking hours, with practice net at zero or better, Firewatch offers to work from that level instead: a more accurate level, not a taper step. Your step-down count then starts again. Turn these offers off in Settings → Your plan, or tick \"Don't ask me again\"."),
@@ -80,7 +96,7 @@ object Help {
         Article("travel", HOW, "Travelling and time zones", "When your phone's time zone changes, the Log tab asks once whether to use your usual day (say 8 AM–11 PM) in local time. \"Yes, use local time\" switches from your next wake-up; past days never move. \"Keep my home times\" leaves everything on home time. The travel day itself counts exactly what you had, like any day. Coming home, the same question switches you back. Clock changes for daylight saving are handled on their own."),
         Article("watch", HOW, "Watch data", "Settings → Your plan → \"Show watch data\" (off unless you turn it on) adds heart rate from your watch to Insights. When it's off, nothing about the watch appears."),
         Article("early", MEANS, "The early estimate (your first week)", "New users start at 8 pieces a day, so the battery and the step-up offer work from day one. As you log, the estimate firms up each day toward your real level. After your first week, Firewatch shows your measured starting point and asks if you want to work from there."),
-        Article("steady", MEANS, "Steady days and holding steady", "A steady day is one with net at zero or better and no cigarettes or vapes. Days added without times count if you stayed at or under your level, and a clear day 🌿 always counts. A day with nothing logged (\"?\") or left out (👻) doesn't. Your steady-days total only ever goes up: a rough day just doesn't add one. It's shown on the home card (you can hide it in Settings → Your plan), with milestones at 7, 30, 60, 90, 180 and 365.\n\nHolding a level is a win too: the Log tab shows how many days you've held your current level in total, and Insights → Going up has a Holding steady chart."),
+        Article("steady", MEANS, "Steady days and holding steady", "A steady day is one with net at zero or better and no cigarettes or vapes. Days added without times count if you stayed at or under your level, and a clear day 🌿 always counts. A day with nothing logged (\"?\") or left out (👻) doesn't. Your steady-days total only ever goes up: a rough day just doesn't add one. It's shown on the home card (you can hide it in Settings → Your plan), with milestones at 7, 30, 60, 90, 180 and 365.\n\nHolding a level is a win too: the Log tab shows how many days you've held your current level in total, and Insights → Gaps & spacing has a Holding steady chart."),
         Article("practice", HOW, "Practice pace", "Practice pace tries a lighter pace without changing your level. The battery and the dose preview use the lighter pace's gap, and \"Practice net\" shows how it's going while it's on. Your level, tier, normal net, steady days and step-down count don't change.\n\nStart it in Settings → Your plan → Practice pace (one level lighter, or down to the level your logs measure), or from \"Try it for a day\" on a step-down offer. Choose \"Turn off at bedtime\" or \"Leave it on until I turn it off\"; you can change that, or tap \"Back to my pace\", any time. It's off while Relapse prevention mode is on.\n\nAfter a day at the next level's pace, the next morning asks: Step down, or Stay here. Either is fine."),
         Article("reference", HOW, "Change what counts as one piece", "Settings → Products and pieces → \"One piece is\". Pick a product, then choose \"From today on\" (past days keep the old piece size) or back-date the change to a date, which recalculates your past totals and may change your level."),
         Article("backup", HOW, "Export, import and move between phone and web", "Settings → Your data → Export saves a file with everything. Tap Import on the other device (phone or the web app) to bring it across. Both use the same file."),
