@@ -87,7 +87,8 @@ object Control {
     fun heldSeries(data: FirewatchData, now: Long, tz: TimeZone, n: Int = 42): List<Triple<LocalDate, Double, Double?>> {
         val today = now.localDate(tz)
         val first = data.doses.firstOrNull()?.at?.localDate(tz) ?: return emptyList()
-        return (n downTo 1).map { today.minus(it, DateTimeUnit.DAY) }.filter { it >= first && Progress.known(data, it, tz) }.map { d ->
+        // Today is included (so far), like every daily chart.
+        return (n downTo 0).map { today.minus(it, DateTimeUnit.DAY) }.filter { it >= first && (it == today || Progress.known(data, it, tz)) }.map { d ->
             val wake = Waking.day(data, d, tz).wakeAt
             Triple(d, Progress.pace(data, d, tz).scaled, BatteryEngine.targetAt(data, wake + DAY - 1))
         }

@@ -107,3 +107,12 @@ Ideas raised while reviewing the app, not sent through the form.
 | 2026-10-04 | Idea | Make the app more accessible; a mini tutorial | Done | 0.17.0: new 6-screen tour for fresh installs. |
 | 2026-10-04 | Idea | Go through all the graphs and keep only the ones D likes | Done | 0.17.0: 25 removed after D's checklist review. |
 | 2026-10-04 | Idea | Favourites in Insights, with a daily facts card | Done | 0.17.0 |
+| 2026-10-05 | Idea | Show a time at night instead of "Full when you wake up" | Done | 0.18.0: "Full at 11:50 PM · or fresh when you wake up". |
+| 2026-10-05 | Idea | Arrival dates and taper speed take ages to show | Done | 0.18.0: from level changes until there are 4 weeks of logs. |
+| 2026-10-05 | Idea | Pace vs your plan skips days with nothing logged | Done | 0.18.0: a slot for every day; the plan drawn day by day. |
+| 2026-10-06 | Idea | Pouches: mark when it came out of the mouth | Done | 0.18.0: "Took it out" in Today's list, and "Took it out at…" when holding the button. |
+| 2026-10-06 | Idea | Say how long Full / About half / Quick mean | Done | 0.18.0: 30+ min, ~15 min, ~5 min. |
+| 2026-10-07 | Idea | Include today in every chart | Done | 0.18.0: labelled "so far". |
+| 2026-10-07 | Bug | Battery takes about a minute to update after logging | Done | 0.18.0: the Log tab recomputes the moment something is logged. |
+| 2026-10-08 | Bug | Logging before Good morning puts the dose on the previous day | Done | 0.18.0: a morning piece before Good morning starts the new day; past mornings recounted. |
+| 2026-10-06 | Idea | Receptor load ideas (Help fix, Favourites fact, explanation, one framing, range band, history before Firewatch, badges) | Declined | D, 8 Oct; the Help line pointing at the removed spike share chart was fixed anyway in 0.18.0. |

@@ -4,7 +4,7 @@ import { FirewatchCore } from 'firewatch-core'
 const core = FirewatchCore.getInstance()
 
 export interface Rung { pieces: number; tier: string; label: string; plain: string }
-export interface Battery { charge: number; state: 'CLEAR' | 'CHARGING' | 'FULL_AT_WAKE' | 'MORNING_DELAY' | 'WIND_DOWN' | 'ASLEEP'; readyAt: number | null; stretchMin: number; pullMin: number; fitsNow?: string | null; closeToBed?: boolean }
+export interface Battery { charge: number; state: 'CLEAR' | 'CHARGING' | 'FULL_AT_WAKE' | 'MORNING_DELAY' | 'WIND_DOWN' | 'ASLEEP'; readyAt: number | null; stretchMin: number; pullMin: number; fitsNow?: string | null; closeToBed?: boolean; fullAt?: number | null }
 export interface StretchDay { date: string; stretchMin: number; pullMin: number; paused?: boolean }
 export interface Relapse { on: boolean; nextAt: number | null; gapMin: number; productId: string | null; productName: string | null; recommend: string | null; movingOn: boolean; modeDays: string[] }
 export interface CravingWindow { from: number; to: number; peakAt: number; likelihood: number; strength: number }
@@ -14,7 +14,7 @@ export interface Outlooks {
 }
 export interface HelpPage { title: string; body: string }
 export interface HelpArticle { id: string; section: string; title: string; body: string }
-export interface DoseView { id: string; at: number; name: string; pieces: number; mg: number; estimated: boolean; tags: string[]; kind: string }
+export interface DoseView { id: string; at: number; name: string; pieces: number; mg: number; estimated: boolean; tags: string[]; kind: string; removedAt?: number | null }
 export interface CravingView { id: string; at: number; intensity: number; name: string; outcome: string; result: string; endedAt: number | null; tags: string[] }
 export interface Review { date: string; pieces: number; netMin: number | null; volatility: number; mix: NamedValue[]; longestGapMin: number | null; stacked: number; morningStretchMin: number | null; tips: string[] }
 export interface DayView {

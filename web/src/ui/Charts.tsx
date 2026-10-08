@@ -37,7 +37,10 @@ export function indexTicks(labels: string[], n = 4, centred = false): [number, s
   return idx.map((i) => [centred ? (i + 0.5) / len : i / Math.max(1, len - 1), labels[i]])
 }
 
-export const dateLabels = (isos: string[]) => isos.map(dayMonth)
+// Every daily chart includes today, labelled "so far".
+const todayIso = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` }
+export const isTodayIso = (iso: string) => iso === todayIso()
+export const dateLabels = (isos: string[]) => isos.map((i) => (isTodayIso(i) ? 'so far' : dayMonth(i)))
 
 /** Axis frame: y values down the left, x labels underneath. */
 export function Frame({ ticks, fmt, height, xt, children, indent, readout }: { ticks?: number[]; fmt?: (v: number) => string; height: number; xt?: [number, string][]; children: any; indent?: number; readout?: (p: number) => string | null }) {

@@ -70,7 +70,9 @@ as an estimate.
   step up (with the reason); Relapse prevention mode suggestion; "Welcome back". With Coaching
   tips on, at most one tip ("Bridge with gum" when pouches are most of your use and the battery is
   at least half full), dismissable for 2 weeks.
-- **Quick logging:** one tap per product (hold for time, amount and more), each with a quiet
+- **Quick logging:** one tap per product (hold for time, amount, how long it stayed in: Full 30+
+  min, About half ~15, Quick ~5, and for pouches "Took it out at…"); a pouch in today's list shows
+  "Took it out" for an hour after logging (time in the mouth sets how much counts); each with a quiet
   dose preview ("+38m pull", "+1h 36m stretch": what logging it now does to net); "Craving? Log it";
   "Friend's vape"; Good morning / Good night; today's list; Relapse prevention mode button;
   "Suggest something / report a bug"; "?" for Help.
@@ -79,8 +81,9 @@ as an estimate.
 
 - **A plain timer:** every dose empties it, whatever its size; it refills over one gap (16 waking
   hours ÷ the rung's pieces a day). "Next piece around …" is always one gap after the last piece.
-  Full at wake-up, fresh every morning, no waiting overnight; sleeping hours (late-night activity
-  catches up). **Wind-down** is a note only. A practice day uses the next rung's gap.
+  Full at wake-up, fresh every morning, no waiting overnight: when it won't be full before bedtime
+  it says "Full at 11:50 PM · or fresh when you wake up"; sleeping hours (late-night activity
+  catches up). A logged piece updates the battery, stretch, pull and net at once. **Wind-down** is a note only. A practice day uses the next rung's gap.
 - **Stretch and pull carry timing and size.** Timing: a piece before the battery is full adds pull
   (the time it still needed); holding off with a full battery adds stretch. Size: p pieces above one
   add (p − 1) × gap of pull; below one add (1 − p) × gap of stretch. **Net** = stretch − pull = time
@@ -165,6 +168,11 @@ Journey to Clear Air counts rungs: rungs stepped down from the heaviest level D 
 of all the rungs from there to Clear Air. It moves only when the level changes. Arrival dates say
 "not unlocked yet" for a tier the current pace doesn't reach.
 
+Every daily chart includes today, labelled "so far" (faded where it's a bar). Taper speed and arrival
+dates come from the level changes (after a first step down) until there are 4 weeks of logs, then
+from the pieces logged. Pace vs your plan has a slot for every calendar day ("?" days as gaps) and
+draws the plan day by day.
+
 Removed in 0.17 after D's chart review: today so far, gap sizes, week shape, first piece weekdays vs
 weekends, how cravings ended, triggers, comparisons, craving strength over time, wins, money saved,
 beaten triggers, average dose size, spike share, heaviness score, double-ups, cravings vs doses, what
@@ -191,7 +199,9 @@ saving days keep the usual clock times.
 
 **One day everywhere:** daily counts (pieces today, calendar, daily Insights bars, tiers, stretch and
 pull, steady days) use the waking day (wake-up to the next wake-up), so a 1 AM piece counts toward
-the night before. Continuous things (the wave, receptors, the hour heatmap, the craving forecast)
+the night before. **Morning logs** (0.18): a piece logged in the morning before Good morning (within
+3 hours before the usual wake time, or after a Good night tap) starts the new day, which begins at
+that piece or at Good morning, whichever is earlier; back-dated pieces never move the day. Continuous things (the wave, receptors, the hour heatmap, the craving forecast)
 keep clock time.
 
 Month heatmap; day view with doses, cravings (with how they ended) and sleep. **Back-dating

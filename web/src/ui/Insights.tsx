@@ -3,7 +3,7 @@ import { useContext, useMemo, useState } from 'preact/hooks'
 import { Core } from '../core'
 import * as S from '../store'
 import { kindColor } from '../theme'
-import { Bars, Diverging, DoseStrip, ForecastChart, Heatmap, KIND_ORDER, Line, Meter, ReceptorChart, StackedBars, Wave, dateLabels } from './Charts'
+import { Bars, Diverging, isTodayIso, DoseStrip, ForecastChart, Heatmap, KIND_ORDER, Line, Meter, ReceptorChart, StackedBars, Wave, dateLabels } from './Charts'
 import { dayTitle, duration, stepText, pieces, shortDate, signedDuration, time } from './format'
 
 const SECTIONS = ['Favourites', 'Today', 'Cravings ahead', 'Receptors', 'Stretch & pull', 'Trends', 'Patterns', 'Gaps & spacing', 'Amounts & peaks', 'Mix', 'Forecasts', 'Milestones', 'Ladder']
@@ -92,7 +92,7 @@ export function Insights() {
         const oldest = snap.days[0]?.date ?? iso
         const showVol = !!settings.showVolatility
         const vol = showVol ? (past ?? Core.day(S.json(), iso)).volatility : undefined
-        const vd = full.map((d) => d.volatility)
+        const vd = days.map((d) => d.volatility)
         const vAvg = vd.map((_, i) => { const s = vd.slice(Math.max(0, i - 6), i + 1); return s.reduce((a, b) => a + b, 0) / s.length })
         const y = snap.yesterday
         return <>
@@ -119,7 +119,7 @@ export function Insights() {
             <div class="xaxis-plain small muted"><span>12 AM</span><span>6 AM</span><span>12 PM</span><span>6 PM</span><span>12 AM</span></div>
           </Card>
           {vd.length > 0 && <Card title="Nicotine volatility" sub="How fast and how much your nicotine level changes, each day (mg per hour), with a 7-day average line. Lower means steadier nicotine through the day.">
-            <Bars values={vd} line={vAvg} fmt={(v) => `${v} mg/h`} x={dl(full)} />
+            <Bars values={vd} line={vAvg} faded={days.map((d) => isTodayIso(d.date))} fmt={(v) => `${v} mg/h`} x={dl(days)} />
           </Card>}
         </>
       })()}
@@ -199,25 +199,26 @@ export function Insights() {
       {sec === 'Gaps & spacing' && <>
         {snap.held.some((h) => Number(h[2]) >= 0) && (() => {
           const hs = snap.held.filter((h) => Number(h[2]) >= 0)
-          const held = hs.filter((h) => Number(h[1]) <= Number(h[2]) + 0.25).length
+          const past = hs.filter((h) => !isTodayIso(h[0]))
+          const held = past.filter((h) => Number(h[1]) <= Number(h[2]) + 0.25).length
           return <Card title="Holding steady" sub="Pieces a day against the rung you were working at (line). Every day at or under it is a win, whether or not you're tapering.">
             <Bars values={hs.map((h) => Number(h[1]))} line={hs.map((h) => Number(h[2]))} fmt={n} x={dateLabels(hs.map((h) => h[0]))}
               faded={hs.map((h) => Number(h[1]) > Number(h[2]) + 0.25)} />
-            <div class="stats"><Stat v={held} l={`of the last ${hs.length} days held`} />{snap.heldDays > 0 && snap.target && <Stat v={snap.heldDays} l={`days held at ${snap.target.label}`} />}</div>
+            <div class="stats"><Stat v={held} l={`of the last ${past.length} days held`} />{snap.heldDays > 0 && snap.target && <Stat v={snap.heldDays} l={`days held at ${snap.target.label}`} />}</div>
           </Card>
         })()}
         {ch.longestGaps.length > 1 && <Card title="Longest gap each day" sub="The day's biggest stretch between pieces.">
-          <Bars values={win(ch.longestGaps).map((g) => g.value / 60)} fmt={h} x={dateLabels(win(ch.longestGaps).map((g) => g.label))} /></Card>}
-        <Card title="Clear hours" sub="Hours each day your level sat near zero while awake."><Line values={full.map((d) => d.clearHours)} color="var(--tertiary)" fmt={h} x={dl(full)} /></Card>
+          <Bars values={win(ch.longestGaps).map((g) => g.value / 60)} faded={win(ch.longestGaps).map((g) => isTodayIso(g.label))} fmt={h} x={dateLabels(win(ch.longestGaps).map((g) => g.label))} /></Card>}
+        <Card title="Clear hours" sub="Hours each day your level sat near zero while awake."><Line values={days.map((d) => d.clearHours)} color="var(--tertiary)" fmt={h} x={dl(days)} /></Card>
         {ins.overnight.length > 1 && <Card title="Overnight gap" sub="Last dose at night to first the next morning."><Line values={ins.overnight.map((m) => m / 60)} color="var(--tertiary)" fmt={h} /></Card>}
       </>}
       {sec === 'Amounts & peaks' && <>
         <Card title="Nicotine quality" sub="How you use nicotine, on a food scale. Gum, lozenges and patches are broccoli; smoke is burger and fries.">
-          <Line values={full.map((d) => d.quality ?? 100)} color="var(--tertiary)" fmt={n} top={100} x={dl(full)} />
+          <Line values={days.map((d) => d.quality ?? 100)} color="var(--tertiary)" fmt={n} top={100} x={dl(days)} />
           {snap.qualityLabel && <b>Today: {snap.qualityLabel}</b>}{snap.swapTip && <div class="small">{snap.swapTip}</div>}
           <div class="muted">🥦 90+ · 🍎 75+ · 🥪 55+ · 🍕 35+ · 🍩 11+ · 🍔 0–10</div></Card>
         {ch.dailyPeaks.length > 1 && <Card title="Daily peak" sub="Each day's highest estimated nicotine level, with a 7-day average line. Lower peaks mean gentler highs.">
-          {(() => { const pk = win(ch.dailyPeaks).map((p) => p.value); const avg = pk.map((_, i) => { const s = pk.slice(Math.max(0, i - 6), i + 1); return s.reduce((a, b) => a + b, 0) / s.length }); return <Bars values={pk} line={avg} fmt={(v) => `${v} mg`} x={dateLabels(win(ch.dailyPeaks).map((p) => p.label))} /> })()}</Card>}
+          {(() => { const pk = win(ch.dailyPeaks).map((p) => p.value); const avg = pk.map((_, i) => { const s = pk.slice(Math.max(0, i - 6), i + 1); return s.reduce((a, b) => a + b, 0) / s.length }); return <Bars values={pk} line={avg} faded={win(ch.dailyPeaks).map((p) => isTodayIso(p.label))} fmt={(v) => `${v} mg`} x={dateLabels(win(ch.dailyPeaks).map((p) => p.label))} /> })()}</Card>}
       </>}
       {sec === 'Mix' && <>
         {(() => {

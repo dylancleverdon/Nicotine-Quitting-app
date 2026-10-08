@@ -226,6 +226,7 @@ object BatteryEngine {
 
         val state: BatteryState
         var readyAt: Long? = null
+        var fullAt: Long? = null
         if (now >= day.sleepAt) {
             val upNow = activity > 0 && now - activity <= ACTIVE_WINDOW
             if (!upNow) {
@@ -244,7 +245,7 @@ object BatteryEngine {
                 goal != null && !firstDose && now < goal -> { state = BatteryState.MORNING_DELAY; readyAt = goal }
                 charge < 1.0 - 1e-9 -> {
                     val ready = now + ceil((1.0 - charge) * interval).toLong() * MIN
-                    if (ready > day.sleepAt) { state = BatteryState.FULL_AT_WAKE; readyAt = nextWake }
+                    if (ready > day.sleepAt) { state = BatteryState.FULL_AT_WAKE; readyAt = nextWake; fullAt = ready }
                     else { state = BatteryState.CHARGING; readyAt = ready }
                 }
                 else -> state = BatteryState.CLEAR
@@ -253,8 +254,8 @@ object BatteryEngine {
         // Relapse prevention mode: waiting longer isn't the goal, so stretch and pull pause.
         // Wind-down is a note only: it never replaces the guidance.
         val closeToBed = data.settings.windDown && now in (day.sleepAt - 60 * MIN) until day.sleepAt
-        if (Relapse.isModeDay(data, day.date, tz)) return Battery(charge, state, readyAt, 0.0, interval, 0.0, closeToBed)
-        return Battery(charge, state, readyAt, sim.stretch, interval, sim.pull, closeToBed, practicePieces = active?.pieces)
+        if (Relapse.isModeDay(data, day.date, tz)) return Battery(charge, state, readyAt, 0.0, interval, 0.0, closeToBed, fullAt = fullAt)
+        return Battery(charge, state, readyAt, sim.stretch, interval, sim.pull, closeToBed, practicePieces = active?.pieces, fullAt = fullAt)
     }
 
     /**

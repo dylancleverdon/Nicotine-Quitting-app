@@ -45,7 +45,7 @@ import kotlinx.serialization.json.JsonElement
 external object JsJodaTimeZoneModule
 
 @Serializable data class RungDto(val pieces: Double, val tier: String, val label: String, val plain: String)
-@Serializable data class BatteryDto(val charge: Double, val state: String, val readyAt: Double?, val stretchMin: Double, val pullMin: Double, val fitsNow: String? = null, val closeToBed: Boolean = false)
+@Serializable data class BatteryDto(val charge: Double, val state: String, val readyAt: Double?, val stretchMin: Double, val pullMin: Double, val fitsNow: String? = null, val closeToBed: Boolean = false, val fullAt: Double? = null)
 @Serializable data class StretchDay(val date: String, val stretchMin: Double, val pullMin: Double, val paused: Boolean = false)
 @Serializable data class RelapseDto(
     val on: Boolean, val nextAt: Double?, val gapMin: Double, val productId: String?, val productName: String?,
@@ -64,7 +64,7 @@ external object JsJodaTimeZoneModule
 )
 @Serializable data class OutlooksDto(val forecast: ForecastDto, val receptors: ReceptorsDto?)
 @Serializable data class HelpDto(val tour: List<com.baastiklabs.firewatch.core.Help.Page>, val why: List<com.baastiklabs.firewatch.core.Help.Page>, val articles: List<com.baastiklabs.firewatch.core.Help.Article>)
-@Serializable data class DoseView(val id: String, val at: Double, val name: String, val pieces: Double, val mg: Double, val estimated: Boolean, val tags: List<String>, val kind: String)
+@Serializable data class DoseView(val id: String, val at: Double, val name: String, val pieces: Double, val mg: Double, val estimated: Boolean, val tags: List<String>, val kind: String, val removedAt: Double? = null)
 @Serializable data class CravingView(val id: String, val at: Double, val intensity: Int, val name: String, val outcome: String, val result: String = "", val endedAt: Double?, val tags: List<String>)
 @Serializable data class DayView(
     val date: String, val pieces: Double, val mg: Double, val doses: Int, val cravings: Int, val rodeOut: Int, val level: Int,
@@ -358,7 +358,7 @@ object FirewatchCore {
             revealed = revealed,
             measured = measured?.dto(),
             target = target?.dto(),
-            battery = battery?.let { BatteryDto(it.charge, it.state.name, it.readyAt?.toDouble(), it.stretchMinutesToday, it.pullMinutesToday, null, it.closeToBed) },
+            battery = battery?.let { BatteryDto(it.charge, it.state.name, it.readyAt?.toDouble(), it.stretchMinutesToday, it.pullMinutesToday, null, it.closeToBed, it.fullAt?.toDouble()) },
             stepDown = stepDown?.dto(),
             stepDownNote = listOfNotNull(readiness?.takeIf { it.confident }?.let {
                 if (it.ready) "From your cravings, the next rung should feel like about a ${it.predictedNext.toInt()} out of 10, and you ride out ${it.capacity}s."
@@ -458,7 +458,7 @@ object FirewatchCore {
             todayCravings = todayCravings.size,
             todayRodeOut = todayCravings.count { Cravings.effectiveOutcome(d, it, now) == com.baastiklabs.firewatch.core.model.CravingOutcome.RODE_OUT },
             lastDoseAt = d.doses.maxOfOrNull { it.at }?.toDouble(),
-            todayDoses = todayDoses.sortedByDescending { it.at }.map { DoseView(it.id, it.at.toDouble(), it.productName, d.piecesOf(it), it.absorbedMg(), it.estimated, it.tags, it.kind.name) },
+            todayDoses = todayDoses.sortedByDescending { it.at }.map { DoseView(it.id, it.at.toDouble(), it.productName, d.piecesOf(it), it.absorbedMg(), it.estimated, it.tags, it.kind.name, it.removedAt?.toDouble()) },
             todayCravingList = todayCravings.map { craving(it) },
             wave = ins.todayCurve(10).map { listOf(it.first.toDouble(), it.second) },
             wakeAt = w.wakeAt.toDouble(),
@@ -507,7 +507,7 @@ object FirewatchCore {
         val date = LocalDate.parse(dayIso)
         val ref = d.referenceMg
         val doses = d.doses.filter { com.baastiklabs.firewatch.core.Days.wakingDate(d, it.at, tz) == date }.sortedBy { it.at }
-            .map { DoseView(it.id, it.at.toDouble(), it.productName, d.piecesOf(it), it.absorbedMg(), it.estimated, it.tags, it.kind.name) }
+            .map { DoseView(it.id, it.at.toDouble(), it.productName, d.piecesOf(it), it.absorbedMg(), it.estimated, it.tags, it.kind.name, it.removedAt?.toDouble()) }
         val cravings = d.cravings.filter { com.baastiklabs.firewatch.core.Days.wakingDate(d, it.at, tz) == date }.map {
             CravingView(it.id, it.at.toDouble(), it.intensity, CravingScale.level(it.intensity).name,
                 Cravings.effectiveOutcome(d, it, nowMs.toLong()).name, Cravings.result(d, it, nowMs.toLong(), tz).title, it.endedAt?.toDouble(), it.tags)

@@ -1,5 +1,15 @@
 # Firewatch web changelog
 
+## 0.15.0 · 2026-10-08
+- Logging a piece now updates the battery, stretch, pull and net straight away (it could take up to a minute).
+- Logged something before tapping Good morning? Your day now starts at that piece instead of it landing on yesterday. Anything logged in the morning (within 3 hours before your usual wake time, or after Good night) counts for the new day. Past mornings have been recounted.
+- At night, when the battery won't be full before bedtime, it shows the time: "Full at 11:50 PM · or fresh when you wake up".
+- Taper speed and arrival dates show up as soon as you've stepped down, worked out from your level changes, until there are 4 weeks of logs.
+- Pace vs your plan keeps a place for every day, including days with nothing logged, and draws the plan day by day.
+- Pouches: tap "Took it out" on a pouch in your Today list (for about an hour after logging), or set the time when you hold the button. Less time in counts less nicotine. The choices now say how long they mean: Full (30+ min), About half (~15 min), Quick (~5 min).
+- Every daily chart now includes today, labelled "so far".
+- Help: the answer about delivery speed pointed to a chart that was removed in 0.17. Fixed.
+
 ## 0.14.0 · 2026-10-05
 - **Favourites in Insights.** Tap ☆ on any chart to add it. Favourites opens first, with a card of one plain fact for each favourite at the top.
 - **Fewer, clearer charts.** 25 charts you didn't need are gone. "Going up" and "Going down" are now **Gaps & spacing** and **Amounts & peaks**, and Background level has moved to Receptors. "When it happens" is now called Heatmap.

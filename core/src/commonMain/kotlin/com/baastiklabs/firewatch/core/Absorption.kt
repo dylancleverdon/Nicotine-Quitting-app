@@ -20,6 +20,34 @@ object Absorption {
         Duration.QUICK -> 0.3
     }
 
+    /** Minutes each choice stands for: Full 30+ min, About half ~15 min, Quick ~5 min. */
+    fun durationMinutes(duration: Duration): Int = when (duration) {
+        Duration.FULL -> 30
+        Duration.HALF -> 15
+        Duration.QUICK -> 5
+    }
+
+    /** "Full (30+ min)", "About half (~15 min)", "Quick (~5 min)". */
+    fun durationLabel(duration: Duration): String = when (duration) {
+        Duration.FULL -> "Full (30+ min)"
+        Duration.HALF -> "About half (~15 min)"
+        Duration.QUICK -> "Quick (~5 min)"
+    }
+
+    /**
+     * Share absorbed for a pouch kept in [minutes], matching the choices above (5 min ≈ 0.3,
+     * 15 ≈ 0.6, 30+ = all), straight lines between them.
+     */
+    fun minutesFactor(minutes: Double): Double {
+        val m = minutes.coerceAtLeast(0.0)
+        return when {
+            m >= 30 -> 1.0
+            m >= 15 -> 0.6 + (m - 15) / 15 * 0.4
+            m >= 5 -> 0.3 + (m - 5) / 10 * 0.3
+            else -> m / 5 * 0.3
+        }
+    }
+
     fun absorbedMg(
         labelMg: Double,
         absorption: Double,
@@ -27,9 +55,11 @@ object Absorption {
         multiplier: Double = 1.0,
         duration: Duration = Duration.FULL,
         acidicDrink: Boolean = false,
+        /** Minutes in the mouth, when known ("Took it out"): replaces [duration]. */
+        inMouthMinutes: Double? = null,
     ): Double {
         var mg = labelMg * absorption * multiplier
-        if (DefaultProducts.isOral(kind)) mg *= durationFactor(duration)
+        if (DefaultProducts.isOral(kind)) mg *= inMouthMinutes?.let { minutesFactor(it) } ?: durationFactor(duration)
         if (acidicDrink && kind == ProductKind.GUM) mg *= ACIDIC_FACTOR
         return mg.coerceAtLeast(0.0)
     }
@@ -47,7 +77,8 @@ fun Dose.absorbedMg(): Double {
     val low = rangeLowMg
     val high = rangeHighMg
     if (low != null && high != null) return (low + high) / 2.0
-    return Absorption.absorbedMg(labelMg, absorption, kind, multiplier, duration, acidicDrink)
+    return Absorption.absorbedMg(labelMg, absorption, kind, multiplier, duration, acidicDrink,
+        inMouthMinutes = removedAt?.takeIf { kind == ProductKind.POUCH && it > at }?.let { (it - at) / 60_000.0 })
 }
 
 /** The cautious (top of range) estimate, used for timing. */

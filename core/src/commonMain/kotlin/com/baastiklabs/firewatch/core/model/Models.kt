@@ -83,6 +83,8 @@ data class Dose(
     val loggedAt: Long = 0,
     /** Back-dated rough estimate (no real time). Counts toward totals, not toward timing stats. */
     val estimated: Boolean = false,
+    /** Pouches: when it came out of the mouth ("Took it out"). Overrides [duration] when set. */
+    val removedAt: Long? = null,
 )
 
 @Serializable

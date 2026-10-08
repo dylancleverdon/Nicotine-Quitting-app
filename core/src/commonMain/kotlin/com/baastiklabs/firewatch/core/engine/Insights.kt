@@ -25,6 +25,7 @@ import kotlinx.datetime.plus
 import kotlinx.datetime.toLocalDateTime
 import kotlin.math.exp
 import kotlin.math.ln
+import kotlin.math.pow
 import kotlin.math.max
 
 /** Everything about one waking day that the insights need. */
@@ -185,7 +186,7 @@ class Insights(private val data: FirewatchData, private val tz: TimeZone, privat
     }
 
     /** Daily volatility: each full day's volatility over its waking day (mg/h). */
-    fun dailyVolatility(): List<Pair<LocalDate, Double>> = fullDays.map { it.date to it.volatility }
+    fun dailyVolatility(): List<Pair<LocalDate, Double>> = days.map { it.date to it.volatility }
 
     fun todayCurve(stepMin: Int = 5): List<Pair<Long, Double>> {
         val w = Waking.day(data, today, tz)
@@ -343,7 +344,33 @@ class Insights(private val data: FirewatchData, private val tz: TimeZone, privat
     // ---- Forecasts ----
 
     /** Average % drop per week, from a fitted line through the last 28 days (positive = going down). */
-    fun taperPercentPerWeek(): Double? {
+    fun taperPercentPerWeek(): Double? = fromPieces()?.takeIf { piecesReady } ?: fromLevels() ?: fromPieces()
+
+    /** Four weeks of logs: taper speed comes from the pieces logged. */
+    private val piecesReady: Boolean get() = firstDate?.let { it.daysUntil(today) >= 28 } ?: false
+
+    /**
+     * Before four weeks of logs (or when the logs can't say yet), once D has stepped down: taper
+     * speed from the level changes themselves, so it shows up straight away.
+     */
+    private fun fromLevels(): Double? {
+        val changes = data.rungChanges
+        if (changes.zipWithNext().none { (a, b) -> b.pieces < a.pieces }) return null
+        val windowStart = today.minus(28, DateTimeUnit.DAY)
+        val startAt = maxOf(changes.first().at, Waking.day(data, windowStart, tz).wakeAt)
+        val startPieces = (changes.lastOrNull { it.at <= startAt } ?: changes.first()).pieces
+        val current = changes.last().pieces
+        if (startPieces <= 0) return null
+        val days = (now - startAt) / (24 * 60 * MIN).toDouble()
+        if (days < 1) return null
+        val ratio = (current.coerceAtLeast(0.2) / startPieces).coerceAtMost(4.0)
+        return (1 - ratio.pow(7.0 / maxOf(days, 7.0))) * 100
+    }
+
+    /** True when the current taper speed comes from level changes rather than pieces logged. */
+    val taperFromLevels: Boolean get() = !(piecesReady && fromPieces() != null) && fromLevels() != null
+
+    private fun fromPieces(): Double? {
         val from = today.minus(28, DateTimeUnit.DAY)
         val pts = fullDays.filter { it.date >= from }.mapNotNull { d -> if (d.pieces > 0.05) from.daysUntil(d.date).toDouble() to ln(d.scaledPieces) else null }
         if (pts.size < 7) return null
@@ -357,9 +384,10 @@ class Insights(private val data: FirewatchData, private val tz: TimeZone, privat
 
     // ---- 0.14 charts ----
 
-    /** Daily peak: each known full day's highest estimated level over its waking day (mg). */
-    fun dailyPeaks(): List<Pair<LocalDate, Double>> = fullDays.map { d ->
-        val c = Kinetics.curve(data.doses.filter { it.at in (d.wakeAt - 24 * 60 * MIN)..d.sleepAt }, d.wakeAt, d.sleepAt, 5)
+    /** Daily peak: each known day's highest estimated level over its waking day (mg); today so far. */
+    fun dailyPeaks(): List<Pair<LocalDate, Double>> = days.map { d ->
+        val end = if (d.date == today) minOf(d.sleepAt, maxOf(now, d.wakeAt + MIN)) else d.sleepAt
+        val c = Kinetics.curve(data.doses.filter { it.at in (d.wakeAt - 24 * 60 * MIN)..end }, d.wakeAt, end, 5)
         d.date to (c.maxOfOrNull { it.second } ?: 0.0)
     }
 
@@ -391,8 +419,8 @@ class Insights(private val data: FirewatchData, private val tz: TimeZone, privat
             Triple(w.first().date, avg { it.date.dayOfWeek.ordinal < 5 }, avg { it.date.dayOfWeek.ordinal >= 5 })
         }
 
-    /** Longest gap between timed pieces, each known full day (minutes; null = fewer than two). */
-    fun longestGaps(): List<Pair<LocalDate, Double?>> = fullDays.map { it.date to it.longestGapMin }
+    /** Longest gap between timed pieces, each known day, today so far (minutes; null = fewer than two). */
+    fun longestGaps(): List<Pair<LocalDate, Double?>> = days.map { it.date to it.longestGapMin }
 
     /** Average logged craving strength per week (week start, average, count). */
     fun cravingStrengthWeekly(): List<Triple<LocalDate, Double, Int>> {
@@ -426,9 +454,23 @@ class Insights(private val data: FirewatchData, private val tz: TimeZone, privat
      */
     fun paceVsPlan(n: Int = 28): Pair<List<Triple<LocalDate, Double?, Double?>>, Boolean> {
         val steppedDown = data.rungChanges.zipWithNext().any { (a, b) -> b.pieces < a.pieces }
-        if (!steppedDown) return emptyList<Triple<LocalDate, Double?, Double?>>() to false
-        val past = lastDays(n).map { Triple(it.date, it.pieces as Double?, BatteryEngine.targetAt(data, it.wakeAt + 12 * 3_600_000L)) }
-        val plan = Control.taperPlan(data, now, tz)?.steps?.map { Triple(it.date, null as Double?, it.rung.pieces as Double?) } ?: emptyList()
+        val first = firstDate
+        if (!steppedDown || first == null) return emptyList<Triple<LocalDate, Double?, Double?>>() to false
+        // Every calendar day gets a slot: "?" and left-out days stay as gaps (no bar), never squeezed
+        // out, and the plan is drawn day by day (today shows so far).
+        val byDate = days.associateBy { it.date }
+        val start = maxOf(first, today.minus(n, DateTimeUnit.DAY))
+        val past = generateSequence(start) { it.plus(1, DateTimeUnit.DAY) }.takeWhile { it <= today }.map { d ->
+            Triple(d, byDate[d]?.pieces, BatteryEngine.targetAt(data, Waking.day(data, d, tz).wakeAt + 12 * 3_600_000L))
+        }.toList()
+        val steps = Control.taperPlan(data, now, tz)?.steps.orEmpty()
+        val plan = if (steps.isEmpty()) emptyList() else {
+            var level = data.targetPieces ?: steps.first().rung.pieces
+            generateSequence(today.plus(1, DateTimeUnit.DAY)) { it.plus(1, DateTimeUnit.DAY) }.takeWhile { it <= steps.last().date }.map { d ->
+                steps.lastOrNull { it.date <= d }?.let { level = it.rung.pieces }
+                Triple(d, null as Double?, level as Double?)
+            }.toList()
+        }
         return (past + plan) to true
     }
 
@@ -436,17 +478,19 @@ class Insights(private val data: FirewatchData, private val tz: TimeZone, privat
     fun taperSpeedText(): String? {
         val p = taperPercentPerWeek() ?: return null
         val r = kotlin.math.round(kotlin.math.abs(p)).toInt()
+        val basis = if (taperFromLevels) "from your level changes" else "last 4 weeks"
         return when {
-            r < 1 -> "About level (last 4 weeks)"
-            p > 0 -> "About $r% lighter each week (last 4 weeks)"
-            else -> "About $r% more each week (last 4 weeks)"
+            r < 1 -> "About level ($basis)"
+            p > 0 -> "About $r% lighter each week ($basis)"
+            else -> "About $r% more each week ($basis)"
         }
     }
 
     /** When D reaches each tier (and Clear Air) at the current pace. */
     fun arrivals(): List<Forecast> {
         val rate = taperPercentPerWeek() ?: return emptyList()
-        val current = lastDays(7).map { it.scaledPieces }.average().takeIf { !it.isNaN() } ?: return emptyList()
+        val current = (if (taperFromLevels) data.targetPieces else null)
+            ?: lastDays(7).map { it.scaledPieces }.average().takeIf { !it.isNaN() } ?: return emptyList()
         val tiers = Tier.entries.filter { it != Tier.WILDFIRE }
         return tiers.map { tier ->
             val targetPieces = when (tier) {

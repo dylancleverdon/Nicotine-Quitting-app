@@ -68,6 +68,7 @@ export const updateSettings = (patch: any) => save('settings', { ...settings.val
 
 export async function logProduct(product: any, at = Date.now(), opts = {}) {
   const dose = Core.doseFor(product, at, opts)
+  if ((opts as any).removedAt) (dose as any).removedAt = (opts as any).removedAt
   await save('dose', dose)
   return dose
 }

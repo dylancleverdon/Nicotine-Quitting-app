@@ -43,6 +43,11 @@ test('back-dated start, logging and persistence', async ({ page }) => {
   await expect(page.locator('.list .item')).toHaveCount(1)
   await expect(page.getByText('in your system now')).toBeVisible()
   await page.screenshot({ path: 'test-results/home.png', fullPage: true })
+  // A pouch can be marked as taken out, from the Today list.
+  await page.locator('.product', { hasText: 'Zyn 3 mg' }).first().click()
+  await page.getByRole('button', { name: 'Took it out' }).click()
+  await expect(page.getByText(/in for \d+ min/)).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Took it out' })).toHaveCount(0)
 
   // Suggestions box opens; cancel without sending anything.
   await page.getByRole('button', { name: 'Suggest something / report a bug' }).click()
@@ -64,7 +69,8 @@ test('back-dated start, logging and persistence', async ({ page }) => {
 
   // Survives a reload (IndexedDB).
   await page.reload()
-  await expect(page.locator('.list .item')).toHaveCount(1)
+  await expect(page.locator('.list .item')).toHaveCount(2)
+  await expect(page.getByText(/in for \d+ min/)).toBeVisible()
   await expect(page.locator('.tier')).toHaveText('Flicker')
 
   // Insights and calendar render.
@@ -153,7 +159,7 @@ test('back-dated start, logging and persistence', async ({ page }) => {
   const text = await (await download.createReadStream()).toArray().then((c) => Buffer.concat(c).toString())
   const file = JSON.parse(text)
   expect(file.app).toBe('Firewatch by Baastik Labs')
-  expect(file.records.filter((r: any) => r.type === 'dose').length).toBe(36)
+  expect(file.records.filter((r: any) => r.type === 'dose').length).toBe(37)
 })
 
 // A brand-new user on the baseline path gets guidance straight away: an early estimate of 8 a day.

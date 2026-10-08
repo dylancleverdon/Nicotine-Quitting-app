@@ -109,7 +109,7 @@ private fun BatteryRow(b: Battery, now: Long, relapseNext: Long?) {
         BatteryState.CLEAR -> "Clear for one if you want it" to "No rush. Every minute you wait counts as stretch."
         BatteryState.CHARGING -> "Next piece around ${b.readyAt?.let { Fmt.time(it) } ?: "later"}" to
             "${b.readyAt?.let { Fmt.duration(it - now) } ?: ""} to go at your target pace"
-        BatteryState.FULL_AT_WAKE -> "Full when you wake up" to "No waiting overnight. Fresh start in the morning."
+        BatteryState.FULL_AT_WAKE -> (b.fullAt?.let { "Full at ${Fmt.time(it)} · or fresh when you wake up" } ?: "Full when you wake up") to "No waiting overnight."
         BatteryState.MORNING_DELAY -> "First piece goal: ${b.readyAt?.let { Fmt.time(it) } ?: ""}" to "Pushing the first piece later is one of the best signs of progress"
         BatteryState.WIND_DOWN -> "Winding down for bed" to "Nicotine is a stimulant; late doses can disrupt sleep"
         BatteryState.ASLEEP -> "Sleeping hours" to "Fresh start when you wake up"

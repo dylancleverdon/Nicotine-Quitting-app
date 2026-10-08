@@ -53,6 +53,8 @@ data class DoseDraft(
     val duration: Duration = Duration.FULL,
     val acidicDrink: Boolean = false,
     val tags: List<String> = emptyList(),
+    /** Pouches: when it came out ("Took it out at…"); null = use [duration]. */
+    val removedAt: Long? = null,
 )
 
 private val offsets = listOf(0 to "Now", 5 to "5 min ago", 10 to "10 min ago", 20 to "20 min ago", 30 to "30 min ago", 60 to "1 hour ago", 120 to "2 hours ago", 180 to "3 hours ago")
@@ -85,9 +87,13 @@ fun DoseSheet(
     var acidic by remember { mutableStateOf(initial.acidicDrink) }
     var tags by remember { mutableStateOf(initial.tags.toSet()) }
     var pickTime by remember { mutableStateOf(false) }
+    var removedAt by remember { mutableStateOf(initial.removedAt) }
+    var pickOut by remember { mutableStateOf(false) }
     val baseAt = initial.at
 
-    val absorbed = Absorption.absorbedMg(labelMg, absorption, kind, multiplier, duration, acidic)
+    fun resolvedAtNow(): Long = customAt ?: (System.currentTimeMillis() - offsetMinutes * 60_000L)
+    val inMouth = removedAt?.takeIf { kind == ProductKind.POUCH }?.let { out -> ((out - resolvedAtNow()) / 60_000.0).takeIf { it > 0 } }
+    val absorbed = Absorption.absorbedMg(labelMg, absorption, kind, multiplier, duration, acidic, inMouthMinutes = inMouth)
     val pieces = Absorption.pieces(absorbed, referenceMg)
 
     fun resolvedAt(): Long = customAt ?: (System.currentTimeMillis() - offsetMinutes * 60_000L)
@@ -151,11 +157,28 @@ fun DoseSheet(
                 SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
                     durations.forEachIndexed { index, (value, label) ->
                         SegmentedButton(
-                            selected = duration == value,
-                            onClick = { duration = value },
+                            selected = duration == value && inMouth == null,
+                            onClick = { duration = value; removedAt = null },
                             shape = SegmentedButtonDefaults.itemShape(index, durations.size),
-                        ) { Text(label) }
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(label)
+                                Text(
+                                    when (value) { Duration.FULL -> "30+ min"; Duration.HALF -> "~15 min"; Duration.QUICK -> "~5 min" },
+                                    style = MaterialTheme.typography.labelSmall,
+                                )
+                            }
+                        }
                     }
+                }
+                if (kind == ProductKind.POUCH) {
+                    FilterChip(
+                        selected = inMouth != null,
+                        onClick = { pickOut = true },
+                        label = {
+                            Text(inMouth?.let { "Took it out at ${Fmt.time(removedAt!!)} (${it.toInt()} min)" } ?: "Took it out at…")
+                        },
+                    )
                 }
             }
 
@@ -190,11 +213,29 @@ fun DoseSheet(
                 }
                 Spacer(Modifier.weight(1f))
                 Button(onClick = {
-                    onSave(DoseDraft(resolvedAt(), multiplier, duration, acidic, DoseTags.filter { it in tags }))
+                    val at = resolvedAt()
+                    onSave(DoseDraft(at, multiplier, duration, acidic, DoseTags.filter { it in tags }, removedAt?.takeIf { kind == ProductKind.POUCH && it > at }))
                 }) { Text(saveLabel) }
             }
             Spacer(Modifier.height(16.dp))
         }
+    }
+
+    if (pickOut) {
+        val at = resolvedAt()
+        val start = (removedAt ?: (at + 30 * 60_000L)).toLocalDateTime()
+        TimePickDialog(
+            title = "When did it come out?",
+            initial = start.toLocalTime(),
+            onDismiss = { pickOut = false },
+            onPick = { time ->
+                var picked = at.toLocalDateTime().toLocalDate().atTime(time)
+                // Out before it went in means just after midnight.
+                if (picked.toEpochMillis() <= at) picked = picked.plusDays(1)
+                removedAt = picked.toEpochMillis()
+                pickOut = false
+            },
+        )
     }
 
     if (pickTime) {

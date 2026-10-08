@@ -240,8 +240,12 @@ private val num: (Double) -> String = { com.baastiklabs.firewatch.ui.charts.fmtN
 private val mgs: (Double) -> String = { "${com.baastiklabs.firewatch.ui.charts.fmtNum(it)} mg" }
 private val pct: (Double) -> String = { "${com.baastiklabs.firewatch.ui.charts.fmtNum(it)}%" }
 private val mins: (Double) -> String = { "${com.baastiklabs.firewatch.ui.charts.fmtNum(it)}m" }
-private fun dates(ds: List<com.baastiklabs.firewatch.core.engine.DayStat>) = ds.map { Fmt.dayMonth(it.date) }
-private fun kdates(ds: List<kotlinx.datetime.LocalDate>) = ds.map { Fmt.dayMonth(it) }
+// Every daily chart includes today, labelled "so far" (and faded where it's a bar).
+private fun isToday(d: kotlinx.datetime.LocalDate) = d.toString() == java.time.LocalDate.now().toString()
+private fun dates(ds: List<com.baastiklabs.firewatch.core.engine.DayStat>) = ds.map { if (isToday(it.date)) "so far" else Fmt.dayMonth(it.date) }
+private fun kdates(ds: List<kotlinx.datetime.LocalDate>) = ds.map { if (isToday(it)) "so far" else Fmt.dayMonth(it) }
+@Composable
+private fun soFar(d: kotlinx.datetime.LocalDate): Color? = if (isToday(d)) MaterialTheme.colorScheme.primary.copy(alpha = 0.3f) else null
 
 @Composable
 private fun TodaySection(
@@ -291,12 +295,12 @@ private fun TodaySection(
             Text("Show volatility", style = MaterialTheme.typography.bodySmall)
         }
     }
-    val vol = ins.fullDays.win()
+    val vol = ins.days.win()
     if (vol.isNotEmpty()) {
         ChartCard("Nicotine volatility", "How fast and how much your nicotine level changes, each day (mg per hour), with a 7-day average line. Lower means steadier nicotine through the day.") {
             val vs = vol.map { it.volatility }
             BarChart(
-                vs.map { Bar(it) },
+                vol.map { Bar(it.volatility, color = soFar(it.date)) },
                 line = vs.indices.map { i -> vs.subList(maxOf(0, i - 6), i + 1).average() },
                 yFmt = { "${fmtNum(it)} mg/h" },
                 xLabels = dates(vol),
@@ -579,9 +583,9 @@ private fun PatternsSection(ins: Insights, data: FirewatchData, tz: TimeZone) = 
 private fun GapsSection(ins: Insights, data: FirewatchData) = Col {
     val lg = ins.longestGaps().win()
     if (lg.size > 1) ChartCard("Longest gap each day", "The day's biggest stretch between pieces.") {
-        BarChart(lg.map { Bar((it.second ?: 0.0) / 60) }, yFmt = hrs, xLabels = kdates(lg.map { it.first }))
+        BarChart(lg.map { Bar((it.second ?: 0.0) / 60, color = soFar(it.first)) }, yFmt = hrs, xLabels = kdates(lg.map { it.first }))
     }
-    val days = ins.fullDays.win()
+    val days = ins.days.win()
     val tz = TimeZone.currentSystemDefault()
     val held = remember(data, ins.today) { com.baastiklabs.firewatch.core.engine.Control.heldSeries(data, System.currentTimeMillis(), tz).filter { it.third != null } }
     if (held.isNotEmpty()) {
@@ -593,11 +597,12 @@ private fun GapsSection(ins: Insights, data: FirewatchData) = Col {
                 yFmt = num,
                 xLabels = kdates(held.map { it.first }),
             )
-            val n = held.count { (_, p, t) -> p <= t!! + 0.25 }
+            val full = held.filter { !isToday(it.first) }
+            val n = full.count { (_, p, t) -> p <= t!! + 0.25 }
             val now = System.currentTimeMillis()
             val atRung = com.baastiklabs.firewatch.core.engine.Control.heldDays(data, now, tz)
             Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
-                Stat("$n", "of the last ${held.size} days held")
+                Stat("$n", "of the last ${full.size} days held")
                 data.targetPieces?.takeIf { atRung > 0 }?.let { Stat("$atRung", "days held at ${com.baastiklabs.firewatch.core.engine.Ladder.rung(it).label}") }
             }
         }
@@ -619,9 +624,9 @@ private fun AmountsSection(ins: Insights, data: FirewatchData, now: Long) = Col 
     val peaks = remember(data, now / 600_000) { ins.dailyPeaks() }.win()
     if (peaks.size > 1) ChartCard("Daily peak", "Each day's highest estimated nicotine level, with a 7-day average line. Lower peaks mean gentler highs.") {
         val v = peaks.map { it.second }
-        BarChart(v.map { Bar(it) }, line = v.indices.map { i -> v.subList(maxOf(0, i - 6), i + 1).average() }, yFmt = mgs, xLabels = kdates(peaks.map { it.first }))
+        BarChart(peaks.map { Bar(it.second, color = soFar(it.first)) }, line = v.indices.map { i -> v.subList(maxOf(0, i - 6), i + 1).average() }, yFmt = mgs, xLabels = kdates(peaks.map { it.first }))
     }
-    val days = ins.fullDays.win()
+    val days = ins.days.win()
     val quality = days.map { it.quality ?: 100.0 }
     ChartCard("Nicotine quality", "How you use nicotine, on a food scale. Gum, lozenges and patches are broccoli; smoke is burger and fries. Switching method raises it; using a vape less doesn't.") {
         TrendLine(quality, color = MaterialTheme.colorScheme.tertiary, yFmt = num, top = 100.0, xLabels = dates(days))

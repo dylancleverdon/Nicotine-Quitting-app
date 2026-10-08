@@ -21,6 +21,7 @@ export function DoseSheet({ product, onClose, onLog }: { product: any; onClose: 
   const [custom, setCustom] = useState('')
   const [mult, setMult] = useState(1)
   const [duration, setDuration] = useState('FULL')
+  const [outAt, setOutAt] = useState('')
   const [acidic, setAcidic] = useState(false)
   const [tags, setTags] = useState<string[]>([])
   const at = () => {
@@ -44,12 +45,13 @@ export function DoseSheet({ product, onClose, onLog }: { product: any; onClose: 
       <div class="row wrap">{AMOUNTS.map(([v, l]) => <button class={`chip ${mult === v ? 'on' : ''}`} onClick={() => setMult(v)}>{l}</button>)}</div>
       {ORAL.includes(product.kind) && <>
         <h3>How long it stayed in</h3>
-        <div class="row wrap">{[['FULL', 'Full'], ['HALF', 'About half'], ['QUICK', 'Quick']].map(([v, l]) => <button class={`chip ${duration === v ? 'on' : ''}`} onClick={() => setDuration(v)}>{l}</button>)}</div>
+        <div class="row wrap">{[['FULL', 'Full', '30+ min'], ['HALF', 'About half', '~15 min'], ['QUICK', 'Quick', '~5 min']].map(([v, l, m]) => <button class={`chip ${duration === v && !outAt ? 'on' : ''}`} onClick={() => { setDuration(v); setOutAt('') }}>{l} <span class="small muted">{m}</span></button>)}</div>
       </>}
+      {product.kind === 'POUCH' && <label class="row small">Took it out at <input type="time" value={outAt} onInput={(e) => setOutAt((e.target as HTMLInputElement).value)} style={{ width: 130 }} /></label>}
       {product.kind === 'GUM' && <label class="row"><input type="checkbox" checked={acidic} onChange={() => setAcidic(!acidic)} style={{ width: 'auto' }} /> Coffee or soda around it (cuts absorption)</label>}
       <h3>What was going on (optional)</h3>
       <div class="row wrap">{TAGS.map((t) => <button class={`chip ${tags.includes(t) ? 'on' : ''}`} onClick={() => setTags(tags.includes(t) ? tags.filter((x) => x !== t) : [...tags, t])}>{t}</button>)}</div>
-      <button class="btn" onClick={() => onLog(at(), { multiplier: mult, duration, acidic, tags })}>Log it</button>
+      <button class="btn" onClick={() => { const t = at(); onLog(t, { multiplier: mult, duration, acidic, tags, removedAt: outTime(t, outAt) }) }}>Log it</button>
     </Sheet>
   )
 }
@@ -121,7 +123,17 @@ export function CheckInSheet({ onClose, onSave }: { onClose: () => void; onSave:
   )
 }
 
-export const doseLine = (d: any) => `${time(d.at)} · ≈ ${pieces(d.pieces)} pc${d.estimated ? ' · estimated' : ''}${d.tags?.length ? ' · ' + d.tags.join(', ').toLowerCase() : ''}`
+/** "Took it out at" (HH:MM) → a time after [at] (just after midnight if earlier); '' = not set. */
+export function outTime(at: number, hm: string): number | null {
+  if (!hm) return null
+  const [h, m] = hm.split(':').map(Number)
+  const d = new Date(at); d.setHours(h, m, 0, 0)
+  if (d.getTime() <= at) d.setDate(d.getDate() + 1)
+  return d.getTime()
+}
+const hhmm = (t: number) => { const d = new Date(t); return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}` }
+
+export const doseLine = (d: any) => `${time(d.at)} · ≈ ${pieces(d.pieces)} pc${d.removedAt && d.removedAt > d.at ? ` · in for ${Math.round((d.removedAt - d.at) / 60000)} min` : ''}${d.estimated ? ' · estimated' : ''}${d.tags?.length ? ' · ' + d.tags.join(', ').toLowerCase() : ''}`
 
 const pad = (n: number) => String(n).padStart(2, '0')
 const localInput = (t: number) => { const d = new Date(t); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}` }
@@ -132,6 +144,7 @@ export function EditDoseSheet({ id, onClose, toast }: { id: string; onClose: () 
   const [when, setWhen] = useState(raw ? localInput(raw.at) : '')
   const [mult, setMult] = useState(raw?.multiplier ?? 1)
   const [duration, setDuration] = useState(raw?.duration ?? 'FULL')
+  const [outAt, setOutAt] = useState(raw?.removedAt ? hhmm(raw.removedAt) : '')
   if (!raw) return null
   return (
     <Sheet onClose={onClose}>
@@ -142,10 +155,12 @@ export function EditDoseSheet({ id, onClose, toast }: { id: string; onClose: () 
         <div class="row wrap">{AMOUNTS.map(([v, l]) => <button class={`chip ${mult === v ? 'on' : ''}`} onClick={() => setMult(v)}>{l}</button>)}</div></>}
       {ORAL.includes(raw.kind) && <>
         <h3>How long it stayed in</h3>
-        <div class="row wrap">{[['FULL', 'Full'], ['HALF', 'About half'], ['QUICK', 'Quick']].map(([v, l]) => <button class={`chip ${duration === v ? 'on' : ''}`} onClick={() => setDuration(v)}>{l}</button>)}</div>
+        <div class="row wrap">{[['FULL', 'Full', '30+ min'], ['HALF', 'About half', '~15 min'], ['QUICK', 'Quick', '~5 min']].map(([v, l, m]) => <button class={`chip ${duration === v && !outAt ? 'on' : ''}`} onClick={() => { setDuration(v); setOutAt('') }}>{l} <span class="small muted">{m}</span></button>)}</div>
+        {raw.kind === 'POUCH' && <label class="row small">Took it out at <input type="time" value={outAt} onInput={(e) => setOutAt((e.target as HTMLInputElement).value)} style={{ width: 130 }} /></label>}
       </>}
       <div class="row"><button class="btn" disabled={!when} onClick={async () => {
-        await S.save('dose', { ...raw, at: new Date(when).getTime(), multiplier: mult, duration }); onClose(); toast('Saved')
+        const t = new Date(when).getTime()
+        await S.save('dose', { ...raw, at: t, multiplier: mult, duration, removedAt: raw.kind === 'POUCH' ? outTime(t, outAt) : raw.removedAt ?? null }); onClose(); toast('Saved')
       }}>Save</button>
         <button class="btn text" onClick={async () => { onClose(); await S.remove(raw.id); toast('Dose deleted', () => S.restore(raw.id)) }}>Delete</button></div>
     </Sheet>

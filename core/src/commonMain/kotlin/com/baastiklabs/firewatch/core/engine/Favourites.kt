@@ -88,7 +88,7 @@ object Favourites {
                 "steady" -> ins.steadyByMonth().sumOf { it.second }.takeIf { it > 0 }?.let { "Steady days: $it in total" }
                 "clearhours" -> y?.let { "Clear hours yesterday: ${one(it.clearHours)}" }
                 "overnight" -> ins.overnightGaps().lastOrNull()?.let { "Last overnight gap: ${Coaching.hm(it.second)}" }
-                "peak" -> ins.dailyPeaks().lastOrNull()?.let { "Peak yesterday: ${one(it.second)} mg" }
+                "peak" -> ins.dailyPeaks().lastOrNull { it.first < ins.today }?.let { "Peak yesterday: ${one(it.second)} mg" }
                 "nextstep" -> Progress.stepDownProgress(data, now, tz)?.text
                 "journey" -> ins.journey()?.let { "Journey to Clear Air: ${(it * 100).toInt()}%" }
                 "taper" -> ins.taperSpeedText()

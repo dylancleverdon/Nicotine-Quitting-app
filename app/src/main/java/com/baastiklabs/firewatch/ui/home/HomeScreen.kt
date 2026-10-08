@@ -228,7 +228,7 @@ fun HomeScreen(
                     duration = draft?.duration ?: com.baastiklabs.firewatch.core.model.Duration.FULL,
                     acidicDrink = draft?.acidicDrink ?: false,
                     tags = draft?.tags ?: emptyList(),
-                ),
+                ).copy(removedAt = draft?.removedAt),
             )
             val waited = com.baastiklabs.firewatch.core.engine.BatteryEngine.waitedForFull(repo.data.value, dose, tz)
             val result = snackbar.showSnackbar(
@@ -643,7 +643,12 @@ fun HomeScreen(
             }
         }
         items(todayDoses, key = { it.id }) { dose ->
-            DoseRow(dose, data.refMgAt(dose.at), onClick = { editing = dose })
+            val canTakeOut = dose.kind == com.baastiklabs.firewatch.core.model.ProductKind.POUCH && dose.removedAt == null &&
+                !dose.estimated && now - dose.at in 0..(60 * 60_000L)
+            DoseRow(
+                dose, data.refMgAt(dose.at), onClick = { editing = dose },
+                onTookOut = if (canTakeOut) ({ scope.launch { repo.updateDose(dose.copy(removedAt = repo.now())) } }) else null,
+            )
         }
         item {
             OutlinedButton(onClick = { relapseDialog = true }, modifier = Modifier.fillMaxWidth()) {
@@ -849,7 +854,7 @@ fun EditDoseSheet(
         labelMg = dose.labelMg,
         absorption = dose.absorption,
         referenceMg = referenceMg,
-        initial = DoseDraft(dose.at, dose.multiplier, dose.duration, dose.acidicDrink, dose.tags),
+        initial = DoseDraft(dose.at, dose.multiplier, dose.duration, dose.acidicDrink, dose.tags, dose.removedAt),
         relativeTime = false,
         saveLabel = "Save",
         onDismiss = onDone,
@@ -863,6 +868,7 @@ fun EditDoseSheet(
                         duration = draft.duration,
                         acidicDrink = draft.acidicDrink,
                         tags = draft.tags,
+                        removedAt = draft.removedAt,
                     ),
                 )
             }
@@ -1026,11 +1032,13 @@ private fun SleepRow(
 }
 
 @Composable
-fun DoseRow(dose: Dose, referenceMg: Double, onClick: () -> Unit) {
+fun DoseRow(dose: Dose, referenceMg: Double, onClick: () -> Unit, onTookOut: (() -> Unit)? = null) {
     val extras = buildList {
         if (dose.estimated) add("estimated")
         if (dose.multiplier != 1.0) add("×${Fmt.pieces(dose.multiplier)}")
-        if (dose.duration != com.baastiklabs.firewatch.core.model.Duration.FULL) add(dose.duration.name.lowercase())
+        val out = dose.removedAt?.takeIf { it > dose.at }
+        if (out != null) add("in for ${((out - dose.at) / 60_000).toInt()} min")
+        else if (dose.duration != com.baastiklabs.firewatch.core.model.Duration.FULL) add(dose.duration.name.lowercase())
         if (dose.acidicDrink) add("with coffee/soda")
         addAll(dose.tags.map { it.lowercase() })
     }
@@ -1045,7 +1053,12 @@ fun DoseRow(dose: Dose, referenceMg: Double, onClick: () -> Unit) {
                 overflow = TextOverflow.Ellipsis,
             )
         },
-        trailingContent = { Text(Fmt.piecesLabel(dose.pieces(referenceMg)), style = MaterialTheme.typography.labelLarge) },
+        trailingContent = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (onTookOut != null) androidx.compose.material3.TextButton(onClick = onTookOut) { Text("Took it out") }
+                Text(Fmt.piecesLabel(dose.pieces(referenceMg)), style = MaterialTheme.typography.labelLarge)
+            }
+        },
     )
 }
 

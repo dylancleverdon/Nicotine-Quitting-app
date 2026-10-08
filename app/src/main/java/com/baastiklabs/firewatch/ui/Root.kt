@@ -56,7 +56,10 @@ fun FirewatchRoot(vm: FirewatchViewModel) {
     val loaded by vm.loaded.collectAsStateWithLifecycle()
     val data by vm.data.collectAsStateWithLifecycle()
     val update by vm.update.collectAsStateWithLifecycle()
-    val now by vm.now.collectAsStateWithLifecycle()
+    val tick by vm.now.collectAsStateWithLifecycle()
+    // The clock ticks every 15 s; when something is logged, recompute with the exact time so the
+    // new piece counts straight away (not up to a minute later).
+    val now = androidx.compose.runtime.remember(data, tick) { maxOf(tick, System.currentTimeMillis()) }
 
     if (!loaded) {
         Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background))

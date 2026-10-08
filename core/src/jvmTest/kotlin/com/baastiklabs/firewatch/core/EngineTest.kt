@@ -16,7 +16,10 @@ import com.baastiklabs.firewatch.core.model.ProductKind
 import com.baastiklabs.firewatch.core.model.RungChange
 import com.baastiklabs.firewatch.core.model.SpeedProfile
 import com.baastiklabs.firewatch.core.records.FirewatchData
+import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.LocalDateTime
+import kotlinx.datetime.plus
+import com.baastiklabs.firewatch.core.engine.Waking
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toInstant
 import kotlin.test.Test
@@ -595,7 +598,7 @@ class EngineTest {
         // Two strong within two hours is enough.
         assertNotNull(CO.stepUp(stepData(cravings = listOf(Craving("a", at(10, 9), 8), Craving("b", at(10, 10), 9))), at(10, 11), tz))
         // Over today's target by more than a piece.
-        val over = stepData((0 until 6).map { gum4.toDose("o$it", at(10, 8) + it * 245 * 60_000L, 0) })
+        val over = stepData((0 until 6).map { gum4.toDose("o$it", at(10, 8) + it * 160 * 60_000L, 0) })
         assertTrue(CO.stepUp(over, at(10, 22, 30), tz)!!.reasons.any { "over today's target" in it })
         // A craving answered with a cigarette.
         val cig = product(DefaultProducts.CIGARETTE)
@@ -1089,7 +1092,9 @@ class EngineTest {
         assertEquals(24, gaps["2–4h"])
         assertEquals(0, gaps["Under 1h"])
         assertEquals(7, ins.weekShape().size)
-        assertTrue(ins.longestGaps().all { it.second == 210.0 })
+        assertTrue(ins.longestGaps().filter { it.first < ins.today }.all { it.second == 210.0 })
+        // Today is included (so far).
+        assertEquals(ins.today, ins.longestGaps().last().first)
         // Net split: gum 4 mg is one piece, so dose size adds nothing.
         assertTrue(ins.netSplit().all { kotlin.math.abs(it.third) < 1e-6 })
         assertEquals(32.0, ins.kindsByHour()[ProductKind.GUM]!!.sum(), 1e-6)
@@ -1218,5 +1223,63 @@ class EngineTest {
         assertEquals(listOf("strip", "longestgap"), facts.map { it.id })
         assertEquals("Doses yesterday: 4", facts[0].text)
         assertEquals(listOf("a"), com.baastiklabs.firewatch.core.engine.Favourites.toggle(listOf("a", "b"), "b"))
+    }
+
+    @Test
+    fun morningLogsBeforeGoodMorningStartTheNewDay() {
+        // Usual day 8 AM to 11 PM (defaults). A piece at 6:45, Good morning at 7:00.
+        val s = com.baastiklabs.firewatch.core.model.Settings()
+        val wakeH = s.wakeMinutes / 60
+        val early = gum4.toDose("e", at(10, wakeH - 1, 15), 0)
+        val tap = com.baastiklabs.firewatch.core.model.SleepEvent("w", at(10, wakeH - 1, 30), com.baastiklabs.firewatch.core.model.SleepKind.WAKE)
+        val d = withTarget(listOf(early)).copy(sleepEvents = listOf(tap))
+        assertEquals(at(10, 10).localDate(tz), Days.wakingDate(d, early.at, tz))
+        assertEquals(early.at, Waking.day(d, at(10, 10).localDate(tz), tz).wakeAt)
+        // Without tapping Good morning at all, the same.
+        val noTap = withTarget(listOf(early))
+        assertEquals(at(10, 10).localDate(tz), Days.wakingDate(noTap, early.at, tz))
+        // A late-night piece long before the usual wake time stays with the night before.
+        val late = gum4.toDose("l", at(10, 1, 30), 0)
+        assertEquals(at(9, 10).localDate(tz), Days.wakingDate(withTarget(listOf(late)), late.at, tz))
+        // A piece before a Good night tap stays with the night before.
+        val lateEarly = gum4.toDose("x", at(10, wakeH - 2), 0)
+        val night = com.baastiklabs.firewatch.core.model.SleepEvent("n", at(10, wakeH - 2, 10), com.baastiklabs.firewatch.core.model.SleepKind.SLEEP)
+        assertEquals(at(9, 10).localDate(tz), Days.wakingDate(withTarget(listOf(lateEarly)).copy(sleepEvents = listOf(night)), lateEarly.at, tz))
+    }
+
+    @Test
+    fun batteryShowsATimeWhenItWontFillBeforeBedtime() {
+        val s = com.baastiklabs.firewatch.core.model.Settings()
+        val sleepH = (s.sleepMinutes / 60) % 24
+        val dose = gum4.toDose("a", at(10, sleepH - 1), 0)
+        val b = Progress.battery(withTarget(listOf(dose)), 4.0, at(10, sleepH - 1, 5), tz)
+        assertEquals(BatteryState.FULL_AT_WAKE, b.state)
+        assertTrue(b.fullAt != null && b.fullAt!! > at(10, sleepH - 1, 5), "$b")
+    }
+
+    @Test
+    fun pouchTakenOutEarlyCountsLess() {
+        val zyn = DefaultProducts.all().first { it.kind == ProductKind.POUCH }
+        val full = zyn.toDose("z", at(10, 9), 0)
+        val out15 = full.copy(removedAt = at(10, 9, 15))
+        assertEquals(full.absorbedMg() * 0.6, out15.absorbedMg(), 1e-9)
+        assertEquals(full.absorbedMg(), full.copy(removedAt = at(10, 10)).absorbedMg(), 1e-9)
+        assertEquals(0.3, Absorption.minutesFactor(5.0), 1e-9)
+    }
+
+    @Test
+    fun taperSpeedFromLevelChangesBeforeFourWeeks() {
+        val data = withTarget(dosesOn(2..9, 4), 4.0).let { d ->
+            d.copy(rungChanges = d.rungChanges + RungChange("d", at(6, 8), 3.0, "down"))
+        }
+        val ins = Insights(data, tz, at(10, 12))
+        assertTrue(ins.taperFromLevels)
+        assertTrue((ins.taperPercentPerWeek() ?: 0.0) > 0)
+        assertTrue(ins.taperSpeedText()!!.contains("from your level changes"))
+        assertTrue(ins.arrivals().isNotEmpty())
+        // Pace vs plan: one slot per calendar day, the plan drawn day by day.
+        val (pvp, show) = ins.paceVsPlan()
+        assertTrue(show)
+        assertTrue(pvp.zipWithNext().all { (a, b) -> a.first.plus(1, DateTimeUnit.DAY) == b.first })
     }
 }

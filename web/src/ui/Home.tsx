@@ -117,7 +117,7 @@ export function Home({ toast, go, backfill }: { toast: (msg: string, undo?: () =
           </div>}
           {battery && !hidden && <div>
             <b>{rp.on && rp.nextAt ? `Next scheduled piece at ${time(rp.nextAt)}` : battery.state === 'CLEAR' ? 'Clear for one if you want it' : battery.state === 'CHARGING' ? `Next piece around ${battery.readyAt ? time(battery.readyAt) : 'later'}` :
-              battery.state === 'FULL_AT_WAKE' ? 'Full when you wake up' : battery.state === 'MORNING_DELAY' ? `First piece goal: ${battery.readyAt ? time(battery.readyAt) : ''}` :
+              battery.state === 'FULL_AT_WAKE' ? (battery.fullAt ? `Full at ${time(battery.fullAt)} · or fresh when you wake up` : 'Full when you wake up') : battery.state === 'MORNING_DELAY' ? `First piece goal: ${battery.readyAt ? time(battery.readyAt) : ''}` :
               battery.state === 'WIND_DOWN' ? 'Winding down for bed' : 'Sleeping hours · Fresh start when you wake up'}</b>
             <Meter value={battery.charge} />
             {battery.closeToBed && <div class="small muted">Close to bedtime: nicotine can make it harder to fall asleep.</div>}
@@ -275,7 +275,10 @@ export function Home({ toast, go, backfill }: { toast: (msg: string, undo?: () =
       {snap.todayDoses.length === 0 && <div class="muted">Nothing logged yet today.</div>}
       <div class="list">{snap.todayDoses.map((d) => (
         <div class="item" onClick={() => setEditDose(d.id)}>
-          <div>{d.name}<br /><span>{doseLine(d)}</span></div><b>{piecesLabel(d.pieces)}</b>
+          <div>{d.name}<br /><span>{doseLine(d)}</span></div>
+          {d.kind === 'POUCH' && !d.removedAt && !d.estimated && Date.now() - d.at >= 0 && Date.now() - d.at < 3600000 &&
+            <button class="btn text" onClick={(e) => { e.stopPropagation(); const raw = S.live('dose').find((x) => x.id === d.id); if (raw) S.save('dose', { ...raw, removedAt: Date.now() }) }}>Took it out</button>}
+          <b>{piecesLabel(d.pieces)}</b>
         </div>
       ))}</div>
       <button class="btn outline" onClick={() => setRelapseSheet(true)}>{rp.on ? 'Relapse prevention mode: on' : 'Relapse prevention mode'}</button>

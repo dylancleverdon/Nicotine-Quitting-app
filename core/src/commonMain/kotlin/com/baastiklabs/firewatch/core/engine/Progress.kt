@@ -36,6 +36,8 @@ data class Battery(
     val pullMinutesToday: Double = 0.0,
     /** In the last hour before usual bedtime (wind-down on): show a bedtime note, keep the guidance. */
     val closeToBed: Boolean = false,
+    /** FULL_AT_WAKE: when the battery would be full if D stayed up ("Full at 11:50 PM · or fresh when you wake up"). */
+    val fullAt: Long? = null,
     /** Practice pace is on at this many pieces a day (the battery and preview use its gap). */
     val practicePieces: Double? = null,
 ) {
