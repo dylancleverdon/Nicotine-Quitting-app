@@ -1282,4 +1282,13 @@ class EngineTest {
         assertTrue(show)
         assertTrue(pvp.zipWithNext().all { (a, b) -> a.first.plus(1, DateTimeUnit.DAY) == b.first })
     }
+
+    @Test
+    fun twoMgPouchIsADefaultProduct() {
+        val p = DefaultProducts.all().first { it.id == DefaultProducts.POUCH_2MG }
+        assertEquals(ProductKind.POUCH, p.kind)
+        assertTrue(p.onHome)
+        // 2 mg at about 40% absorbed = 0.8 mg, 0.4 of a piece.
+        assertEquals(0.4, p.toDose("p", at(10, 9), 0).pieces(DefaultProducts.REFERENCE_MG), 1e-9)
+    }
 }

@@ -2,6 +2,9 @@
 
 Newest first. Each release is a "## <version>" heading; the app shows these notes in "What's new".
 
+## 0.18.1 · 2026-10-24
+- New product: **Nicotine pouch 2 mg** (about 0.4 of a piece), on the Log tab next to your other products. You can rename it, move it or hide it in Settings → Products.
+
 ## 0.18.0 · 2026-10-08
 - Logging a piece now updates the battery, stretch, pull and net straight away (it could take up to a minute).
 - Logged something before tapping Good morning? Your day now starts at that piece instead of it landing on yesterday. Anything logged in the morning (within 3 hours before your usual wake time, or after Good night) counts for the new day. Past mornings have been recounted.

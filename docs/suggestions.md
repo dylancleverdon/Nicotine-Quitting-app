@@ -115,4 +115,9 @@ Ideas raised while reviewing the app, not sent through the form.
 | 2026-10-07 | Idea | Include today in every chart | Done | 0.18.0: labelled "so far". |
 | 2026-10-07 | Bug | Battery takes about a minute to update after logging | Done | 0.18.0: the Log tab recomputes the moment something is logged. |
 | 2026-10-08 | Bug | Logging before Good morning puts the dose on the previous day | Done | 0.18.0: a morning piece before Good morning starts the new day; past mornings recounted. |
+| 2026-10-24 | Idea | Add a 2 mg pouch as a product | Done | 0.18.1: "Nicotine pouch 2 mg", added to existing installs automatically. |
+| 2026-10-09 | Idea | "This rung is tough right now" only when net is −1 gap or worse | Undecided | Proposed 13 Oct: net replaces the pull and over-target triggers. |
+| 2026-10-09 | Idea | Use total net more, like a calorie deficit | Undecided | Proposed 13 Oct: net this week, running net chart. |
+| 2026-10-12 | Idea | Took it out: does it recalculate stretch and pull? | Done | Answered: yes, the dose-size part (0.18.0). |
+| 2026-10-12 | Idea | An optional smaller step down | Undecided | Proposed 13 Oct: "Smaller step" (half a piece) beside the step-down button. |
 | 2026-10-06 | Idea | Receptor load ideas (Help fix, Favourites fact, explanation, one framing, range band, history before Firewatch, badges) | Declined | D, 8 Oct; the Help line pointing at the removed spike share chart was fixed anyway in 0.18.0. |

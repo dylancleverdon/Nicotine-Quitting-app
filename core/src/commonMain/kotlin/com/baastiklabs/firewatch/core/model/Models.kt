@@ -302,6 +302,7 @@ data class PracticeSession(
 object DefaultProducts {
     const val ZYN_3MG = "zyn-3"
     const val ZYN_6MG = "zyn-6"
+    const val POUCH_2MG = "pouch-2"
     const val GUM_2MG = "gum-2"
     const val GUM_4MG = "gum-4"
     const val CIGARETTE = "cigarette"
@@ -314,6 +315,8 @@ object DefaultProducts {
         Product(ZYN_6MG, "Zyn 6 mg", ProductKind.POUCH, 6.0, defaultAbsorption(ProductKind.POUCH), SpeedProfile.BUILD, onHome = true, order = 1),
         Product(GUM_2MG, "Nicotine gum 2 mg", ProductKind.GUM, 2.0, defaultAbsorption(ProductKind.GUM), SpeedProfile.CHEW, onHome = true, order = 2),
         Product(GUM_4MG, "Nicotine gum 4 mg", ProductKind.GUM, 4.0, defaultAbsorption(ProductKind.GUM), SpeedProfile.CHEW, onHome = true, order = 3),
+        // Added in 0.18.1; existing installs get it on update (new defaults are added automatically).
+        Product(POUCH_2MG, "Nicotine pouch 2 mg", ProductKind.POUCH, 2.0, defaultAbsorption(ProductKind.POUCH), SpeedProfile.BUILD, onHome = true, order = 4),
         cigarette(),
     )
 
