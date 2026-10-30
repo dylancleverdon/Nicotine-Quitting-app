@@ -79,19 +79,22 @@ as an estimate.
 
 ## 7. The battery (next-piece guidance)
 
-- **A plain timer:** every dose empties it, whatever its size; it refills over one gap (16 waking
-  hours ÷ the rung's pieces a day). "Next piece around …" is always one gap after the last piece.
+- **A tank (0.19):** it holds one piece and refills over one gap (16 waking hours ÷ the rung's
+  pieces a day). Each dose uses its share (a gum 4 mg empties it, a gum 2 mg uses half), never
+  below empty, so the wait is at most one gap. "Next piece around …" is when it's full again.
   Full at wake-up, fresh every morning, no waiting overnight: when it won't be full before bedtime
   it says "Full at 11:50 PM · or fresh when you wake up"; sleeping hours (late-night activity
   catches up). A logged piece updates the battery, stretch, pull and net at once. **Wind-down** is a note only. A practice day uses the next rung's gap.
-- **Stretch and pull carry timing and size.** Timing: a piece before the battery is full adds pull
-  (the time it still needed); holding off with a full battery adds stretch. Size: p pieces above one
-  add (p − 1) × gap of pull; below one add (1 − p) × gap of stretch. **Net** = stretch − pull = time
-  ahead of or behind the rung's pace whatever the product (a Zyn 6 mg every 3h 50m nets 0 at
-  Bonfire; two gum 2 mg = one gum 4 mg). Negative net is grey, never red. Paused in Relapse
+- **Stretch and pull.** Pull = the part of a dose that didn't fit, max(0, p − charge) × gap;
+  stretch = time held with a full battery (before bedtime). **Net** = stretch − pull = time ahead
+  of or behind the rung's pace, and the same nicotine gives the same net whatever the dose size
+  (4 × gum 4 mg every gap and 8 × gum 2 mg every half gap both net 0; a Zyn 6 mg every 3h 50m nets
+  0 at Bonfire; two gum 2 mg = one gum 4 mg). "Where your net comes from" splits off the size part
+  (the part of a dose beyond one whole piece). Changed in 0.19 from "every dose empties it" plus a
+  separate size rule, which credited small pieces twice; past days recounted. Negative net is grey, never red. Paused in Relapse
   prevention mode. The full-battery cheer stays. Stretch, pull and net always stay against the real
   level, even with practice pace on.
-- **Dose preview** under each product between the name and the pieces (shown even with "Hide next piece timer"; its own toggle "Hide stretch and pull on doses"). Neutral wording only.
+- **Dose preview** ("+38m pull": the part that wouldn't fit now; nothing shown when it fits) under each product between the name and the pieces (shown even with "Hide next piece timer"; its own toggle "Hide stretch and pull on doses"). Neutral wording only.
 - **Hide next piece timer** (opt-in): "Tap to see your next piece time"; each tap is a counted
   check, a "wanting it" signal used in Insights and the offers.
 - The maths jumps from dose to dose (fast); tests check it matches a minute-by-minute version.
@@ -99,9 +102,10 @@ as an estimate.
 ## 8. The ladder: find, control, taper
 
 - Rungs one piece apart from 24 down to ½ and ⅓, then Clear Air; tiers Wildfire → Clear Air.
-- **Step up (find):** offered, with the reason, the same day any one of these happens: pull
-  reaches a full gap; 3 strong cravings (or 2 within 2 hours); more than a piece over today's
-  target; a spike in timer checks; a craving that ends in a cigarette or vape. Also when the last
+- **Step up (find):** offered, with the reason, the same day any one of these happens: net
+  at one full gap behind or worse (0.19: replaces "pull reaches a gap" and "more than a piece over
+  target"; stretch earned earlier counts); 3 strong cravings (or 2 within 2 hours); a spike in
+  timer checks; a craving that ends in a cigarette or vape. Also when the last
   7 days measure a heavier rung (creeping up), or when two multi-day signals line up. "I'm OK"
   hides it until tomorrow. No "just for today" option: the point is finding the real level.
 - **Hold (control):** holding a rung is a win: held-days counts, a Holding steady chart, badges at

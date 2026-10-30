@@ -442,7 +442,7 @@ private fun BackgroundCard(ins: Insights) {
 @Composable
 private fun StretchSection(ins: Insights) = Col {
     val split = ins.netSplit().win()
-    if (split.isNotEmpty()) ChartCard("Where your net comes from", "Each day's net, split into timing (orange: waiting for a full battery) and dose size (teal: pieces smaller or bigger than one).") {
+    if (split.isNotEmpty()) ChartCard("Where your net comes from", "Each day's net, split into timing (orange: waiting for a full battery) and dose size (teal: the part of a piece beyond one whole piece).") {
         DivergingBars(split.map { it.second }, split.map { it.third }, kdates(split.map { it.first }), { Fmt.signedMinutes(it) })
     }
     val days = ins.stretchPull.win()

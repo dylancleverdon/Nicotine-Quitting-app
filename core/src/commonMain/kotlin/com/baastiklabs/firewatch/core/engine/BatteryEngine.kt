@@ -60,10 +60,12 @@ object BatteryEngine {
      * The battery for one waking day up to [until], jumping from event to event (fast). Awake = from
      * wake-up to bedtime, plus any late-night time up to [awakeUntil]. [stopBefore] stops just before
      * that dose (for the cheer).
-     * - Every dose empties the battery, whatever its size; it refills over one gap while awake.
-     * - Timing: a dose before the battery is full adds pull (the time it still needed); minutes
-     *   held with a full battery (before bedtime) add stretch.
-     * - Size: p pieces above one add (p − 1) × gap of pull; below one add (1 − p) × gap of stretch.
+     * - A tank: each dose uses its share (p pieces), never below empty; it refills one piece per gap
+     *   while awake. A gum 4 mg empties it, a gum 2 mg uses half.
+     * - Pull: the part of a dose that didn't fit, max(0, p − charge) × gap. Stretch: minutes held
+     *   with a full battery (before bedtime). So the same nicotine gives the same net whatever the
+     *   dose size (8 × 2 mg every half gap nets the same as 4 × 4 mg every gap).
+     * - [Sim.sizeNet]: the pull from the part of a dose beyond one whole piece (the rest is timing).
      */
     private fun simulate(
         data: FirewatchData,
@@ -117,14 +119,13 @@ object BatteryEngine {
             if (stopBefore != null && d.id == stopBefore.id) return Sim(charge, stretch, pull, charge >= 1.0 - 1e-9)
             val full = charge >= 1.0 - 1e-9
             val gap = gapAt(d.at)
+            val p = data.piecesOf(d)
             if (inCount(d.at)) {
-                if (!full) pull += (1.0 - charge) * gap
-                val p = data.piecesOf(d)
-                if (p > 1.0) pull += (p - 1.0) * gap else stretch += (1.0 - p) * gap
-                sizeNet += (1.0 - p) * gap
+                pull += (p - charge).coerceAtLeast(0.0) * gap
+                sizeNet -= (p - maxOf(charge, 1.0)).coerceAtLeast(0.0) * gap
             }
             fullBeforeLast = full
-            charge = 0.0
+            charge = (charge - p).coerceAtLeast(0.0)
         }
         advance(end)
         return Sim(charge, stretch, pull, fullBeforeLast, sizeNet)
@@ -144,10 +145,9 @@ object BatteryEngine {
         while (t <= end) {
             while (di < doses.size && doses[di].at <= t) {
                 val d = doses[di]
-                if (charge < 1.0 - 1e-9) pull += (1.0 - charge) * interval
                 val p = data.piecesOf(d)
-                if (p > 1.0) pull += (p - 1.0) * interval else stretch += (1.0 - p) * interval
-                charge = 0.0
+                pull += (p - charge).coerceAtLeast(0.0) * interval
+                charge = (charge - p).coerceAtLeast(0.0)
                 di++
             }
             if (t < awakeEnd && t < end) {
@@ -193,8 +193,9 @@ object BatteryEngine {
     }
 
     /**
-     * What logging [product] now would do to today's net, in minutes: positive = stretch, negative =
-     * pull (timing and size combined). Null without a target, or on a Relapse prevention mode day.
+     * What logging [product] now would do to today's net, in minutes: the pull from the part that
+     * wouldn't fit in the battery (0 when it fits). Null without a target, or on a Relapse
+     * prevention mode day.
      */
     fun preview(data: FirewatchData, product: com.baastiklabs.firewatch.core.model.Product, targetPieces: Double, now: Long, tz: TimeZone, lastActivityAt: Long = 0L): Double? {
         val b = now(data, targetPieces, now, tz, lastActivityAt)
@@ -202,9 +203,7 @@ object BatteryEngine {
         if (Relapse.isModeDay(data, day.date, tz)) return null
         val interval = b.intervalMinutes
         val p = Absorption.pieces(Absorption.absorbedMg(product), data.refMgAt(now))
-        val timing = -(1.0 - b.charge).coerceAtLeast(0.0) * interval
-        val size = if (p > 1.0) -(p - 1.0) * interval else (1.0 - p) * interval
-        return timing + size
+        return -(p - b.charge).coerceAtLeast(0.0) * interval
     }
 
     /** The target rung (pieces a day) in force at time [t], or null before any target. */

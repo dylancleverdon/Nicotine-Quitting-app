@@ -1,5 +1,10 @@
 # Firewatch web changelog
 
+## 0.16.0 · 2026-10-30
+- **Same nicotine, same net.** The battery now works like a tank: each piece uses its share of it (a gum 4 mg empties it, a gum 2 mg uses half), and pull is only the part of a piece that doesn't fit. So 8 gum 2 mg spread through the day give the same net as 4 gum 4 mg, where before the smaller pieces came out about 2 hours ahead. After a gum 2 mg on a full battery, the next piece now fits half a gap later. Past days have been recounted, so a few past nets with small pieces early in the day may be slightly lower.
+- **"This rung is tough right now"** now looks at your net instead of your pull: it shows when today's net is one full gap behind or worse, so time you held off earlier counts. Strong cravings, lots of timer checks, a cigarette or vape, and patterns over several days can still bring it up.
+- The dose preview under each product shows only the pull from the part that wouldn't fit; no line means it fits right now.
+
 ## 0.15.1 · 2026-10-24
 - New product: **Nicotine pouch 2 mg** (about 0.4 of a piece), on the Log tab next to your other products. You can rename it, move it or hide it in Settings → Products.
 

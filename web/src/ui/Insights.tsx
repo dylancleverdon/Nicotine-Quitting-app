@@ -165,7 +165,7 @@ export function Insights() {
           {snap.stretchSummary && <div class="small">{snap.stretchSummary}</div>}
           {paused > 0 && <div class="muted">{paused} {paused === 1 ? 'day' : 'days'} in Relapse prevention mode: stretch and pull paused.</div>}
         </Card>
-        {ch.netSplit.length > 0 && (() => { const ns = win(ch.netSplit); return <Card title="Where your net comes from" sub="Each day's net, split into timing (orange: waiting for a full battery) and dose size (teal: pieces smaller or bigger than one).">
+        {ch.netSplit.length > 0 && (() => { const ns = win(ch.netSplit); return <Card title="Where your net comes from" sub="Each day's net, split into timing (orange: waiting for a full battery) and dose size (teal: the part of a piece beyond one whole piece).">
           <Diverging a={ns.map((r) => Number(r[1]))} b={ns.map((r) => Number(r[2]))} labels={dateLabels(ns.map((r) => r[0]))} fmt={hm} />
         </Card> })()}</>
       })()}

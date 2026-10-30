@@ -96,9 +96,10 @@ object Coach {
     /**
      * Offer a step back up when the current rung is too much right now. It aims to catch a rough day
      * the same day, before it turns into a relapse. Any one of these today is enough:
-     * - pull reaches one full gap; 3+ cravings above what D usually rides out (or 2+ within 2 hours);
-     * - more than 1 piece over today's target; timer checks while refilling at least double the usual
-     *   (and 6+, when "Hide next piece timer" is on); a craving answered with a cigarette or vape.
+     * - net at one full gap behind or worse (stretch counts, so a long wait earlier in the day is
+     *   credited); 3+ cravings above what D usually rides out (or 2+ within 2 hours);
+     * - timer checks while refilling at least double the usual (and 6+, when "Hide next piece timer"
+     *   is on); a craving answered with a cigarette or vape.
      * Or, over the last 5 days against the 14 before, two or more of: 3+ days over target, more early
      * doses and relapses, more strong cravings, more timer checks while refilling, stronger cravings.
      * "I'm OK" hides a same-day offer until tomorrow and a multi-day one for 3 days.
@@ -118,14 +119,12 @@ object Coach {
         // ---- Today ----
         val reasons = ArrayList<String>()
         val interval = BatteryEngine.intervalFor(if (target > 0) target else 1.0 / 3.0)
-        val pull = BatteryEngine.day(data, day.date, tz, now)?.pullMin ?: 0.0
-        if (pull >= interval) reasons += "today's pull has reached ${hm(pull)}"
+        val todayBattery = BatteryEngine.day(data, day.date, tz, now)
+        val net = todayBattery?.takeIf { !it.paused }?.netMin ?: 0.0
+        if (net <= -interval) reasons += "today's net is −${hm(-net)}, more than one gap behind your level's pace"
         val strongToday = cravingsIn(day.wakeAt, minOf(now + 1, nextWake)).filter { it.intensity > strongAt }
         val clustered = strongToday.any { c -> strongToday.count { it.at in c.at until c.at + 2 * 60 * MIN } >= 2 }
         if (strongToday.size >= 3 || clustered) reasons += "you've had ${strongToday.size} strong cravings today"
-        val piecesToday = data.doses.filter { it.at >= day.wakeAt && it.at < nextWake }
-            .sumOf { data.piecesOf(it) }
-        if (piecesToday > target + 1.0) reasons += "you're already ${com.baastiklabs.firewatch.core.engine.Ladder.piecesText(piecesToday - target)} over today's target"
         if (data.settings.hideTimer) {
             val todayChecks = Checks.day(data, day.date, tz).charging
             val usual = Checks.history(data, day.date, tz, 14).map { it.charging }.average().takeIf { !it.isNaN() } ?: 0.0
