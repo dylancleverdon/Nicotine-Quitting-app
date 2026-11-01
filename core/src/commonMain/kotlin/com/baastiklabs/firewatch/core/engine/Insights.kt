@@ -430,8 +430,6 @@ class Insights(private val data: FirewatchData, private val tz: TimeZone, privat
     }
 
     /** Net per day split into timing and dose size (minutes): (date, timing, size). */
-    fun netSplit(): List<Triple<LocalDate, Double, Double>> =
-        stretchPull.filter { it.date < today && !it.paused }.map { Triple(it.date, it.netMin - it.sizeNetMin, it.sizeNetMin) }
 
     /** Pieces by hour of day and product kind over the last 30 known full days. */
     fun kindsByHour(): Map<ProductKind, DoubleArray> {
@@ -539,8 +537,8 @@ class Insights(private val data: FirewatchData, private val tz: TimeZone, privat
         val s = week.map { it.stretchMin }.average()
         val n = week.map { it.netMin }.average()
         fun hm(m: Double): String { val t = kotlin.math.abs(m).toInt(); return if (t >= 60) "${t / 60}h ${t % 60}m" else "${t}m" }
-        return if (n >= 0) "This week you averaged ${hm(s)} of stretch a day, net +${hm(n)}: living below your target pace."
-        else "This week you averaged ${hm(s)} of stretch a day, net −${hm(n)}. Pieces came a little early on average; the battery resets every morning."
+        return if (n >= 0) "This week you averaged ${hm(s)} of stretch a day, net +${hm(n)}: at or under your level."
+        else "This week you averaged ${hm(s)} of stretch a day, net −${hm(n)}: a bit over your level on average."
     }
 
     // ---- Milestones ----

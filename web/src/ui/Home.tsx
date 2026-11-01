@@ -6,6 +6,14 @@ import { Meter, Wave } from './Charts'
 import { CheckInSheet, CravingSheet, DoseSheet, EditDoseSheet, PracticeDurationSheet, VapeSheet, doseLine } from './Sheets'
 import { TAGS, cravingColor, dayTitle, duration, stepText, isoToday, mg, minutesOfDay, pieces, piecesLabel, signedDuration, time } from './format'
 
+
+/** "9:00 PM", or "tomorrow 8:00 AM" when it isn't today (at 2 a day or less the battery runs overnight). */
+function readyText(at: number): string {
+  const d = new Date(at), today = new Date(), tomorrow = new Date(); tomorrow.setDate(today.getDate() + 1)
+  if (d.toDateString() === today.toDateString()) return time(at)
+  if (d.toDateString() === tomorrow.toDateString()) return `tomorrow ${time(at)}`
+  return `${d.toLocaleDateString([], { weekday: 'short' })} ${time(at)}`
+}
 export function Home({ toast, go, backfill }: { toast: (msg: string, undo?: () => void) => void; go: (r: string) => void; backfill?: (days: string[]) => void }) {
   const snap = S.snapshot.value!
   const settings = S.settings.value
@@ -116,14 +124,12 @@ export function Home({ toast, go, backfill }: { toast: (msg: string, undo?: () =
             <Meter value={battery.charge} />
           </div>}
           {battery && !hidden && <div>
-            <b>{rp.on && rp.nextAt ? `Next scheduled piece at ${time(rp.nextAt)}` : battery.state === 'CLEAR' ? 'Clear for one if you want it' : battery.state === 'CHARGING' ? `Next piece around ${battery.readyAt ? time(battery.readyAt) : 'later'}` :
-              battery.state === 'FULL_AT_WAKE' ? (battery.fullAt ? `Full at ${time(battery.fullAt)} · or fresh when you wake up` : 'Full when you wake up') : battery.state === 'MORNING_DELAY' ? `First piece goal: ${battery.readyAt ? time(battery.readyAt) : ''}` :
+            <b>{rp.on && rp.nextAt ? `Next scheduled piece at ${time(rp.nextAt)}` : battery.state === 'CLEAR' ? 'Clear for one if you want it' : battery.state === 'CHARGING' ? `Next piece around ${battery.readyAt ? readyText(battery.readyAt) : 'later'}` :
+              battery.state === 'FULL_AT_WAKE' ? 'Full when you wake up' : battery.state === 'MORNING_DELAY' ? `First piece goal: ${battery.readyAt ? time(battery.readyAt) : ''}` :
               battery.state === 'WIND_DOWN' ? 'Winding down for bed' : 'Sleeping hours · Fresh start when you wake up'}</b>
             <Meter value={battery.charge} />
             {battery.closeToBed && <div class="small muted">Close to bedtime: nicotine can make it harder to fall asleep.</div>}
-            {!rp.on && <div class="small stretch" style={{ color: battery.stretchMin - battery.pullMin >= 0 ? 'var(--tertiary)' : 'var(--muted)' }}>
-              Stretch {duration(battery.stretchMin * 60000)} · Pull {duration(battery.pullMin * 60000)} · Net {signedDuration(battery.stretchMin - battery.pullMin)}</div>}
-            {!rp.on && snap.morningStretch != null && snap.morningStretch >= 1 && <div class="small muted">Morning stretch: {duration(snap.morningStretch * 60000)}</div>}
+            {!rp.on && <div class="small stretch net-line" style={{ color: battery.netMin >= 0 ? 'var(--tertiary)' : 'var(--muted)' }}>Net {signedDuration(battery.netMin)}</div>}
             {!rp.on && !settings.netExplained && <div class="card accent small">
               <div>{snap.netExplainer}</div>
               <div class="row"><button class="btn text" onClick={() => S.updateSettings({ netExplained: true })}>Got it</button><button class="btn text" onClick={() => go('help')}>Learn more</button></div>
@@ -248,7 +254,7 @@ export function Home({ toast, go, backfill }: { toast: (msg: string, undo?: () =
         {S.homeProducts.value.map((p) => (
           <button class="product" onPointerDown={() => down(p)} onPointerUp={() => up(p)} onPointerLeave={() => press.current && clearTimeout(press.current)} onContextMenu={(e) => e.preventDefault()}>
             <b>{p.name}</b>
-            {!settings.hideDosePreview && snap.previews[p.id] != null && Math.abs(snap.previews[p.id]) >= 1 && <span class="preview">{snap.previews[p.id] > 0 ? `+${duration(snap.previews[p.id] * 60000)} stretch` : `+${duration(-snap.previews[p.id] * 60000)} pull`}</span>}
+            {!settings.hideDosePreview && snap.previews[p.id] != null && Math.abs(snap.previews[p.id]) >= 1 && <span class="preview">−{duration(Math.abs(snap.previews[p.id]) * 60000)} net</span>}
             <span>{piecesLabel(Core.piecesOf(p, S.json()))}</span>
           </button>
         ))}

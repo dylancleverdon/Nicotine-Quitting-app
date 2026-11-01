@@ -12,7 +12,11 @@ import kotlinx.datetime.toInstant
 import kotlinx.datetime.toLocalDateTime
 
 /** A waking day: from getting up to going to sleep (which may be after midnight). */
-data class WakingDay(val date: LocalDate, val wakeAt: Long, val sleepAt: Long) {
+/**
+ * [bedtime]: the usual bedtime from Settings for this day (Good night taps don't move it). The
+ * battery fits the day's level between [wakeAt] and [bedtime] and stops refilling at [bedtime].
+ */
+data class WakingDay(val date: LocalDate, val wakeAt: Long, val sleepAt: Long, val bedtime: Long = sleepAt) {
     val awakeMinutes: Double get() = (sleepAt - wakeAt) / 60_000.0
     operator fun contains(t: Long) = t in wakeAt until sleepAt
 }
@@ -39,7 +43,7 @@ object Waking {
         val sleep = data.sleepEvents
             .filter { it.kind == SleepKind.SLEEP && it.at in (wake + 4 * H)..(defaultSleep + 8 * H) }
             .minByOrNull { kotlin.math.abs(it.at - defaultSleep) }?.at ?: defaultSleep
-        return WakingDay(date, wake, maxOf(sleep, wake + H))
+        return WakingDay(date, wake, maxOf(sleep, wake + H), bedtime = maxOf(defaultSleep, wake + H))
     }
 
     /**

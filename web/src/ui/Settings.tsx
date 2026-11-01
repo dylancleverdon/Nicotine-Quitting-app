@@ -69,13 +69,17 @@ export function Settings({ toast, go, updateInfo }: { toast: (m: string) => void
       <div class="row wrap small">Custom:
         <input style={{ width: 90 }} inputMode="decimal" placeholder="hours" onChange={(e) => { const h = Number((e.target as HTMLInputElement).value); if (h > 0) S.updateSettings({ morningDelayMinutes: Math.round(h * 60), morningDelayClock: -1 }) }} /> hours after waking, or at
         <input type="time" style={{ width: 130 }} value={(s.morningDelayClock ?? -1) >= 0 ? toTime(s.morningDelayClock) : ''} onChange={(e) => { const v = (e.target as HTMLInputElement).value; if (v) S.updateSettings({ morningDelayClock: toMin(v), morningDelayMinutes: 0 }) }} /></div>
+      <div class="small">Battery when you wake up</div>
+      <div class="row wrap">{([[1, 'Full'], [0.75, '¾'], [0.5, 'Half'], [0.25, '¼'], [0, 'Empty']] as [number, string][]).map(([v, l]) =>
+        <button class={`chip ${Math.abs((s.wakeBattery ?? 1) - v) < 1e-6 ? 'on' : ''}`} onClick={() => S.updateSettings({ wakeBattery: v })}>{l}</button>)}</div>
+      <div class="small muted">Above 2 a day. The battery then refills so you reach your level by your usual bedtime, whichever you pick. At 2 a day or less it runs around the clock instead.</div>
       <div class="small">Time format</div>
       <div class="row wrap">{[['system', 'Device setting'], ['12h', '12-hour (AM/PM)'], ['24h', '24-hour']].map(([v, l]) =>
         <button class={`chip ${(s.timeFormat ?? 'system') === v ? 'on' : ''}`} onClick={() => S.updateSettings({ timeFormat: v })}>{l}</button>)}</div>
       <label class="row small"><input type="checkbox" style={{ width: 'auto' }} checked={s.showSteadyDays ?? true} onChange={() => S.updateSettings({ showSteadyDays: !(s.showSteadyDays ?? true) })} /> Show steady days on the home card</label>
       <label class="row small"><input type="checkbox" style={{ width: 'auto' }} checked={!!s.coachingTips} onChange={() => S.updateSettings({ coachingTips: !s.coachingTips })} /> Coaching tips</label>
       <div class="small muted">Practical tips based on your own logs. Off means Firewatch just measures.</div>
-      <label class="row small"><input type="checkbox" style={{ width: 'auto' }} checked={!!s.hideDosePreview} onChange={() => S.updateSettings({ hideDosePreview: !s.hideDosePreview })} /> Hide stretch and pull on doses</label>
+      <label class="row small"><input type="checkbox" style={{ width: 'auto' }} checked={!!s.hideDosePreview} onChange={() => S.updateSettings({ hideDosePreview: !s.hideDosePreview })} /> Hide net cost on products (the "−2h net" line)</label>
       <label class="row small"><input type="checkbox" style={{ width: 'auto' }} checked={!!s.detailedCharts} onChange={() => S.updateSettings({ detailedCharts: !s.detailedCharts })} /> Detailed charts: range choices and earlier/later on Insights charts</label>
       <label class="row small"><input type="checkbox" style={{ width: 'auto' }} checked={!!s.hideTimer} onChange={() => S.updateSettings({ hideTimer: !s.hideTimer })} /> Hide next piece timer: the time shows only when you tap, so Firewatch can learn how often you check</label>
       <label class="row small"><input type="checkbox" style={{ width: 'auto' }} checked={s.windDown} onChange={() => S.updateSettings({ windDown: !s.windDown })} /> Wind down before bed: a bedtime note in the last hour before bed</label>

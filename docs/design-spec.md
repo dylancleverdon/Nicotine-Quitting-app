@@ -79,22 +79,32 @@ as an estimate.
 
 ## 7. The battery (next-piece guidance)
 
-- **A tank (0.19):** it holds one piece and refills over one gap (16 waking hours ÷ the rung's
-  pieces a day). Each dose uses its share (a gum 4 mg empties it, a gum 2 mg uses half), never
-  below empty, so the wait is at most one gap. "Next piece around …" is when it's full again.
-  Full at wake-up, fresh every morning, no waiting overnight: when it won't be full before bedtime
-  it says "Full at 11:50 PM · or fresh when you wake up"; sleeping hours (late-night activity
-  catches up). A logged piece updates the battery, stretch, pull and net at once. **Wind-down** is a note only. A practice day uses the next rung's gap.
-- **Stretch and pull.** Pull = the part of a dose that didn't fit, max(0, p − charge) × gap;
-  stretch = time held with a full battery (before bedtime). **Net** = stretch − pull = time ahead
-  of or behind the rung's pace, and the same nicotine gives the same net whatever the dose size
-  (4 × gum 4 mg every gap and 8 × gum 2 mg every half gap both net 0; a Zyn 6 mg every 3h 50m nets
-  0 at Bonfire; two gum 2 mg = one gum 4 mg). "Where your net comes from" splits off the size part
-  (the part of a dose beyond one whole piece). Changed in 0.19 from "every dose empties it" plus a
-  separate size rule, which credited small pieces twice; past days recounted. Negative net is grey, never red. Paused in Relapse
-  prevention mode. The full-battery cheer stays. Stretch, pull and net always stay against the real
-  level, even with practice pace on.
-- **Dose preview** ("+38m pull": the part that wouldn't fit now; nothing shown when it fits) under each product between the name and the pieces (shown even with "Hide next piece timer"; its own toggle "Hide stretch and pull on doses"). Neutral wording only.
+- **A tank fitted to the day (0.20).** It holds one piece; each dose uses its share (a gum 4 mg
+  empties it, a 2 mg pouch uses 40%), never below empty, so the wait is at most one piece's time.
+  "Next piece around …" is when it's full again. The level for a day is the rung in force at
+  wake-up (a change applies from the next wake-up).
+  - **Above 2 a day (daily):** at wake-up it starts at Settings' "Battery when you wake up" (Full by
+    default; ¾, Half, ¼, Empty) and refills at a steady speed so start + refill = the level exactly
+    by the usual bedtime from Settings (a late Good night doesn't stretch the day): time per piece =
+    (bedtime − wake-up) ÷ (level − start). Longer day → slower refill. No refill after bedtime, no
+    late-night catch-up; "Full when you wake up" when it won't fill before bedtime; "Sleeping hours"
+    after it. Fixes 0.19, where a full start plus a fixed 16-hour refill let small pieces reach
+    ~4.75–5 at a 4-a-day level with net still at 0.
+  - **2 a day or less (continuous):** refills around the clock at level ÷ 24 h, never resets, holds
+    up to one piece, starts empty when D first moves to such a level; "Next piece around tomorrow
+    8:00 AM" can cross midnight.
+- **Net = room left today (shown on the Log tab).** Start amount + refill so far − pieces so far, in
+  minutes at the day's time per piece; it counts the battery, so at wake-up it's one piece's worth
+  (+5h at 4 a day over 8–23). At bedtime it's exactly (level − pieces) × time per piece, so the same
+  nicotine gives the same net whatever the dose size or day length, and net ≥ 0 at bedtime ⇔ at or
+  under the level (steady days use that). Negative net is grey, never red. Paused in Relapse
+  prevention mode. Stays against the real level with practice pace on (practice pace changes the
+  refill speed, fitted the same way at its lighter level).
+- **Stretch and pull (Insights only since 0.20):** stretch = time held with a full battery before
+  bedtime; pull = the part of a dose that didn't fit. "Where your net comes from" retired in 0.20.
+- **Cost under each product** ("−2h net": its pieces × the day's time per piece; toggle "Hide net
+  cost on products"). Neutral wording only. The full-battery cheer stays. A logged piece updates
+  everything at once. **Wind-down** is a note only.
 - **Hide next piece timer** (opt-in): "Tap to see your next piece time"; each tap is a counted
   check, a "wanting it" signal used in Insights and the offers.
 - The maths jumps from dose to dose (fast); tests check it matches a minute-by-minute version.
@@ -156,8 +166,8 @@ pause on mode days.
 Sections (0.17): **Favourites** (opens first once anything is starred: a card of one plain fact per
 starred chart, then the starred charts; "Tap ☆ on any chart to add it here" when empty), Today
 (Yesterday in review, blood-level wave with optional volatility line, nicotine volatility, dose
-strip), Cravings ahead, Receptors (receptor load; background level), Stretch & pull (stretch & pull;
-where your net comes from), Trends (days known, daily totals, tier staircase, gap between pieces),
+strip), Cravings ahead, Receptors (receptor load; background level), Stretch & pull (stretch, pull
+and net per day), Trends (days known, daily totals, tier staircase, gap between pieces),
 Patterns (heatmap, checking, wake to first piece), Gaps & spacing (longest gap each day, holding
 steady, clear hours, overnight gap), Amounts & peaks (daily peak, nicotine quality), Mix (doses by
 product over the day, product mix), Forecasts (next step down, if you take each step, pace vs your
@@ -220,7 +230,7 @@ Appearance (theme line → **More themes**: 18 themes with light/dark, follow ph
 always dark, calmer colours with no red (on by default), colour-blind-safe charts, true black; the
 widgets follow), Plan (step back up a rung, hold period, first-piece goal, time format, Hide next piece timer, wind
 down note, show steady days, Coaching tips (off; the pouch → gum swap tip is part of it), practice pace,
-lighter-level practice offers, hide stretch and pull on doses, detailed charts, daily check-in), Relapse prevention mode, money, data (export,
+lighter-level practice offers, battery when you wake up (above 2 a day), hide net cost on products, detailed charts, daily check-in), Relapse prevention mode, money, data (export,
 import, automatic backups off the phone, "Last backup: N days ago"), products and the reference piece (change "from today on", or back-dated with a warning), sleep schedule,
 unsent suggestions, Help, About, updates.
 

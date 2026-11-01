@@ -89,7 +89,7 @@ object Coaching {
 
     /**
      * "Bridge with gum": when pouches are most of D's use and a smaller gum is on the home screen,
-     * a gum now can take the edge off at no net cost (battery at least half full).
+     * a gum now can take the edge off while net stays at or above zero (battery at least half full).
      */
     fun bridgeTip(data: FirewatchData, targetPieces: Double?, now: Long, tz: TimeZone, lastActivityAt: Long = 0L): Tip? {
         if (!data.settings.coachingTips || targetPieces == null || dismissed(data, BRIDGE, now)) return null
@@ -105,9 +105,9 @@ object Coaching {
             .filter { it.second < 0.9 }.minByOrNull { it.second }?.first ?: return null
         val b = BatteryEngine.now(data, targetPieces, now, tz, lastActivityAt)
         if (b.state == BatteryState.ASLEEP || b.charge < 0.5) return null
-        val preview = BatteryEngine.preview(data, gum, targetPieces, now, tz, lastActivityAt) ?: return null
-        if (preview < -1) return null
-        return Tip(BRIDGE, "A ${gum.name} now is net-neutral and can take the edge off before your next piece.")
+        val cost = BatteryEngine.preview(data, gum, targetPieces, now, tz, lastActivityAt) ?: return null
+        if (b.netMin + cost < 0) return null
+        return Tip(BRIDGE, "A ${gum.name} now still keeps your net at or above zero and can take the edge off before your next piece.")
     }
 
     /** The pouch → gum quality swap tip: only with Coaching tips on. */

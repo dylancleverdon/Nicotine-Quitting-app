@@ -3,7 +3,7 @@ import { useContext, useMemo, useState } from 'preact/hooks'
 import { Core } from '../core'
 import * as S from '../store'
 import { kindColor } from '../theme'
-import { Bars, Diverging, isTodayIso, DoseStrip, ForecastChart, Heatmap, KIND_ORDER, Line, Meter, ReceptorChart, StackedBars, Wave, dateLabels } from './Charts'
+import { Bars, isTodayIso, DoseStrip, ForecastChart, Heatmap, KIND_ORDER, Line, Meter, ReceptorChart, StackedBars, Wave, dateLabels } from './Charts'
 import { dayTitle, duration, stepText, pieces, shortDate, signedDuration, time } from './format'
 
 const SECTIONS = ['Favourites', 'Today', 'Cravings ahead', 'Receptors', 'Stretch & pull', 'Trends', 'Patterns', 'Gaps & spacing', 'Amounts & peaks', 'Mix', 'Forecasts', 'Milestones', 'Ladder']
@@ -155,7 +155,7 @@ export function Insights() {
         const week = sd.filter((d) => d.date < snap.today).slice(-7).filter((d) => !d.paused)
         const paused = sd.filter((d) => d.paused).length
         const avg = (f: (d: any) => number) => (week.length ? week.reduce((a, d) => a + f(d), 0) / week.length : 0)
-        return <><Card title="Stretch & pull" sub="Stretch: time you held off after the battery was full. Pull: nicotine that came before the battery had room for it. Net = stretch − pull; positive means you're living below your target pace. Every day starts clean.">
+        return <><Card title="Stretch & pull" sub="Stretch: time you held off after the battery was full. Pull: nicotine that came before the battery had room for it. Net is room left: it counts what's still in the battery, so at bedtime it's your level minus what you had, in time. Every day starts clean.">
           <div class="muted">Stretch (teal) and pull (grey), hours a day</div>
           <Line values={sd.map((d) => d.pullMin / 60)} second={sd.map((d) => d.stretchMin / 60)} color="var(--muted)" fmt={h} x={dl(sd)} />
           <div class="muted">Net, hours a day</div>
@@ -165,9 +165,7 @@ export function Insights() {
           {snap.stretchSummary && <div class="small">{snap.stretchSummary}</div>}
           {paused > 0 && <div class="muted">{paused} {paused === 1 ? 'day' : 'days'} in Relapse prevention mode: stretch and pull paused.</div>}
         </Card>
-        {ch.netSplit.length > 0 && (() => { const ns = win(ch.netSplit); return <Card title="Where your net comes from" sub="Each day's net, split into timing (orange: waiting for a full battery) and dose size (teal: the part of a piece beyond one whole piece).">
-          <Diverging a={ns.map((r) => Number(r[1]))} b={ns.map((r) => Number(r[2]))} labels={dateLabels(ns.map((r) => r[0]))} fmt={hm} />
-        </Card> })()}</>
+</>
       })()}
       {sec === 'Trends' && <>
         {snap.recentStates.length > 0 && <Card title={`${snap.recentStates.filter((s) => s.extra === 'logged' || s.extra === 'clear').length} of ${snap.recentStates.length} days known`} fav="known" sub="One dot per day: filled = logged, 🌿 = clear, ? = nothing logged, 👻 = left out. Only known days count in your figures.">

@@ -106,10 +106,10 @@ fun TierStatusCard(
 @Composable
 private fun BatteryRow(b: Battery, now: Long, relapseNext: Long?) {
     val (title, detail) = if (relapseNext != null) "Next scheduled piece at ${Fmt.time(relapseNext)}" to "Relapse prevention mode: staying ahead of cravings" else when (b.state) {
-        BatteryState.CLEAR -> "Clear for one if you want it" to "No rush. Every minute you wait counts as stretch."
-        BatteryState.CHARGING -> "Next piece around ${b.readyAt?.let { Fmt.time(it) } ?: "later"}" to
+        BatteryState.CLEAR -> "Clear for one if you want it" to "No rush. Every minute you wait adds to your net."
+        BatteryState.CHARGING -> "Next piece around ${b.readyAt?.let { readyText(it, now) } ?: "later"}" to
             "${b.readyAt?.let { Fmt.duration(it - now) } ?: ""} to go at your target pace"
-        BatteryState.FULL_AT_WAKE -> (b.fullAt?.let { "Full at ${Fmt.time(it)} · or fresh when you wake up" } ?: "Full when you wake up") to "No waiting overnight."
+        BatteryState.FULL_AT_WAKE -> "Full when you wake up" to "The battery stops refilling at your usual bedtime."
         BatteryState.MORNING_DELAY -> "First piece goal: ${b.readyAt?.let { Fmt.time(it) } ?: ""}" to "Pushing the first piece later is one of the best signs of progress"
         BatteryState.WIND_DOWN -> "Winding down for bed" to "Nicotine is a stimulant; late doses can disrupt sleep"
         BatteryState.ASLEEP -> "Sleeping hours" to "Fresh start when you wake up"
@@ -119,8 +119,32 @@ private fun BatteryRow(b: Battery, now: Long, relapseNext: Long?) {
         LinearProgressIndicator(progress = { b.charge.coerceIn(0.0, 1.0).toFloat() }, modifier = Modifier.fillMaxWidth())
         Text(detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         if (b.closeToBed) Text("Close to bedtime: nicotine can make it harder to fall asleep.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        if (relapseNext == null) StretchLine(b.stretchMinutesToday, b.pullMinutesToday)
+        if (relapseNext == null) NetLine(b.netMin)
     }
+}
+
+/** "9:00 PM", or "tomorrow 8:00 AM" when it isn't today (the battery at 2 a day or less runs overnight). */
+private fun readyText(at: Long, now: Long): String {
+    val zone = java.time.ZoneId.systemDefault()
+    val day = java.time.Instant.ofEpochMilli(at).atZone(zone).toLocalDate()
+    val today = java.time.Instant.ofEpochMilli(now).atZone(zone).toLocalDate()
+    return when (day) {
+        today -> Fmt.time(at)
+        today.plusDays(1) -> "tomorrow ${Fmt.time(at)}"
+        else -> "${Fmt.dayTitle(day)} ${Fmt.time(at)}"
+    }
+}
+
+/** Net: room left today, counting the battery. Grey when below zero, never red. */
+@Composable
+fun NetLine(netMin: Double) {
+    val sign = if (netMin >= 0) "+" else "−"
+    Text(
+        "Net $sign${Fmt.duration((kotlin.math.abs(netMin) * 60_000).toLong())}",
+        style = MaterialTheme.typography.labelLarge,
+        fontWeight = FontWeight.SemiBold,
+        color = if (netMin >= 0) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.outline,
+    )
 }
 
 /** "Hide next piece timer": the bar only, until a tap reveals the time (and counts a check). */

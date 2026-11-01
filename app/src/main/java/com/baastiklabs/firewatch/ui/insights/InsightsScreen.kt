@@ -441,10 +441,6 @@ private fun BackgroundCard(ins: Insights) {
 
 @Composable
 private fun StretchSection(ins: Insights) = Col {
-    val split = ins.netSplit().win()
-    if (split.isNotEmpty()) ChartCard("Where your net comes from", "Each day's net, split into timing (orange: waiting for a full battery) and dose size (teal: the part of a piece beyond one whole piece).") {
-        DivergingBars(split.map { it.second }, split.map { it.third }, kdates(split.map { it.first }), { Fmt.signedMinutes(it) })
-    }
     val days = ins.stretchPull.win()
     if (days.isEmpty()) {
         ChartCard("Stretch & pull", "Starts once you're working at a target rung.") {}
@@ -453,7 +449,7 @@ private fun StretchSection(ins: Insights) = Col {
     ChartCard(
         "Stretch & pull",
         "Stretch: time you held off after the battery was full. Pull: nicotine that came before the battery had room for it. " +
-            "Net = stretch − pull; positive means you're living below your target pace. Every day starts clean.",
+            "Net is room left: it counts what's still in the battery, so at bedtime it's your level minus what you had, in time. Every day starts clean.",
     ) {
         Text("Stretch (teal) and pull (grey), hours a day", style = MaterialTheme.typography.labelMedium)
         TrendLine(days.map { it.stretchMin / 60 }, second = days.map { it.pullMin / 60 },

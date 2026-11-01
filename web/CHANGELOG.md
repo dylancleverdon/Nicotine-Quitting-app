@@ -1,5 +1,13 @@
 # Firewatch web changelog
 
+## 0.17.0 · 2026-11-01
+- **The battery now fits your day.** When you wake up it starts full (you can change that in Settings → Your plan → Battery when you wake up) and refills at a steady speed so you reach your level exactly by your usual bedtime. A longer day refills more slowly and a shorter day faster, so the same nicotine is allowed either way. It stops refilling at your usual bedtime from Settings.
+- **Net is now your room left today.** It counts what's in the battery: at wake-up it's one piece's worth (e.g. +5h at 4 a day over 8 AM–11 PM), each piece costs its share and time builds it back up. At bedtime it's exactly your level minus what you had, in time. So net at zero or better always means you stayed at or under your level, whatever you used. Steady days now follow the same rule.
+- Each product button shows what it costs from your net, e.g. "−2h net" for a 2 mg pouch at 4 a day.
+- **At 2 a day or less the battery runs around the clock:** it refills overnight too, at your level spread over 24 hours, and starts empty when you first move to that level. "Next piece around" can say tomorrow.
+- The Log tab shows Net only; stretch and pull are in Insights → Stretch & pull. The "Morning stretch" line and the "Where your net comes from" chart are gone.
+- Past days have been recounted with the new rules, so some past nets and your steady-days total may have changed a little.
+
 ## 0.16.0 · 2026-10-30
 - **Same nicotine, same net.** The battery now works like a tank: each piece uses its share of it (a gum 4 mg empties it, a gum 2 mg uses half), and pull is only the part of a piece that doesn't fit. So 8 gum 2 mg spread through the day give the same net as 4 gum 4 mg, where before the smaller pieces came out about 2 hours ahead. After a gum 2 mg on a full battery, the next piece now fits half a gap later. Past days have been recounted, so a few past nets with small pieces early in the day may be slightly lower.
 - **"This rung is tough right now"** now looks at your net instead of your pull: it shows when today's net is one full gap behind or worse, so time you held off earlier counts. Strong cravings, lots of timer checks, a cigarette or vape, and patterns over several days can still bring it up.

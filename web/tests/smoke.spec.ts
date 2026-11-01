@@ -27,7 +27,9 @@ test('back-dated start, logging and persistence', async ({ page }) => {
   await expect(page.getByText('Your starting point: Flicker')).toBeVisible()
   await page.getByRole('button', { name: 'Start here' }).click()
   await expect(page.locator('.tier')).toHaveText('Flicker')
-  await expect(page.getByText(/Stretch .* · Pull .* · Net/)).toBeVisible()
+  // Net only on the Log tab (room left, counting the battery); each product shows its cost.
+  await expect(page.locator('.net-line')).toHaveText(/^Net [+−]\d/)
+  await expect(page.locator('.product .preview').first()).toHaveText(/^−.* net$/)
   // The step-down count sits on the top card, filling by waking hours.
   await expect(page.locator('.step-progress')).toContainText(/held toward Embers|unlocked/)
   // Dose preview under the product buttons.

@@ -22,6 +22,7 @@ Dose field `estimated: true` marks back-dated rough entries (no real time): coun
 Added in 0.16.0: settings `showWatch` (false), `lastZone` (""), `zoneHistory` (list of "<epoch ms>|<zone id>": which zone the usual wake/sleep times are in from the next day on).
 Added in 0.17.0: setting `favouriteCharts` (empty list): starred Insights chart ids (`core/.../engine/Favourites.kt`); unknown ids are ignored.
 Added in 0.18.0: dose `removedAt` (null): for pouches, when it came out of the mouth; when set it replaces `duration` in the absorbed estimate (5 min ≈ 30%, 15 min ≈ 60%, 30+ min = all).
+Added in 0.20.0: setting `wakeBattery` (1.0): how full the battery is at wake-up above 2 a day (1 = full … 0 = empty); the refill speed is fitted so the level is reached by the usual bedtime.
 
 Added in 0.14.0: settings `theme` ("firewatch"), `themeMode` ("system"), `trueBlack` (false), `colourBlindCharts` (false), `calmColours` (true), `installCardSeen` (false), `lastBackupAt` (0), `clearAirOfferSnoozedAt` (0). The old `remindCheckIn` / `remindBackup` settings are no longer read (those reminders were removed).
 

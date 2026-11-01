@@ -96,8 +96,8 @@ object Coach {
     /**
      * Offer a step back up when the current rung is too much right now. It aims to catch a rough day
      * the same day, before it turns into a relapse. Any one of these today is enough:
-     * - net at one full gap behind or worse (stretch counts, so a long wait earlier in the day is
-     *   credited); 3+ cravings above what D usually rides out (or 2+ within 2 hours);
+     * - net (room left) at one full piece behind the day's line or worse, in the day's time per
+     *   piece; 3+ cravings above what D usually rides out (or 2+ within 2 hours);
      * - timer checks while refilling at least double the usual (and 6+, when "Hide next piece timer"
      *   is on); a craving answered with a cigarette or vape.
      * Or, over the last 5 days against the 14 before, two or more of: 3+ days over target, more early
@@ -118,8 +118,8 @@ object Coach {
 
         // ---- Today ----
         val reasons = ArrayList<String>()
-        val interval = BatteryEngine.intervalFor(if (target > 0) target else 1.0 / 3.0)
         val todayBattery = BatteryEngine.day(data, day.date, tz, now)
+        val interval = todayBattery?.gapMin ?: BatteryEngine.intervalFor(if (target > 0) target else 1.0 / 3.0)
         val net = todayBattery?.takeIf { !it.paused }?.netMin ?: 0.0
         if (net <= -interval) reasons += "today's net is −${hm(-net)}, more than one gap behind your level's pace"
         val strongToday = cravingsIn(day.wakeAt, minOf(now + 1, nextWake)).filter { it.intensity > strongAt }

@@ -4,7 +4,7 @@ import { FirewatchCore } from 'firewatch-core'
 const core = FirewatchCore.getInstance()
 
 export interface Rung { pieces: number; tier: string; label: string; plain: string }
-export interface Battery { charge: number; state: 'CLEAR' | 'CHARGING' | 'FULL_AT_WAKE' | 'MORNING_DELAY' | 'WIND_DOWN' | 'ASLEEP'; readyAt: number | null; stretchMin: number; pullMin: number; fitsNow?: string | null; closeToBed?: boolean; fullAt?: number | null }
+export interface Battery { charge: number; state: 'CLEAR' | 'CHARGING' | 'FULL_AT_WAKE' | 'MORNING_DELAY' | 'WIND_DOWN' | 'ASLEEP'; readyAt: number | null; stretchMin: number; pullMin: number; fitsNow?: string | null; closeToBed?: boolean; fullAt?: number | null; netMin: number; gapMin: number }
 export interface StretchDay { date: string; stretchMin: number; pullMin: number; paused?: boolean }
 export interface Relapse { on: boolean; nextAt: number | null; gapMin: number; productId: string | null; productName: string | null; recommend: string | null; movingOn: boolean; modeDays: string[] }
 export interface CravingWindow { from: number; to: number; peakAt: number; likelihood: number; strength: number }
@@ -51,7 +51,7 @@ export interface Snapshot {
   clearAir: { active: boolean; daysFree: number; healing: number | null; offer: boolean }
   charts: {
     gapSizes: NamedValue[]; weekShape: NamedValue[]; dailyPeaks: NamedValue[]; firstPiece: string[][]; longestGaps: NamedValue[]; cravingWeekly: NamedValue[]
-    netSplit: string[][]; kindsByHour: Record<string, number[]>; steadyByMonth: NamedValue[]; paceVsPlan: string[][]; practiceRuns: NamedValue[]; daysFree: NamedValue[]
+    kindsByHour: Record<string, number[]>; steadyByMonth: NamedValue[]; paceVsPlan: string[][]; practiceRuns: NamedValue[]; daysFree: NamedValue[]
   }
   qualityScore: number | null; qualityLabel: string | null; swapTip: string | null; activeCraving: CravingView | null
   todayPieces: number; todayMg: number; todayCravings: number; todayRodeOut: number; lastDoseAt: number | null

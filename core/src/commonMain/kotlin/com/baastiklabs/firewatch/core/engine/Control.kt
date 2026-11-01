@@ -150,7 +150,8 @@ object Control {
         if (Relapse.isModeDay(data, date, tz)) return true
         if (doses.isNotEmpty() && doses.all { it.estimated }) return doses.sumOf { data.piecesOf(it) } <= target + 0.25
         val day = BatteryEngine.day(data, date, tz, now) ?: return null
-        return day.netMin >= 0
+        // Net at the end of the day is (level − pieces) × the day's gap: steady = at or under the level.
+        return day.netMin >= -1.0
     }
 
     /**

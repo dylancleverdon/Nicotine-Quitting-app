@@ -201,7 +201,8 @@ object Practice {
         val hold = s.holdDays.coerceAtLeast(1)
         if (covered < COVERAGE * hold * Ladder.WAKING_MINUTES) return null
         val net = runNet(data, sessions, morning, tz)
-        if (net < 0) return null
+        // A minute's tolerance for rounding: a run exactly on pace nets 0.
+        if (net < -1.0) return null
         return WorkFrom(measured, covered, net)
     }
 

@@ -153,6 +153,11 @@ data class Settings(
     val movingOnDismissedAt: Long = 0,
     /** The first-launch welcome tour has been seen. */
     val tourSeen: Boolean = false,
+    /**
+     * How full the battery is at wake-up, above 2 a day (1 = full, 0 = empty). The refill speed is
+     * fitted so start + refill = the level by the usual bedtime.
+     */
+    val wakeBattery: Double = 1.0,
     /** Insights → Favourites: starred chart ids (see engine/Favourites.kt). */
     val favouriteCharts: List<String> = emptyList(),
     /** Opt-in "Hide next piece timer": the time shows only on a tap, and each tap is counted. */

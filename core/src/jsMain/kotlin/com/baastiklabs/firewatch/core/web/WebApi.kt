@@ -45,7 +45,7 @@ import kotlinx.serialization.json.JsonElement
 external object JsJodaTimeZoneModule
 
 @Serializable data class RungDto(val pieces: Double, val tier: String, val label: String, val plain: String)
-@Serializable data class BatteryDto(val charge: Double, val state: String, val readyAt: Double?, val stretchMin: Double, val pullMin: Double, val fitsNow: String? = null, val closeToBed: Boolean = false, val fullAt: Double? = null)
+@Serializable data class BatteryDto(val charge: Double, val state: String, val readyAt: Double?, val stretchMin: Double, val pullMin: Double, val fitsNow: String? = null, val closeToBed: Boolean = false, val fullAt: Double? = null, val netMin: Double = 0.0, val gapMin: Double = 0.0)
 @Serializable data class StretchDay(val date: String, val stretchMin: Double, val pullMin: Double, val paused: Boolean = false)
 @Serializable data class RelapseDto(
     val on: Boolean, val nextAt: Double?, val gapMin: Double, val productId: String?, val productName: String?,
@@ -91,7 +91,6 @@ external object JsJodaTimeZoneModule
     val firstPiece: List<List<String>>,
     val longestGaps: List<NamedValue>, val cravingWeekly: List<NamedValue>,
     /** [date, timing min, size min]. */
-    val netSplit: List<List<String>>,
     val kindsByHour: Map<String, List<Double>>,
     val steadyByMonth: List<NamedValue>,
     /** [date, pieces or "", level or ""]; empty unless there's been a step down. */
@@ -358,7 +357,7 @@ object FirewatchCore {
             revealed = revealed,
             measured = measured?.dto(),
             target = target?.dto(),
-            battery = battery?.let { BatteryDto(it.charge, it.state.name, it.readyAt?.toDouble(), it.stretchMinutesToday, it.pullMinutesToday, null, it.closeToBed, it.fullAt?.toDouble()) },
+            battery = battery?.let { BatteryDto(it.charge, it.state.name, it.readyAt?.toDouble(), it.stretchMinutesToday, it.pullMinutesToday, null, it.closeToBed, null, it.netMin, it.gapMin) },
             stepDown = stepDown?.dto(),
             stepDownNote = listOfNotNull(readiness?.takeIf { it.confident }?.let {
                 if (it.ready) "From your cravings, the next rung should feel like about a ${it.predictedNext.toInt()} out of 10, and you ride out ${it.capacity}s."
@@ -423,7 +422,6 @@ object FirewatchCore {
                 firstPiece = ins.firstPieceWeekdaysVsWeekends().map { listOf(it.first.toString(), (it.second ?: -1.0).toString(), (it.third ?: -1.0).toString()) },
                 longestGaps = ins.longestGaps().map { NamedValue(it.first.toString(), it.second ?: 0.0) },
                 cravingWeekly = ins.cravingStrengthWeekly().map { NamedValue(it.first.toString(), it.second, it.third.toString()) },
-                netSplit = ins.netSplit().map { listOf(it.first.toString(), it.second.toString(), it.third.toString()) },
                 kindsByHour = ins.kindsByHour().mapKeys { it.key.name }.mapValues { it.value.toList() },
                 steadyByMonth = ins.steadyByMonth().map { NamedValue(it.first, it.second.toDouble()) },
                 paceVsPlan = ins.paceVsPlan().first.map { listOf(it.first.toString(), it.second?.toString() ?: "", it.third?.toString() ?: "") },

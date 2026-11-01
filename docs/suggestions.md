@@ -117,6 +117,11 @@ Ideas raised while reviewing the app, not sent through the form.
 | 2026-10-08 | Bug | Logging before Good morning puts the dose on the previous day | Done | 0.18.0: a morning piece before Good morning starts the new day; past mornings recounted. |
 | 2026-10-24 | Idea | Add a 2 mg pouch as a product | Done | 0.18.1: "Nicotine pouch 2 mg", added to existing installs automatically. |
 | 2026-10-13 | Bug | Same nicotine, different net: 8 × 2 mg every 2 h netted +2h while 4 × 4 mg every 4 h netted 0 | Done | 0.19.0: the battery is a tank (each dose uses its share; pull is the part that does not fit); past days recounted. |
+| 2026-10-31 | Bug | Small pieces "whenever they fit" kept net at 0 but reached ~4.8 at a 4-a-day level | Done | 0.20.0: the battery is fitted to the day (start + refill = the level by the usual bedtime); net counts the battery. |
+| 2026-10-31 | Idea | Longer and shorter days should allow the same nicotine | Done | 0.20.0 |
+| 2026-10-31 | Idea | At 2 a day or less, a battery that runs around the clock | Done | 0.20.0: refills overnight at level ÷ 24 h, starts empty at the move. |
+| 2026-11-01 | Idea | Net as a smooth "room left" signal; Log tab shows Net only; cost per product ("−2h net") | Done | 0.20.0 |
+| 2026-11-01 | Idea | Retire "Where your net comes from" | Done | 0.20.0 |
 | 2026-10-09 | Idea | "This rung is tough right now" only when net is −1 gap or worse | Done | 0.19.0: net replaces the pull and over-target triggers; cravings, timer checks, cigarette/vape and multi-day patterns stay. |
 | 2026-10-09 | Idea | Use total net more, like a calorie deficit | Undecided | Proposed 13 Oct: net this week, running net chart. |
 | 2026-10-12 | Idea | Took it out: does it recalculate stretch and pull? | Done | Answered: yes, the dose-size part (0.18.0). |

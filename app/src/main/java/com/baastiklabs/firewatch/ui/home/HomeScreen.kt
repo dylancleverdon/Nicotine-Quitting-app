@@ -320,15 +320,6 @@ fun HomeScreen(
             )
         }
         if (showTier && battery != null && !data.relapseOn && !clearAir) {
-            morningStretch?.takeIf { it >= 1 }?.let { m ->
-                item {
-                    Text(
-                        "Morning stretch: ${Fmt.duration((m * 60_000).toLong())}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.tertiary,
-                    )
-                }
-            }
             if (!data.settings.netExplained) item {
                 OfferCard(
                     title = "Your net",
@@ -979,10 +970,10 @@ private fun ProductButton(
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
-            // What logging it now would do to net (timing and size): neutral, never "earn it".
+            // What it costs from today's net: pieces × the day's time per piece. Neutral wording.
             preview?.takeIf { kotlin.math.abs(it) >= 1 }?.let {
                 Text(
-                    if (it > 0) "+${Fmt.duration((it * 60_000).toLong())} stretch" else "+${Fmt.duration((-it * 60_000).toLong())} pull",
+                    "−${Fmt.duration((kotlin.math.abs(it) * 60_000).toLong())} net",
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
                 )

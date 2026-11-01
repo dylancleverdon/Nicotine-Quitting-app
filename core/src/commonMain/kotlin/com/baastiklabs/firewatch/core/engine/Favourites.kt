@@ -24,7 +24,6 @@ object Favourites {
         Chart("receptors", "Receptors", "Receptors"),
         Chart("background", "Background level", "Receptors"),
         Chart("stretch", "Stretch & pull", "Stretch & pull"),
-        Chart("netsplit", "Where your net comes from", "Stretch & pull"),
         Chart("known", "Days known", "Trends"),
         Chart("totals", "Daily totals", "Trends"),
         Chart("staircase", "Tier staircase", "Trends"),

@@ -100,6 +100,17 @@ fun PlanSettings(vm: FirewatchViewModel, data: FirewatchData) {
             customDelay = false
             update { it.copy(morningDelayMinutes = minutes, morningDelayClock = clock) }
         }
+        Text("Battery when you wake up", style = MaterialTheme.typography.titleSmall)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf(1.0 to "Full", 0.75 to "¾", 0.5 to "Half", 0.25 to "¼", 0.0 to "Empty").forEach { (v, label) ->
+                FilterChip(selected = kotlin.math.abs(s.wakeBattery - v) < 1e-6, onClick = { update { it.copy(wakeBattery = v) } }, label = { Text(label) })
+            }
+        }
+        Text(
+            "Above 2 a day. The battery then refills so you reach your level by your usual bedtime, whichever you pick. At 2 a day or less it runs around the clock instead.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
         Text("Time format", style = MaterialTheme.typography.titleSmall)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             listOf("system" to "Phone setting", "12h" to "12-hour (AM/PM)", "24h" to "24-hour").forEach { (v, label) ->
@@ -114,7 +125,7 @@ fun PlanSettings(vm: FirewatchViewModel, data: FirewatchData) {
         ToggleRow("Wind down before bed", "A bedtime note in the last hour before bed", s.windDown) { v -> update { it.copy(windDown = v) } }
         ToggleRow("Show steady days", "\"✓ N steady days\" on the home card", s.showSteadyDays) { v -> update { it.copy(showSteadyDays = v) } }
         ToggleRow("Coaching tips", "Practical tips based on your own logs. Off means Firewatch just measures.", s.coachingTips) { v -> update { it.copy(coachingTips = v) } }
-        ToggleRow("Hide stretch and pull on doses", "The \"+38m pull\" line on each product button", s.hideDosePreview) { v -> update { it.copy(hideDosePreview = v) } }
+        ToggleRow("Hide net cost on products", "The \"−2h net\" line on each product button", s.hideDosePreview) { v -> update { it.copy(hideDosePreview = v) } }
         ToggleRow("Show watch data", "Heart rate from your watch in Insights (off unless you turn it on)", s.showWatch) { v -> update { it.copy(showWatch = v) } }
         ToggleRow("Detailed charts", "Range choices and earlier/later on Insights charts", s.detailedCharts) { v -> update { it.copy(detailedCharts = v) } }
         ToggleRow("Daily check-in", "Three quick taps: craving strength, mood and sleep", s.dailyCheckIn) { v -> update { it.copy(dailyCheckIn = v) } }
