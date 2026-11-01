@@ -122,6 +122,8 @@ Ideas raised while reviewing the app, not sent through the form.
 | 2026-10-31 | Idea | At 2 a day or less, a battery that runs around the clock | Done | 0.20.0: refills overnight at level ÷ 24 h, starts empty at the move. |
 | 2026-11-01 | Idea | Net as a smooth "room left" signal; Log tab shows Net only; cost per product ("−2h net") | Done | 0.20.0 |
 | 2026-11-01 | Idea | Retire "Where your net comes from" | Done | 0.20.0 |
+| 2026-11-01 | Idea | Around-the-clock battery as an option above 2 a day | Later | D wants to try it once at that level; net would read less clearly with overnight refill. |
+| 2026-11-01 | Bug | Around-the-clock mode (2 a day or less): a day can end at net 0 with more than the level (full battery carried in, overnight refill used late) | Later | Proposed fix: in that mode a steady day counts pieces (at or under the level) instead of net. D: hold off for now. |
 | 2026-10-09 | Idea | "This rung is tough right now" only when net is −1 gap or worse | Done | 0.19.0: net replaces the pull and over-target triggers; cravings, timer checks, cigarette/vape and multi-day patterns stay. |
 | 2026-10-09 | Idea | Use total net more, like a calorie deficit | Undecided | Proposed 13 Oct: net this week, running net chart. |
 | 2026-10-12 | Idea | Took it out: does it recalculate stretch and pull? | Done | Answered: yes, the dose-size part (0.18.0). |
