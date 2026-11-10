@@ -3,10 +3,10 @@
 Newest first. Each release is a "## <version>" heading; the app shows these notes in "What's new".
 
 ## 0.21.0 · 2026-11-10
-- **2 a day now uses your waking day.** From tomorrow's wake-up (11 Nov), the battery at 2 a day works like it does at higher levels: it's fitted so you reach 2 by your usual bedtime and stops refilling then. Before, it ran around the clock, so after a night it was full and several small pieces fitted into the morning, with long waits after.
+- **2 a day now uses your waking day.** From your wake-up on 10 Nov, the battery at 2 a day works like it does at higher levels: it's fitted so you reach 2 by your usual bedtime and stops refilling then. Before, it ran around the clock, so after a night it was full and several small pieces fitted into the morning, with long waits after.
 - At 2 a day, a full battery at wake-up is half a piece, so the morning holds a quarter of your day, like at 4 a day. Over an 8 AM–11 PM day you wake up at +5h net and a 2 mg pouch costs −4h.
 - 3 a day and above are unchanged. At 1 a day or less the battery still runs around the clock.
-- Today and earlier days keep the old rule; nothing is recounted.
+- 9 Nov and earlier days keep the old rule; nothing is recounted.
 
 ## 0.20.0 · 2026-11-01
 - **The battery now fits your day.** When you wake up it starts full (you can change that in Settings → Your plan → Battery when you wake up) and refills at a steady speed so you reach your level exactly by your usual bedtime. A longer day refills more slowly and a shorter day faster, so the same nicotine is allowed either way. It stops refilling at your usual bedtime from Settings.

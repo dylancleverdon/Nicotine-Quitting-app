@@ -54,7 +54,7 @@ object BatteryEngine {
      * From this waking day on, 2 a day uses the fitted day (0.21). Before it, the battery ran around
      * the clock at 2 a day or less; those days keep that rule.
      */
-    val TWO_A_DAY_FITTED_FROM: LocalDate = LocalDate(2026, 11, 11)
+    val TWO_A_DAY_FITTED_FROM: LocalDate = LocalDate(2026, 11, 10)
 
     /** At or below this many pieces a day, the battery runs around the clock on the day [date]. */
     fun continuousAt(date: LocalDate): Double = if (date >= TWO_A_DAY_FITTED_FROM) 1.0 else 2.0

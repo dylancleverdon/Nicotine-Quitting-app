@@ -94,7 +94,7 @@ as an estimate.
   - **1 a day or less (continuous):** refills around the clock at level ÷ 24 h, never resets, holds
     up to one piece, starts empty when D first moves to such a level; "Next piece around tomorrow
     8:00 AM" can cross midnight.
-  - **2 a day moved to daily mode in 0.21**, from the waking day of 11 Nov 2026 (D: around the clock,
+  - **2 a day moved to daily mode in 0.21**, from the waking day of 10 Nov 2026 (D: around the clock,
     a full battery after the night let several small pieces bunch up in the morning, then long
     waits). Days before that keep the around-the-clock rule and are not recounted.
 - **Net = room left today (shown on the Log tab).** Start amount + refill so far − pieces so far, in

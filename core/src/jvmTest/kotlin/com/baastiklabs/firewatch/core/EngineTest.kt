@@ -1372,8 +1372,8 @@ class EngineTest {
     }
 
     @Test
-    fun twoADayUsesTheWakingDayFromElevenNovember() {
-        // 0.21: from the 11 Nov 2026 wake-up, 2 a day is fitted to the day, starting at half a piece.
+    fun twoADayUsesTheWakingDayFromTenNovember() {
+        // 0.21: from the 10 Nov 2026 wake-up, 2 a day is fitted to the day, starting at half a piece.
         // Days before keep the around-the-clock rule (not recounted). 1 a day or less stays around the clock.
         fun nov(d: Int, h: Int, m: Int = 0) = LocalDateTime(2026, 11, d, h, m).toInstant(tz).toEpochMilliseconds()
         val B = com.baastiklabs.firewatch.core.engine.BatteryEngine
@@ -1381,26 +1381,31 @@ class EngineTest {
         val pouch2 = product(DefaultProducts.POUCH_2MG)
         fun data(doses: List<com.baastiklabs.firewatch.core.model.Dose>, level: Double = 2.0) = FirewatchData(products = DefaultProducts.all(), doses = doses, settings = s,
             rungChanges = listOf(RungChange("a", nov(1, 8), 4.0, "start"), RungChange("b", nov(5, 12), level, "down")))
-        // 10 Nov: still around the clock (12 h a piece).
-        assertEquals(720.0, B.day(data(emptyList()), kotlinx.datetime.LocalDate(2026, 11, 10), tz, nov(10, 12))!!.gapMin, 1e-6)
-        assertEquals(720.0, Progress.battery(data(emptyList()), 2.0, nov(10, 23, 30), tz).gapMin, 1e-6)
-        // 11 Nov: half a piece at wake-up, 1.5 pieces over 8:00–23:00 → 10 h a piece; +5h net at wake.
-        val wake = Progress.battery(data(emptyList()), 2.0, nov(11, 8), tz)
+        // 9 Nov: still around the clock (12 h a piece).
+        assertEquals(720.0, B.day(data(emptyList()), kotlinx.datetime.LocalDate(2026, 11, 9), tz, nov(9, 12))!!.gapMin, 1e-6)
+        assertEquals(720.0, Progress.battery(data(emptyList()), 2.0, nov(9, 23, 30), tz).gapMin, 1e-6)
+        // 10 Nov: half a piece at wake-up, 1.5 pieces over 8:00–23:00 → 10 h a piece; +5h net at wake.
+        val wake = Progress.battery(data(emptyList()), 2.0, nov(10, 8), tz)
         assertEquals(600.0, wake.gapMin, 1e-6)
         assertEquals(300.0, wake.netMin, 1.0)
         assertEquals(0.5, wake.charge, 1e-6)
-        assertEquals(-240.0, B.preview(data(emptyList()), pouch2, 2.0, nov(11, 8), tz)!!, 1.0)
+        assertEquals(-240.0, B.preview(data(emptyList()), pouch2, 2.0, nov(10, 8), tz)!!, 1.0)
         // Five 2 mg pouches spread 8, 11, 15, 19, 23 never go below zero and land on 2 at bedtime.
-        val times = listOf(nov(11, 8), nov(11, 11), nov(11, 15), nov(11, 19), nov(11, 23))
+        val times = listOf(nov(10, 8), nov(10, 11), nov(10, 15), nov(10, 19), nov(10, 23))
         val five = data(times.mapIndexed { i, at -> pouch2.toDose("p$i", at, 0) })
         times.forEach { at -> assertTrue(Progress.battery(five, 2.0, at, tz).netMin >= -1.0, "$at") }
-        assertEquals(0.0, B.day(five, kotlinx.datetime.LocalDate(2026, 11, 11), tz, nov(11, 23, 59))!!.netMin, 1.0)
+        assertEquals(0.0, B.day(five, kotlinx.datetime.LocalDate(2026, 11, 10), tz, nov(10, 23, 59))!!.netMin, 1.0)
         // No refill after bedtime at 2 a day now.
-        assertEquals(BatteryState.ASLEEP, Progress.battery(five, 2.0, nov(11, 23, 30), tz).state)
+        assertEquals(BatteryState.ASLEEP, Progress.battery(five, 2.0, nov(10, 23, 30), tz).state)
         // 1 a day stays around the clock: 24 h a piece.
-        assertEquals(1440.0, Progress.battery(data(emptyList(), 1.0), 1.0, nov(11, 12), tz).gapMin, 1e-6)
+        assertEquals(1440.0, Progress.battery(data(emptyList(), 1.0), 1.0, nov(10, 12), tz).gapMin, 1e-6)
         // 3 a day is unchanged: full start, 2 pieces over 15 h.
-        assertEquals(450.0, Progress.battery(data(emptyList(), 3.0), 3.0, nov(11, 12), tz).gapMin, 1e-6)
+        assertEquals(450.0, Progress.battery(data(emptyList(), 3.0), 3.0, nov(10, 12), tz).gapMin, 1e-6)
+        // The switch follows the local date: 22:37 on 9 Nov in Los Angeles (06:37 UTC on 10 Nov) is still the old rule.
+        val la = TimeZone.of("America/Los_Angeles")
+        fun laAt(d: Int, h: Int, m: Int) = LocalDateTime(2026, 11, d, h, m).toInstant(la).toEpochMilliseconds()
+        assertEquals(720.0, Progress.battery(data(emptyList()), 2.0, laAt(9, 22, 37), la).gapMin, 1e-6)
+        assertEquals(600.0, Progress.battery(data(emptyList()), 2.0, laAt(10, 9, 0), la).gapMin, 1e-6)
     }
 
     @Test
