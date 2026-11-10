@@ -72,7 +72,7 @@ export function Settings({ toast, go, updateInfo }: { toast: (m: string) => void
       <div class="small">Battery when you wake up</div>
       <div class="row wrap">{([[1, 'Full'], [0.75, '¾'], [0.5, 'Half'], [0.25, '¼'], [0, 'Empty']] as [number, string][]).map(([v, l]) =>
         <button class={`chip ${Math.abs((s.wakeBattery ?? 1) - v) < 1e-6 ? 'on' : ''}`} onClick={() => S.updateSettings({ wakeBattery: v })}>{l}</button>)}</div>
-      <div class="small muted">Above 2 a day. The battery then refills so you reach your level by your usual bedtime, whichever you pick. At 2 a day or less it runs around the clock instead.</div>
+      <div class="small muted">Above 1 a day. The battery then refills so you reach your level by your usual bedtime, whichever you pick. At 2 a day, full means half a piece, so your morning holds a quarter of your day. At 1 a day or less it runs around the clock instead.</div>
       <div class="small">Time format</div>
       <div class="row wrap">{[['system', 'Device setting'], ['12h', '12-hour (AM/PM)'], ['24h', '24-hour']].map(([v, l]) =>
         <button class={`chip ${(s.timeFormat ?? 'system') === v ? 'on' : ''}`} onClick={() => S.updateSettings({ timeFormat: v })}>{l}</button>)}</div>

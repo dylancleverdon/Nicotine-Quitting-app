@@ -123,7 +123,7 @@ private fun BatteryRow(b: Battery, now: Long, relapseNext: Long?) {
     }
 }
 
-/** "9:00 PM", or "tomorrow 8:00 AM" when it isn't today (the battery at 2 a day or less runs overnight). */
+/** "9:00 PM", or "tomorrow 8:00 AM" when it isn't today (the battery at 1 a day or less runs overnight). */
 private fun readyText(at: Long, now: Long): String {
     val zone = java.time.ZoneId.systemDefault()
     val day = java.time.Instant.ofEpochMilli(at).atZone(zone).toLocalDate()

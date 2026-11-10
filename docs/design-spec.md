@@ -83,16 +83,20 @@ as an estimate.
   empties it, a 2 mg pouch uses 40%), never below empty, so the wait is at most one piece's time.
   "Next piece around …" is when it's full again. The level for a day is the rung in force at
   wake-up (a change applies from the next wake-up).
-  - **Above 2 a day (daily):** at wake-up it starts at Settings' "Battery when you wake up" (Full by
-    default; ¾, Half, ¼, Empty) and refills at a steady speed so start + refill = the level exactly
+  - **Above 1 a day (daily):** at wake-up it starts at Settings' "Battery when you wake up" (Full by
+    default; ¾, Half, ¼, Empty; at 2 a day each is halved, so Full = half a piece and the morning
+    holds a quarter of the day, as at 4 a day: +5h net at wake over 8–23, a 2 mg pouch −4h) and refills at a steady speed so start + refill = the level exactly
     by the usual bedtime from Settings (a late Good night doesn't stretch the day): time per piece =
     (bedtime − wake-up) ÷ (level − start). Longer day → slower refill. No refill after bedtime, no
     late-night catch-up; "Full when you wake up" when it won't fill before bedtime; "Sleeping hours"
     after it. Fixes 0.19, where a full start plus a fixed 16-hour refill let small pieces reach
     ~4.75–5 at a 4-a-day level with net still at 0.
-  - **2 a day or less (continuous):** refills around the clock at level ÷ 24 h, never resets, holds
+  - **1 a day or less (continuous):** refills around the clock at level ÷ 24 h, never resets, holds
     up to one piece, starts empty when D first moves to such a level; "Next piece around tomorrow
     8:00 AM" can cross midnight.
+  - **2 a day moved to daily mode in 0.21**, from the waking day of 11 Nov 2026 (D: around the clock,
+    a full battery after the night let several small pieces bunch up in the morning, then long
+    waits). Days before that keep the around-the-clock rule and are not recounted.
 - **Net = room left today (shown on the Log tab).** Start amount + refill so far − pieces so far, in
   minutes at the day's time per piece; it counts the battery, so at wake-up it's one piece's worth
   (+5h at 4 a day over 8–23). At bedtime it's exactly (level − pieces) × time per piece, so the same

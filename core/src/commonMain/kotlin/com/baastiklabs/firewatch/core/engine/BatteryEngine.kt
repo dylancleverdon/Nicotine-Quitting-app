@@ -32,11 +32,14 @@ data class DayBattery(
 /**
  * The next-piece battery (0.20: fitted to the day).
  * - Level for a day: the rung in force at wake-up (a change applies from the next wake-up).
- * - Daily mode (above 2 a day): at wake-up the battery starts at Settings' wake amount (full by
- *   default) and refills at a steady speed so start + refill = the level exactly at the usual
- *   bedtime (Settings, not Good night). Longer day → slower refill. No refill after bedtime.
- * - Continuous mode (2 a day or less): the battery refills around the clock at level ÷ 24 h, never
+ * - Daily mode (above 1 a day): at wake-up the battery starts at Settings' wake amount (full by
+ *   default; at 2 a day "full" is half a piece, so the morning holds a quarter of the day) and
+ *   refills at a steady speed so start + refill = the level exactly at the usual bedtime (Settings,
+ *   not Good night). Longer day → slower refill. No refill after bedtime.
+ * - Continuous mode (1 a day or less): the battery refills around the clock at level ÷ 24 h, never
  *   resets, holds up to one piece and starts empty when D first moves to that level.
+ * - 0.21: 2 a day moved from continuous to daily mode from the waking day of
+ *   [TWO_A_DAY_FITTED_FROM]. Days before it keep the old rule, so they are never recounted.
  * - A tank: each dose uses its share (p pieces), never below empty, so the wait is at most one gap.
  *   Pull: the part of a dose that didn't fit, in minutes. Stretch: minutes held with a full battery
  *   before bedtime. Both are for Insights.
@@ -47,8 +50,17 @@ data class DayBattery(
 object BatteryEngine {
     private const val MIN = 60_000L
     private const val DAY_MIN = 24 * 60.0
-    /** At or below this many pieces a day, the battery runs around the clock. */
-    const val CONTINUOUS_AT = 2.0
+    /**
+     * From this waking day on, 2 a day uses the fitted day (0.21). Before it, the battery ran around
+     * the clock at 2 a day or less; those days keep that rule.
+     */
+    val TWO_A_DAY_FITTED_FROM: LocalDate = LocalDate(2026, 11, 11)
+
+    /** At or below this many pieces a day, the battery runs around the clock on the day [date]. */
+    fun continuousAt(date: LocalDate): Double = if (date >= TWO_A_DAY_FITTED_FROM) 1.0 else 2.0
+
+    /** Share of a piece a full start holds at [level] (daily mode): half a piece at 2 a day. */
+    private fun startShare(level: Double): Double = if (level <= 2.0 + 1e-9) 0.5 else 1.0
 
     private class Sim(val charge: Double, val stretch: Double, val pull: Double, val fullBeforeLast: Boolean?)
 
@@ -89,19 +101,22 @@ object BatteryEngine {
     private fun fittedRate(level: Double, c0: Double, day: WakingDay): Double =
         (level - c0).coerceAtLeast(0.05) / ((day.bedtime - day.wakeAt) / MIN.toDouble()).coerceAtLeast(60.0)
 
-    /** When the current run of levels at 2 a day or less began (the battery starts empty there). */
-    private fun continuousSince(data: FirewatchData, t: Long): Long? {
+    /** When the current run of levels at or below [limit] began (the battery starts empty there). */
+    private fun continuousSince(data: FirewatchData, t: Long, limit: Double): Long? {
         var since: Long? = null
         for (rc in data.rungChanges) {
             if (rc.at > t) break
-            since = if (rc.pieces <= CONTINUOUS_AT + 1e-9) (since ?: rc.at) else null
+            since = if (rc.pieces <= limit + 1e-9) (since ?: rc.at) else null
         }
         return since
     }
 
-    /** The continuous battery's charge just before [t]: empty at the start of the run, then L ÷ 24 h. */
-    internal fun continuousCharge(data: FirewatchData, t: Long): Double {
-        val since = continuousSince(data, t) ?: return 0.0
+    /**
+     * The continuous battery's charge just before [t]: empty at the start of the run of levels at or
+     * below [limit], then L ÷ 24 h.
+     */
+    internal fun continuousCharge(data: FirewatchData, t: Long, limit: Double): Double {
+        val since = continuousSince(data, t, limit) ?: return 0.0
         var c = 0.0
         var x = since
         val events = (data.rungChanges.filter { it.at in since until t }.map { it.at to null as Dose? } +
@@ -118,16 +133,17 @@ object BatteryEngine {
     internal fun plan(data: FirewatchData, day: WakingDay, nextWake: Long, fallback: Double? = null): DayPlan? {
         val raw = targetAt(data, day.wakeAt) ?: fallback ?: data.rungChanges.firstOrNull { it.at < day.bedtime }?.pieces ?: return null
         val level = levelOf(raw)
-        if (level <= CONTINUOUS_AT + 1e-9) {
-            return DayPlan(day, nextWake, level, true, continuousCharge(data, day.wakeAt), level / DAY_MIN)
+        val limit = continuousAt(day.date)
+        if (level <= limit + 1e-9) {
+            return DayPlan(day, nextWake, level, true, continuousCharge(data, day.wakeAt, limit), level / DAY_MIN)
         }
-        val c0 = data.settings.wakeBattery.coerceIn(0.0, 1.0).coerceAtMost(level)
+        val c0 = (data.settings.wakeBattery.coerceIn(0.0, 1.0) * startShare(level)).coerceAtMost(level)
         return DayPlan(day, nextWake, level, false, c0, fittedRate(level, c0, day))
     }
 
     /** Refill speed for a practice level, fitted the same way as the real level. */
     private fun rateFor(level: Double, plan: DayPlan): Double =
-        if (plan.continuous || level <= CONTINUOUS_AT + 1e-9) levelOf(level) / DAY_MIN
+        if (plan.continuous || level <= continuousAt(plan.day.date) + 1e-9) levelOf(level) / DAY_MIN
         else fittedRate(level, plan.c0.coerceAtMost(level), plan.day)
 
     /**

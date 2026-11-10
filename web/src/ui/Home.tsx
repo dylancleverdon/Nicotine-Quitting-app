@@ -7,7 +7,7 @@ import { CheckInSheet, CravingSheet, DoseSheet, EditDoseSheet, PracticeDurationS
 import { TAGS, cravingColor, dayTitle, duration, stepText, isoToday, mg, minutesOfDay, pieces, piecesLabel, signedDuration, time } from './format'
 
 
-/** "9:00 PM", or "tomorrow 8:00 AM" when it isn't today (at 2 a day or less the battery runs overnight). */
+/** "9:00 PM", or "tomorrow 8:00 AM" when it isn't today (at 1 a day or less the battery runs overnight). */
 function readyText(at: number): string {
   const d = new Date(at), today = new Date(), tomorrow = new Date(); tomorrow.setDate(today.getDate() + 1)
   if (d.toDateString() === today.toDateString()) return time(at)

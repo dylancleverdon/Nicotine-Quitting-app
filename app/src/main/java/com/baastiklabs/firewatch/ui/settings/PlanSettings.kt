@@ -107,7 +107,7 @@ fun PlanSettings(vm: FirewatchViewModel, data: FirewatchData) {
             }
         }
         Text(
-            "Above 2 a day. The battery then refills so you reach your level by your usual bedtime, whichever you pick. At 2 a day or less it runs around the clock instead.",
+            "Above 1 a day. The battery then refills so you reach your level by your usual bedtime, whichever you pick. At 2 a day, full means half a piece, so your morning holds a quarter of your day. At 1 a day or less it runs around the clock instead.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
