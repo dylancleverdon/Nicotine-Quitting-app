@@ -42,4 +42,18 @@ class RepositoryTest {
         assertEquals(200_000L, repo.data.value.doses.single().at)
         assertEquals(true, store.saved["d1"]?.json?.contains("200000"))
     }
+
+    @Test
+    fun `choosing what to step in shows at once and survives a reload`() = runBlocking {
+        val store = SlowStore()
+        val repo = Repository(store) { 1_000L }
+        repo.setStepUnit(com.baastiklabs.firewatch.core.model.DefaultProducts.POUCH_2MG)
+        assertEquals(com.baastiklabs.firewatch.core.model.DefaultProducts.POUCH_2MG, repo.data.value.unitChanges.single().productId)
+        // Every record type the app writes is read back the same way the web app reads it.
+        val fresh = com.baastiklabs.firewatch.core.records.FirewatchData.fromRecords(store.all())
+        assertEquals(fresh.unitChanges, repo.data.value.unitChanges)
+        val reloaded = Repository(store) { 2_000L }
+        reloaded.setStepUnit("")
+        assertEquals(listOf(com.baastiklabs.firewatch.core.model.DefaultProducts.POUCH_2MG, ""), reloaded.data.value.unitChanges.map { it.productId })
+    }
 }

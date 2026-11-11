@@ -48,6 +48,7 @@ class Repository(
     private val refChanges = HashMap<String, RefChange>()
     private val dayMarks = HashMap<String, com.baastiklabs.firewatch.core.model.DayMark>()
     private val practices = HashMap<String, com.baastiklabs.firewatch.core.model.PracticeSession>()
+    private val unitChanges = HashMap<String, com.baastiklabs.firewatch.core.model.UnitChange>()
     private var settings = Settings()
 
     private val _data = MutableStateFlow(FirewatchData())
@@ -196,6 +197,7 @@ class Repository(
      * change; the battery holds one from the next wake-up and each step down is one.
      */
     suspend fun setStepUnit(productId: String) {
+        ensureLoaded()
         val now = clock()
         if ((_data.value.unitChanges.lastOrNull()?.productId ?: "") == productId) return
         mutate { t -> listOf(RecordCodec.unitChange(com.baastiklabs.firewatch.core.model.UnitChange(Ids.newId(now), now, productId), null, t)) }
@@ -300,6 +302,7 @@ class Repository(
             RecordTypes.REF_CHANGE -> put(refChanges, env, RefChange.serializer())
             RecordTypes.DAY_MARK -> put(dayMarks, env, com.baastiklabs.firewatch.core.model.DayMark.serializer())
             RecordTypes.PRACTICE -> put(practices, env, com.baastiklabs.firewatch.core.model.PracticeSession.serializer())
+            RecordTypes.UNIT_CHANGE -> put(unitChanges, env, com.baastiklabs.firewatch.core.model.UnitChange.serializer())
             RecordTypes.SETTINGS -> settings =
                 (if (env.deleted) null else RecordCodec.decode(env.json, Settings.serializer())) ?: Settings()
             else -> Unit // A newer version's record type: kept in storage and backups, ignored here.
@@ -325,6 +328,7 @@ class Repository(
             refChanges = refChanges.values.sortedBy { it.at },
             dayMarkList = dayMarks.values.toList(),
             practices = practices.values.sortedBy { it.start },
+            unitChanges = unitChanges.values.sortedBy { it.at },
         )
         onChange?.invoke()
     }

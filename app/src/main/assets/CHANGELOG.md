@@ -2,6 +2,9 @@
 
 Newest first. Each release is a "## <version>" heading; the app shows these notes in "What's new".
 
+## 0.22.1 · 2026-11-11
+- **Battery and steps in now works on the phone.** In 0.22.0, tapping a product there was saved but didn't show. Your taps were kept, so if you picked Nicotine pouch 2 mg it's now selected, and the battery holds one pouch from your next wake-up.
+
 ## 0.22.0 · 2026-11-11
 - **Taper in pouches (or another product you use).** Settings → Your plan → Battery and steps in → Nicotine pouch 2 mg. Your level doesn't change: it's still counted in pieces, so your tier, steady days, held days, Journey to Clear Air and history stay as they are. It's shown in pouches first, e.g. "Embers · 5 pouches a day".
 - From your next wake-up after switching, the battery holds one pouch: it starts the day with one, and "Next pouch around …" is when a whole pouch is ready. Net works the same way.
