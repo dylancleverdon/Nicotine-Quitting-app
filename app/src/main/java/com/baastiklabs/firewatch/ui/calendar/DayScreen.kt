@@ -142,10 +142,7 @@ fun DayScreen(
             data.rungChanges.withIndex().filter { (i, rc) ->
                 i > 0 && com.baastiklabs.firewatch.core.engine.BatteryEngine.currentDay(data, rc.at, tz).first.date == kDate
             }.forEach { (i, rc) ->
-                val from = com.baastiklabs.firewatch.core.engine.Ladder.rung(data.rungChanges[i - 1].pieces)
-                val to = com.baastiklabs.firewatch.core.engine.Ladder.rung(rc.pieces)
-                val text = if (from.tier == to.tier) "${from.tier.title} ${com.baastiklabs.firewatch.core.engine.Ladder.piecesText(from.pieces)} → ${com.baastiklabs.firewatch.core.engine.Ladder.piecesText(to.pieces)}"
-                    else "${from.tier.title} ${com.baastiklabs.firewatch.core.engine.Ladder.piecesText(from.pieces)} → ${to.label}"
+                val text = data.steps.changeText(data.rungChanges[i - 1].pieces, rc.pieces)
                 item { Text("Level: $text", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary) }
             }
             if (entries.isEmpty() || summary.doseCount == 0) {

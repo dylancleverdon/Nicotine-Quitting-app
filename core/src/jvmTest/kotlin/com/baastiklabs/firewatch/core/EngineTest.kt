@@ -1408,6 +1408,81 @@ class EngineTest {
         assertEquals(600.0, Progress.battery(data(emptyList()), 2.0, laAt(10, 9, 0), la).gapMin, 1e-6)
     }
 
+    private fun nov(d: Int, h: Int, m: Int = 0) = LocalDateTime(2026, 11, d, h, m).toInstant(tz).toEpochMilliseconds()
+    private fun pouchData(doses: List<com.baastiklabs.firewatch.core.model.Dose>, level: Double = 2.0, switchAt: Long? = nov(12, 14)) = FirewatchData(
+        products = DefaultProducts.all(), doses = doses, settings = com.baastiklabs.firewatch.core.model.Settings(wakeMinutes = 8 * 60),
+        rungChanges = listOf(RungChange("a", nov(1, 8), 6.0, "start"), RungChange("b", nov(3, 8), level, "down")),
+        unitChanges = listOfNotNull(switchAt?.let { com.baastiklabs.firewatch.core.model.UnitChange("u", it, DefaultProducts.POUCH_2MG) }))
+
+    @Test
+    fun steppingInPouchesKeepsTheLevelAndStepsOnePouchAtATime() {
+        val d = pouchData(emptyList())
+        assertEquals(0.4, d.unitAt(nov(13, 8))!!.pieces, 1e-6)
+        val st = d.steps
+        // The level stays 2 pieces (Embers); it's shown in pouches first.
+        assertEquals(2.0, d.targetPieces)
+        assertEquals("Embers · 5 pouches a day", st.rung(2.0).label)
+        assertEquals("Very light, about 5 pouches a day (2 pieces).", st.rung(2.0).plainLine)
+        // One pouch per step: 5 → 4 → 3 → 2 → 1 → Clear Air.
+        val down = generateSequence(2.0) { p -> st.nextDown(p).pieces.takeIf { it > 0 } }.toList()
+        assertEquals(listOf(2.0, 1.6, 1.2, 0.8, 0.4), down)
+        assertEquals(listOf("Embers · 4 pouches a day", "Embers · 3 pouches a day", "Cinders · 2 pouches a day", "Ash · 1 pouch a day"),
+            down.drop(1).map { st.rung(it).label })
+        assertEquals(Tier.CLEAR_AIR, st.nextDown(0.4).tier)
+        assertEquals("Flicker · 6 pouches a day", st.nextUp(2.0).label)
+        assertEquals("Flicker · 7 pouches a day", st.measured(2.7).label)
+        assertEquals("Embers 5 → 4 pouches", st.changeText(2.0, 1.6))
+        // Pieces are unchanged without a switch.
+        val pieces = pouchData(emptyList(), switchAt = null)
+        assertEquals("Embers · 2 a day", pieces.steps.rung(2.0).label)
+        assertEquals(1.0, pieces.steps.nextDown(2.0).pieces)
+        assertEquals(0.5, pieces.steps.nextDown(1.0).pieces)
+        // Step-down progress keeps counting at the same level; the next step is 4 pouches.
+        assertEquals(1.6, Progress.stepDownProgress(d, nov(13, 12), tz)!!.next.pieces, 1e-9)
+        assertEquals(Progress.stepDownProgress(pieces, nov(13, 12), tz)!!.held, Progress.stepDownProgress(d, nov(13, 12), tz)!!.held)
+        // Journey: the same at the switch, then each pouch step moves it forward.
+        val j = Insights(d, tz, nov(13, 12)).journey()!!
+        assertEquals(Insights(pieces, tz, nov(13, 12)).journey()!!, j, 1e-9)
+        val stepped = d.copy(rungChanges = d.rungChanges + RungChange("c", nov(13, 9), 1.6, "down"))
+        assertTrue(Insights(stepped, tz, nov(13, 12)).journey()!! > j)
+        // After switching back to pieces, a pouch level steps to the next piece rung.
+        assertEquals(1.0, Ladder.nextDown(1.6).pieces)
+    }
+
+    @Test
+    fun theBatteryHoldsOnePouchFromTheNextWakeUp() {
+        val B = com.baastiklabs.firewatch.core.engine.BatteryEngine
+        val pouch2 = product(DefaultProducts.POUCH_2MG)
+        // 12 Nov (switched at 14:00): today keeps its battery (half a piece at wake, 10 h a piece).
+        assertEquals(Progress.battery(pouchData(emptyList(), switchAt = null), 2.0, nov(12, 15), tz), Progress.battery(pouchData(emptyList()), 2.0, nov(12, 15), tz))
+        assertEquals(600.0, Progress.battery(pouchData(emptyList()), 2.0, nov(12, 15), tz).gapMin, 1e-6)
+        // 13 Nov: full = one pouch at wake; 1.6 pieces over 8:00–23:00 → a pouch every 3h 45m.
+        val wake = Progress.battery(pouchData(emptyList()), 2.0, nov(13, 8), tz)
+        assertEquals(1.0, wake.charge, 1e-6)
+        assertEquals(BatteryState.CLEAR, wake.state)
+        assertEquals("pouch", wake.unitNoun)
+        assertEquals(225.0, wake.unitGapMin, 1.0)
+        assertEquals(225.0, wake.netMin, 1.0)
+        assertEquals(-225.0, B.preview(pouchData(emptyList()), pouch2, 2.0, nov(13, 8), tz)!!, 1.0)
+        val times = listOf(nov(13, 8), nov(13, 11, 45), nov(13, 15, 30), nov(13, 19, 15), nov(13, 23))
+        val five = pouchData(times.mapIndexed { i, at -> pouch2.toDose("p$i", at, 0) })
+        times.forEach { at -> assertTrue(Progress.battery(five, 2.0, at, tz).netMin >= -1.0, "$at") }
+        assertEquals(0.0, B.day(five, kotlinx.datetime.LocalDate(2026, 11, 13), tz, nov(13, 23, 59))!!.netMin, 1.0)
+        val after = Progress.battery(five, 2.0, nov(13, 8, 1), tz)
+        assertTrue(kotlin.math.abs(after.readyAt!! - nov(13, 11, 45)) <= 2 * 60_000L, "${after.readyAt}")
+        assertEquals(true, B.onTime(five, five.doses[1], tz))
+        // "This rung is tough": one pouch behind is enough when stepping in pouches.
+        val three = pouchData((0 until 3).map { pouch2.toDose("t$it", nov(13, 8) + it * 60_000L, 0) })
+        assertTrue(Coach.stepUp(three, nov(13, 8, 5), tz)?.reasons?.any { it.contains("net") } == true)
+        val threeGum = pouchData((0 until 3).map { pouch2.toDose("t$it", nov(13, 8) + it * 60_000L, 0) }, switchAt = null)
+        assertTrue(Coach.stepUp(threeGum, nov(13, 8, 5), tz)?.reasons?.any { it.contains("net") } != true)
+        // At 2 pouches a day (0.8 pieces) the battery runs around the clock and holds one pouch.
+        val low = pouchData(listOf(pouch2.toDose("x", nov(14, 8), 0)), level = 0.8, switchAt = nov(2, 8))
+        assertEquals(1.0, Progress.battery(low, 0.8, nov(14, 7, 59), tz).charge, 1e-6)
+        val lowAfter = Progress.battery(low, 0.8, nov(14, 8, 1), tz)
+        assertTrue(kotlin.math.abs(lowAfter.readyAt!! - nov(14, 20)) <= 2 * 60_000L, "${lowAfter.readyAt}")
+    }
+
     @Test
     fun steadyMeansAtOrUnderTheLevel() {
         val s = com.baastiklabs.firewatch.core.model.Settings(wakeMinutes = 8 * 60)

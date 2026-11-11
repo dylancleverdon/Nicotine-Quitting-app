@@ -116,6 +116,23 @@ as an estimate.
 ## 8. The ladder: find, control, taper
 
 - Rungs one piece apart from 24 down to ½ and ⅓, then Clear Air; tiers Wildfire → Clear Air.
+- **Battery and steps in (0.22, Settings → Your plan).** Pieces (default) or a product D uses (gum,
+  pouch or lozenge kinds), e.g. Nicotine pouch 2 mg (≈ 0.4 piece). Levels stay in pieces (gum 4 mg
+  equivalents) and tiers come from pieces, so switching never moves the level, tier, steady days,
+  held days, journey or history, and nothing is recounted. What changes:
+  - Labels show the product first: "Embers · 5 pouches a day", "Very light, about 5 pouches a day
+    (2 pieces)"; the Log tab counts "pouches today", product buttons and today's doses read
+    "≈ 1.5 pouches", and the step-down count names the step ("toward Embers · 4 pouches a day").
+  - Rungs are whole numbers of the product (5 → 4 → 3 → 2 → 1 pouch → Clear Air = 2 → 1.6 → 1.2 →
+    0.8 → 0.4 pieces), so each step down or up is one; the hold and "Stay here" are unchanged.
+    Forecasts take more, smaller steps.
+  - From the next wake-up the battery holds one of it (§7): full = one pouch, a full start is one
+    pouch, "Next pouch around …"; net and costs keep the same formulas. "This rung is tough" fires
+    at net one pouch's time behind (one step's worth).
+  - Journey to Clear Air is measured on the piece ladder with levels between rungs counted as part
+    of a rung, so every pouch step moves it. Insights charts and the calendar keep counting pieces
+    (Trends notes "1 piece = 2.5 pouches"). Data: record type `unitchange` (docs/data-format.md).
+  - "One piece is" (the reference piece) is different: it changes the measuring stick itself.
 - **Step up (find):** offered, with the reason, the same day any one of these happens: net
   at one full gap behind or worse (0.19: replaces "pull reaches a gap" and "more than a piece over
   target"; stretch earned earlier counts); 3 strong cravings (or 2 within 2 hours); a spike in
@@ -234,7 +251,7 @@ Appearance (theme line → **More themes**: 18 themes with light/dark, follow ph
 always dark, calmer colours with no red (on by default), colour-blind-safe charts, true black; the
 widgets follow), Plan (step back up a rung, hold period, first-piece goal, time format, Hide next piece timer, wind
 down note, show steady days, Coaching tips (off; the pouch → gum swap tip is part of it), practice pace,
-lighter-level practice offers, battery when you wake up (above 2 a day), hide net cost on products, detailed charts, daily check-in), Relapse prevention mode, money, data (export,
+lighter-level practice offers, battery when you wake up (above 1 a day), battery and steps in (pieces or a product, §8), hide net cost on products, detailed charts, daily check-in), Relapse prevention mode, money, data (export,
 import, automatic backups off the phone, "Last backup: N days ago"), products and the reference piece (change "from today on", or back-dated with a warning), sleep schedule,
 unsent suggestions, Help, About, updates.
 

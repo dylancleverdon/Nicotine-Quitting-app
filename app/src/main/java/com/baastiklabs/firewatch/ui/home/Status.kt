@@ -77,7 +77,10 @@ fun TierStatusCard(
                 if (timerHidden) HiddenBatteryRow(it, onReveal) else BatteryRow(it, now, relapseNext)
             }
             Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
-                Stat("≈ ${Fmt.pieces(today.pieces)}", "pieces today", big = true)
+                // Stepping in pouches: today's count in pouches first (0.22).
+                val unit = (target ?: measured)?.unit
+                if (unit != null) Stat("≈ ${unit.countText(today.pieces)}", "${unit.plural} today", big = true)
+                else Stat("≈ ${Fmt.pieces(today.pieces)}", "pieces today", big = true)
                 Stat("≈ ${Fmt.mg(today.absorbedMg)}", "absorbed today", big = true)
             }
             Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
@@ -107,7 +110,7 @@ fun TierStatusCard(
 private fun BatteryRow(b: Battery, now: Long, relapseNext: Long?) {
     val (title, detail) = if (relapseNext != null) "Next scheduled piece at ${Fmt.time(relapseNext)}" to "Relapse prevention mode: staying ahead of cravings" else when (b.state) {
         BatteryState.CLEAR -> "Clear for one if you want it" to "No rush. Every minute you wait adds to your net."
-        BatteryState.CHARGING -> "Next piece around ${b.readyAt?.let { readyText(it, now) } ?: "later"}" to
+        BatteryState.CHARGING -> "Next ${b.unitNoun} around ${b.readyAt?.let { readyText(it, now) } ?: "later"}" to
             "${b.readyAt?.let { Fmt.duration(it - now) } ?: ""} to go at your target pace"
         BatteryState.FULL_AT_WAKE -> "Full when you wake up" to "The battery stops refilling at your usual bedtime."
         BatteryState.MORNING_DELAY -> "First piece goal: ${b.readyAt?.let { Fmt.time(it) } ?: ""}" to "Pushing the first piece later is one of the best signs of progress"

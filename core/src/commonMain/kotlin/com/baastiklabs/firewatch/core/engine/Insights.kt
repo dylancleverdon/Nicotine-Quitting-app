@@ -507,18 +507,17 @@ class Insights(private val data: FirewatchData, private val tz: TimeZone, privat
     /**
      * 0..1 down the ladder: rungs stepped down from the heaviest level D has worked at, out of the
      * rungs between that level and Clear Air. Moves only when the level changes, so it always
-     * agrees with the step-down count. Null before any level is set.
+     * agrees with the step-down count. Measured on the piece ladder; a level between rungs (a pouch
+     * step, 0.22) counts as part of a rung, so every step moves it forward. Null before any level.
      */
     fun journey(): Double? {
         val changes = data.rungChanges
         if (changes.isEmpty()) return null
-        fun index(p: Double): Int = if (p <= 0) Ladder.rungs.size
-            else Ladder.rungs.indexOfFirst { kotlin.math.abs(it.pieces - p) < 1e-6 }.let { if (it < 0) Ladder.rungs.indexOf(Ladder.rung(p)) else it }
-        val start = index(changes.maxOf { it.pieces })
-        val current = index(changes.last().pieces)
+        val start = Ladder.fractionalIndex(changes.maxOf { it.pieces })
+        val current = Ladder.fractionalIndex(changes.last().pieces)
         val span = Ladder.rungs.size - start
         if (span <= 0) return 1.0
-        return ((current - start).toDouble() / span).coerceIn(0.0, 1.0)
+        return ((current - start) / span).coerceIn(0.0, 1.0)
     }
 
     // ---- Stretch & pull ----
@@ -567,7 +566,7 @@ class Insights(private val data: FirewatchData, private val tz: TimeZone, privat
     fun badges(): List<Badge> {
         val out = mutableListOf<Badge>()
         data.rungChanges.filter { it.reason == "down" || it.reason == "start" }.forEach { rc ->
-            val r = Ladder.rung(rc.pieces)
+            val r = data.steps.rung(rc.pieces)
             out += Badge(r.label, if (rc.reason == "start") "Started the climb down" else "Reached a new rung", rc.at.localDate(tz))
         }
         val sorted = data.doses.filter { !it.estimated }.sortedBy { it.at }
@@ -588,7 +587,7 @@ class Insights(private val data: FirewatchData, private val tz: TimeZone, privat
             val (n, lastDay) = held
             if (lastDay == null) return@forEach
             listOf(7, 30, 90, 180).filter { n >= it }.forEach { m ->
-                out += Badge("Held ${Ladder.rung(pieces).label} for $m days", "Holding steady is a win", lastDay)
+                out += Badge("Held ${data.steps.rung(pieces).label} for $m days", "Holding steady is a win", lastDay)
             }
         }
         Control.steadyDates(data, now, tz).let { steady ->
@@ -655,7 +654,7 @@ class Insights(private val data: FirewatchData, private val tz: TimeZone, privat
         val from = inRange.first().date
         val to = inRange.last().date
         val rungs = data.rungChanges.filter { it.reason == "down" }.filter { it.at.localDate(tz) in from..to }
-            .map { Ladder.rung(it.pieces).label }
+            .map { data.steps.rung(it.pieces).label }
         return Recap(
             month = label,
             pieces = inRange.sumOf { it.pieces },

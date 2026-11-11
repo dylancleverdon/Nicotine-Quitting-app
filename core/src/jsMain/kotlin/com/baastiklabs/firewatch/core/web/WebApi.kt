@@ -45,7 +45,7 @@ import kotlinx.serialization.json.JsonElement
 external object JsJodaTimeZoneModule
 
 @Serializable data class RungDto(val pieces: Double, val tier: String, val label: String, val plain: String)
-@Serializable data class BatteryDto(val charge: Double, val state: String, val readyAt: Double?, val stretchMin: Double, val pullMin: Double, val fitsNow: String? = null, val closeToBed: Boolean = false, val fullAt: Double? = null, val netMin: Double = 0.0, val gapMin: Double = 0.0)
+@Serializable data class BatteryDto(val charge: Double, val state: String, val readyAt: Double?, val stretchMin: Double, val pullMin: Double, val fitsNow: String? = null, val closeToBed: Boolean = false, val fullAt: Double? = null, val netMin: Double = 0.0, val gapMin: Double = 0.0, val unitNoun: String = "piece")
 @Serializable data class StretchDay(val date: String, val stretchMin: Double, val pullMin: Double, val paused: Boolean = false)
 @Serializable data class RelapseDto(
     val on: Boolean, val nextAt: Double?, val gapMin: Double, val productId: String?, val productName: String?,
@@ -158,6 +158,14 @@ external object JsJodaTimeZoneModule
     val swapTip: String?,
     val activeCraving: CravingView?,
     val todayPieces: Double,
+    /** "Battery and steps in" (0.22): the product id ("" = pieces), what one is worth, its words, the choices. */
+    val stepUnitId: String = "",
+    val unitPieces: Double = 1.0,
+    val unitNoun: String = "piece",
+    val unitPlural: String = "pieces",
+    val stepProducts: List<NamedValue> = emptyList(),
+    val chartNote: String? = null,
+    val stepUnitNote: String = com.baastiklabs.firewatch.core.Help.STEP_UNIT_NOTE,
     val todayMg: Double,
     val todayCravings: Int,
     val todayRodeOut: Int,
@@ -297,7 +305,7 @@ object FirewatchCore {
         val baseline = Baseline.status(d, today, tz)
         val revealed = baseline is BaselineStatus.Complete
         val measured = if (revealed) Progress.measuredRung(d, today, tz) else null
-        val target = d.targetPieces?.let { Ladder.rung(it) }
+        val target = d.targetPieces?.let { d.steps.rung(it) }
         val battery = target?.let { Progress.battery(d, if (it.pieces > 0) it.pieces else 1.0 / 3.0, now, tz, lastActivityMs.toLong()) }
         val stepDown = if (revealed) Progress.stepDownOffer(d, now, tz) else null
         val readiness = d.targetPieces?.let { Coach.readiness(d, it, now) }
@@ -345,7 +353,7 @@ object FirewatchCore {
                 ins.months().map { it.first }.distinct().mapNotNull { y -> ins.yearRecap(y)?.let { RecapDto("year-$y", it.month, it.pieces, it.biggestWeeklyDropPct, it.longestGapMin, it.mostBeatenTrigger, it.rungsReached, it.cravingsRidden) } },
             capacity = prof.capacity, coachConfident = prof.confident,
             coachLevels = prof.levels.filter { it.total > 0 }.map { NamedValue("Level ${it.level}", it.rate, "${it.rodeOut} of ${it.total} beaten") },
-            honest = Coach.honestPieces(d, now, tz)?.let { Ladder.measured(it).label },
+            honest = Coach.honestPieces(d, now, tz)?.let { d.steps.measured(it).label },
             checkIns = d.checkIns.map { NamedValue(it.at.toString(), it.craving.toDouble(), it.mood.toString()) },
         )
 
@@ -357,7 +365,7 @@ object FirewatchCore {
             revealed = revealed,
             measured = measured?.dto(),
             target = target?.dto(),
-            battery = battery?.let { BatteryDto(it.charge, it.state.name, it.readyAt?.toDouble(), it.stretchMinutesToday, it.pullMinutesToday, null, it.closeToBed, null, it.netMin, it.gapMin) },
+            battery = battery?.let { BatteryDto(it.charge, it.state.name, it.readyAt?.toDouble(), it.stretchMinutesToday, it.pullMinutesToday, null, it.closeToBed, null, it.netMin, it.gapMin, it.unitNoun) },
             stepDown = stepDown?.dto(),
             stepDownNote = listOfNotNull(readiness?.takeIf { it.confident }?.let {
                 if (it.ready) "From your cravings, the next rung should feel like about a ${it.predictedNext.toInt()} out of 10, and you ride out ${it.capacity}s."
@@ -452,6 +460,13 @@ object FirewatchCore {
             swapTip = com.baastiklabs.firewatch.core.engine.Coaching.swapTip(d, todayDoses),
             activeCraving = Cravings.active(d, now)?.let { craving(it) },
             todayPieces = todayDoses.sumOf { d.piecesOf(it) },
+            stepUnitId = d.steps.unit?.productId ?: "",
+            unitPieces = d.steps.unit?.pieces ?: 1.0,
+            unitNoun = d.steps.noun,
+            unitPlural = d.steps.plural,
+            chartNote = d.steps.chartNote,
+            stepProducts = d.products.filter { !it.archived && it.kind in FirewatchData.STEP_KINDS && it.id != d.settings.referenceProductId }
+                .sortedWith(compareBy({ it.order }, { it.name })).map { NamedValue(it.name, 0.0, it.id) },
             todayMg = todayDoses.sumOf { it.absorbedMg() },
             todayCravings = todayCravings.size,
             todayRodeOut = todayCravings.count { Cravings.effectiveOutcome(d, it, now) == com.baastiklabs.firewatch.core.model.CravingOutcome.RODE_OUT },
@@ -472,7 +487,7 @@ object FirewatchCore {
             },
             sevenDayAverage = ins.days.indices.map { ins.sevenDayAverage(it) },
             insights = insights,
-            ladder = (Ladder.rungs + Ladder.clearAir).map { it.dto() },
+            ladder = (d.steps.rungs + Ladder.clearAir).map { it.dto() },
             tiers = Tier.entries.map { NamedValue(it.title, 0.0, it.pace) },
             stretchDays = ins.stretchPull.map { StretchDay(it.date.toString(), it.stretchMin, it.pullMin, it.paused) },
             stretchSummary = ins.stretchSummary(),
@@ -518,9 +533,7 @@ object FirewatchCore {
         val sleeps = d.sleepEvents.filter { it.at in w.wakeAt - 6 * 3_600_000L until next }
             .map { NamedValue(if (it.kind == com.baastiklabs.firewatch.core.model.SleepKind.WAKE) "Woke up" else "Went to sleep", it.at.toDouble(), it.id) }
         val levels = d.rungChanges.withIndex().filter { (i, rc) -> i > 0 && com.baastiklabs.firewatch.core.Days.wakingDate(d, rc.at, tz) == date }.map { (i, rc) ->
-            val from = Ladder.rung(d.rungChanges[i - 1].pieces); val to = Ladder.rung(rc.pieces)
-            if (from.tier == to.tier) "${from.tier.title} ${Ladder.piecesText(from.pieces)} → ${Ladder.piecesText(to.pieces)}"
-            else "${from.tier.title} ${Ladder.piecesText(from.pieces)} → ${to.label}"
+            d.steps.changeText(d.rungChanges[i - 1].pieces, rc.pieces)
         }
         val state = com.baastiklabs.firewatch.core.Days.state(d, date, tz, nowMs.toLong()).name.lowercase()
         @Serializable data class DayDetail(

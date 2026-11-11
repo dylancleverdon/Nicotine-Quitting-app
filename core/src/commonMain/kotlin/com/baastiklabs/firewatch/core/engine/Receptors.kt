@@ -99,7 +99,7 @@ object Receptors {
         val perPiece = if (ratios.size >= 3) ratios.average() else theoreticalMgPerPiece(ref)
 
         val current = data.targetPieces
-            ?: daily.takeLast(7).map { it.third }.average().let { Ladder.measured(it).pieces }
+            ?: daily.takeLast(7).map { it.third }.average().let { data.steps.measured(it).pieces }
         val hold = data.settings.holdDays.coerceAtLeast(1)
         val lastChange = data.rungChanges.lastOrNull()?.at?.localDate(tz)
         var daysLeftOnRung = (hold - (lastChange?.daysUntil(today) ?: 0)).coerceAtLeast(1)
@@ -117,7 +117,7 @@ object Receptors {
             if (i > 0 && rung > 0.0) {
                 daysLeftOnRung--
                 if (daysLeftOnRung <= 0) {
-                    rung = Ladder.nextDown(rung).pieces
+                    rung = data.steps.nextDown(rung).pieces
                     daysLeftOnRung = hold
                     if (rung <= 0.0 && clearAir == null) clearAir = d
                 }

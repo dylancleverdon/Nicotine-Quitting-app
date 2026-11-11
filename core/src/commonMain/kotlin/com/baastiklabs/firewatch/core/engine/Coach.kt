@@ -80,7 +80,7 @@ object Coach {
     /** Would the next rung down be manageable, judging by D's own craving history? */
     fun readiness(data: FirewatchData, targetPieces: Double, now: Long): Readiness {
         val p = profile(data, now)
-        val next = Ladder.nextDown(targetPieces)
+        val next = data.steps.nextDown(targetPieces)
         val interval = if (next.pieces <= 0) Ladder.WAKING_MINUTES * 3 else next.intervalMinutes
         val predicted = p.predictedIntensity(interval)
         return Readiness(predicted, p.capacity, !p.confident || predicted <= p.capacity + 0.5, p.confident)
@@ -96,8 +96,9 @@ object Coach {
     /**
      * Offer a step back up when the current rung is too much right now. It aims to catch a rough day
      * the same day, before it turns into a relapse. Any one of these today is enough:
-     * - net (room left) at one full piece behind the day's line or worse, in the day's time per
-     *   piece; 3+ cravings above what D usually rides out (or 2+ within 2 hours);
+     * - net (room left) one full step behind the day's line or worse (one piece's time, or one
+     *   pouch's when stepping in pouches); 3+ cravings above what D usually rides out (or 2+
+     *   within 2 hours);
      * - timer checks while refilling at least double the usual (and 6+, when "Hide next piece timer"
      *   is on); a craving answered with a cigarette or vape.
      * Or, over the last 5 days against the 14 before, two or more of: 3+ days over target, more early
@@ -106,7 +107,7 @@ object Coach {
      */
     fun stepUp(data: FirewatchData, now: Long, tz: TimeZone): StepUp? {
         val target = data.targetPieces ?: return null
-        val next = Ladder.nextUp(target)
+        val next = data.steps.nextUp(target)
         if (next.pieces <= target) return null
         val today = now.localDate(tz)
         val snoozed = data.settings.stepUpSnoozedAt
@@ -119,7 +120,8 @@ object Coach {
         // ---- Today ----
         val reasons = ArrayList<String>()
         val todayBattery = BatteryEngine.day(data, day.date, tz, now)
-        val interval = todayBattery?.gapMin ?: BatteryEngine.intervalFor(if (target > 0) target else 1.0 / 3.0)
+        // One step's worth behind: one piece's time, or one pouch's when stepping in pouches.
+        val interval = todayBattery?.unitGapMin ?: BatteryEngine.intervalFor(if (target > 0) target else 1.0 / 3.0)
         val net = todayBattery?.takeIf { !it.paused }?.netMin ?: 0.0
         if (net <= -interval) reasons += "today's net is −${hm(-net)}, more than one gap behind your level's pace"
         val strongToday = cravingsIn(day.wakeAt, minOf(now + 1, nextWake)).filter { it.intensity > strongAt }
@@ -142,7 +144,7 @@ object Coach {
             val measured = Progress.measuredRung(data, today, tz)
             val sinceChange = data.rungChanges.lastOrNull()?.at ?: 0L
             if (measured != null && measured.pieces > target + 1e-6 && now - sinceChange >= 7 * 24 * 60 * MIN) {
-                return StepUp(Ladder.rung(measured.pieces), listOf("your last 7 days measure ${measured.label}"), sameDay = false)
+                return StepUp(data.steps.rung(measured.pieces), listOf("your last 7 days measure ${measured.label}"), sameDay = false)
             }
         }
         val since = data.rungChanges.lastOrNull()?.at ?: return null

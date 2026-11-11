@@ -4,7 +4,7 @@ import { savedName, sendFeedback } from '../feedback'
 import * as S from '../store'
 import { Meter, Wave } from './Charts'
 import { CheckInSheet, CravingSheet, DoseSheet, EditDoseSheet, PracticeDurationSheet, VapeSheet, doseLine } from './Sheets'
-import { TAGS, cravingColor, dayTitle, duration, stepText, isoToday, mg, minutesOfDay, pieces, piecesLabel, signedDuration, time } from './format'
+import { TAGS, amountLabel, cravingColor, dayTitle, duration, stepText, isoToday, mg, minutesOfDay, pieces, signedDuration, time } from './format'
 
 
 /** "9:00 PM", or "tomorrow 8:00 AM" when it isn't today (at 1 a day or less the battery runs overnight). */
@@ -110,7 +110,7 @@ export function Home({ toast, go, backfill }: { toast: (msg: string, undo?: () =
             {snap.early && <div class="muted">Early estimate · firming up as you log your first week{snap.baselineState === 'progress' ? ` (day ${snap.baselineDay} of 7)` : ''}.</div>}
             {sp && !snap.early && <div class="step-progress">
               <Meter value={sp.fraction} label="Waking hours held toward the next step down" />
-              <div class="small">{stepText(sp)}</div>
+              <div class="small">{stepText(sp, snap.unitPieces !== 1)}</div>
               {sp.unlocked ? <button class="btn" onClick={() => moveTarget(sp.next.pieces, 'down')}>Step down to {sp.next.label}</button>
                 : sp.todayOver ? <div class="muted">Today won't count toward this one; the count starts again tomorrow.</div>
                 : sp.unlocksAt ? <div class="muted">Unlocks around {new Date(sp.unlocksAt).toDateString() === new Date(Date.now() + 864e5).toDateString() ? 'tomorrow' : dayTitle(new Date(sp.unlocksAt).toISOString().slice(0, 10))}, {time(sp.unlocksAt)} if today stays at or under {snap.target?.label}</div> : null}
@@ -124,7 +124,7 @@ export function Home({ toast, go, backfill }: { toast: (msg: string, undo?: () =
             <Meter value={battery.charge} />
           </div>}
           {battery && !hidden && <div>
-            <b>{rp.on && rp.nextAt ? `Next scheduled piece at ${time(rp.nextAt)}` : battery.state === 'CLEAR' ? 'Clear for one if you want it' : battery.state === 'CHARGING' ? `Next piece around ${battery.readyAt ? readyText(battery.readyAt) : 'later'}` :
+            <b>{rp.on && rp.nextAt ? `Next scheduled piece at ${time(rp.nextAt)}` : battery.state === 'CLEAR' ? 'Clear for one if you want it' : battery.state === 'CHARGING' ? `Next ${battery.unitNoun ?? 'piece'} around ${battery.readyAt ? readyText(battery.readyAt) : 'later'}` :
               battery.state === 'FULL_AT_WAKE' ? 'Full when you wake up' : battery.state === 'MORNING_DELAY' ? `First piece goal: ${battery.readyAt ? time(battery.readyAt) : ''}` :
               battery.state === 'WIND_DOWN' ? 'Winding down for bed' : 'Sleeping hours · Fresh start when you wake up'}</b>
             <Meter value={battery.charge} />
@@ -143,7 +143,9 @@ export function Home({ toast, go, backfill }: { toast: (msg: string, undo?: () =
           <button class="btn outline" onClick={() => go('backfill')}>Estimate my last week instead</button>
         </>}
         <div class="stats">
-          <div class="stat"><b>≈ {pieces(snap.todayPieces)}</b><span>pieces today</span></div>
+          {snap.unitPieces !== 1
+            ? <div class="stat"><b>≈ {Math.round(snap.todayPieces / snap.unitPieces * 10) / 10}</b><span>{snap.unitPlural} today</span></div>
+            : <div class="stat"><b>≈ {pieces(snap.todayPieces)}</b><span>pieces today</span></div>}
           <div class="stat"><b>≈ {mg(snap.todayMg)}</b><span>absorbed today</span></div>
         </div>
         <div class="stats">
@@ -255,7 +257,7 @@ export function Home({ toast, go, backfill }: { toast: (msg: string, undo?: () =
           <button class="product" onPointerDown={() => down(p)} onPointerUp={() => up(p)} onPointerLeave={() => press.current && clearTimeout(press.current)} onContextMenu={(e) => e.preventDefault()}>
             <b>{p.name}</b>
             {!settings.hideDosePreview && snap.previews[p.id] != null && Math.abs(snap.previews[p.id]) >= 1 && <span class="preview">−{duration(Math.abs(snap.previews[p.id]) * 60000)} net</span>}
-            <span>{piecesLabel(Core.piecesOf(p, S.json()))}</span>
+            <span>{amountLabel(Core.piecesOf(p, S.json()), snap.unitPieces, snap.unitNoun, snap.unitPlural)}</span>
           </button>
         ))}
       </div></>}
@@ -284,7 +286,7 @@ export function Home({ toast, go, backfill }: { toast: (msg: string, undo?: () =
           <div>{d.name}<br /><span>{doseLine(d)}</span></div>
           {d.kind === 'POUCH' && !d.removedAt && !d.estimated && Date.now() - d.at >= 0 && Date.now() - d.at < 3600000 &&
             <button class="btn text" onClick={(e) => { e.stopPropagation(); const raw = S.live('dose').find((x) => x.id === d.id); if (raw) S.save('dose', { ...raw, removedAt: Date.now() }) }}>Took it out</button>}
-          <b>{piecesLabel(d.pieces)}</b>
+          <b>{amountLabel(d.pieces, snap.unitPieces, snap.unitNoun, snap.unitPlural)}</b>
         </div>
       ))}</div>
       <button class="btn outline" onClick={() => setRelapseSheet(true)}>{rp.on ? 'Relapse prevention mode: on' : 'Relapse prevention mode'}</button>

@@ -88,6 +88,8 @@ export async function startGum() {
   await updateSettings({ relapseProductId: gum.find((p) => p.id === 'gum-4')?.id ?? gum[0]?.id ?? 'gum-4' })
   await setRelapse(true)
 }
+/** "Battery and steps in" (0.22): step in a product ('' = pieces). The level and progress don't change. */
+export const setStepUnit = (productId: string) => save('unitchange', { id: Core.newId(), at: Date.now(), productId })
 export const setTarget = (pieces: number, reason: string, detail = '') => save('rung', { id: Core.newId(), at: Date.now(), pieces, reason, detail })
 
 /** Mark an empty day 'clear' or 'ghost'; null puts it back to "?". */

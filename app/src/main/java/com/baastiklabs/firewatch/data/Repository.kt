@@ -191,6 +191,16 @@ class Repository(
         updateSettings { it.copy(referenceProductId = productId) }
     }
 
+    /**
+     * "Battery and steps in" (0.22): step in [productId] ("" = pieces). The level and progress don't
+     * change; the battery holds one from the next wake-up and each step down is one.
+     */
+    suspend fun setStepUnit(productId: String) {
+        val now = clock()
+        if ((_data.value.unitChanges.lastOrNull()?.productId ?: "") == productId) return
+        mutate { t -> listOf(RecordCodec.unitChange(com.baastiklabs.firewatch.core.model.UnitChange(Ids.newId(now), now, productId), null, t)) }
+    }
+
     /** "Hide next piece timer": a tap to see the time. */
     suspend fun logTimerCheck(charging: Boolean) {
         val now = clock()

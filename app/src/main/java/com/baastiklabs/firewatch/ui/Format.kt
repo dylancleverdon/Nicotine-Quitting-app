@@ -37,6 +37,9 @@ object Fmt {
 
     fun piecesLabel(x: Double): String = "≈ ${pieces(x)} ${if (abs(x - 1.0) < 0.05) "piece" else "pieces"}"
 
+    /** "≈ 1.5 pouches" when stepping in pouches (0.22), else "≈ 0.6 pieces". */
+    fun amountLabel(x: Double, unit: com.baastiklabs.firewatch.core.engine.StepUnit?): String = unit?.let { "≈ ${it.amount(x)}" } ?: piecesLabel(x)
+
     fun mg(x: Double): String = String.format(Locale.getDefault(), "%.1f mg", x)
 
     fun time(ms: Long): String = time(ms.toLocalDateTime().toLocalTime())

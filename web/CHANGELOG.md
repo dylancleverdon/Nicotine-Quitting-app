@@ -1,5 +1,11 @@
 # Firewatch web changelog
 
+## 0.19.0 · 2026-11-11
+- **Taper in pouches (or another product you use).** Settings → Your plan → Battery and steps in → Nicotine pouch 2 mg. Your level doesn't change: it's still counted in pieces, so your tier, steady days, held days, Journey to Clear Air and history stay as they are. It's shown in pouches first, e.g. "Embers · 5 pouches a day".
+- From your next wake-up after switching, the battery holds one pouch: it starts the day with one, and "Next pouch around …" is when a whole pouch is ready. Net works the same way.
+- Step-downs go one pouch at a time (5 → 4 → 3 → 2 → 1 → Clear Air), smaller steps than whole pieces. Each step still waits for your hold and offers Stay here. With more, smaller steps, the forecasts reach Clear Air a little later.
+- Product buttons, today's doses and the "today" count show pouches. Insights charts and the calendar keep counting pieces. You can switch back to Pieces any time.
+
 ## 0.18.0 · 2026-11-10
 - **2 a day now uses your waking day.** From your wake-up on 10 Nov, the battery at 2 a day works like it does at higher levels: it's fitted so you reach 2 by your usual bedtime and stops refilling then. Before, it ran around the clock, so after a night it was full and several small pieces fitted into the morning, with long waits after.
 - At 2 a day, a full battery at wake-up is half a piece, so the morning holds a quarter of your day, like at 4 a day. Over an 8 AM–11 PM day you wake up at +5h net and a 2 mg pouch costs −4h.

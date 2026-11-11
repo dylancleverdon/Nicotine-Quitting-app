@@ -44,6 +44,10 @@ data class Battery(
     val gapMin: Double = intervalMinutes,
     /** Practice pace is on at this many pieces a day (the battery and preview use its gap). */
     val practicePieces: Double? = null,
+    /** Minutes per step unit (0.22): one pouch's time when stepping in pouches, else [gapMin]. */
+    val unitGapMin: Double = gapMin,
+    /** What the battery holds today: "piece", or "pouch" when stepping in pouches. */
+    val unitNoun: String = "piece",
 ) {
 }
 
@@ -77,7 +81,7 @@ data class StepDownProgress(
         val days = kotlin.math.floor(heldMinutes / per + 1e-9).toInt()
         val hours = kotlin.math.round((heldMinutes - days * per) / 60).toInt()
         val d = "$days ${if (days == 1) "day" else "days"}"
-        return (if (hours > 0) "$d $hours ${if (hours == 1) "hour" else "hours"}" else d) + " of $needed days held toward ${next.tier.title}"
+        return (if (hours > 0) "$d $hours ${if (hours == 1) "hour" else "hours"}" else d) + " of $needed days held toward ${if (next.unit != null) next.label else next.tier.title}"
     }
     val fraction: Double get() = if (unlocked) 1.0 else if (neededMinutes <= 0) 0.0 else (heldMinutes / neededMinutes).coerceIn(0.0, 1.0)
 }
@@ -130,7 +134,7 @@ object Progress {
     }
 
     fun measuredRung(data: FirewatchData, today: LocalDate, tz: TimeZone): Rung? =
-        rollingAverage(data, today, tz)?.let { Ladder.measured(it) }
+        rollingAverage(data, today, tz)?.let { data.steps.measured(it) }
 
     /** Tiers are revealed once the baseline week is done. */
     fun tiersRevealed(data: FirewatchData, today: LocalDate, tz: TimeZone): Boolean =
@@ -201,7 +205,7 @@ object Progress {
         val shownHeld = if (unlocked) hold else held
         val unlocksAt = if (!unlocked && todayCounts && !todayOver && held + 1 >= hold) nextWake else null
         return StepDownProgress(
-            shownHeld, hold, Ladder.nextDown(target), unlocked,
+            shownHeld, hold, data.steps.nextDown(target), unlocked,
             heldMinutes = if (unlocked) hold * usual else held * usual + todayMin, neededMinutes = hold * usual,
             todayMinutes = todayMin, todayOver = todayOver, unlocksAt = unlocksAt, restartedOn = restartedOn,
         )

@@ -41,12 +41,12 @@ fun PlanSettings(vm: FirewatchViewModel, data: FirewatchData) {
     val target = data.targetPieces
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(
-            target?.let { "Working at ${Ladder.rung(it).label}" } ?: "Your target appears after the baseline week.",
+            target?.let { "Working at ${data.steps.rung(it).label}" } ?: "Your target appears after the baseline week.",
             style = MaterialTheme.typography.bodyLarge,
         )
         if (target != null) {
-            OutlinedButton(onClick = { scope.launch { vm.repository.setTarget(Ladder.nextUp(target).pieces, "up") } }) {
-                Text("Step back up a rung (${Ladder.nextUp(target).label})")
+            OutlinedButton(onClick = { scope.launch { vm.repository.setTarget(data.steps.nextUp(target).pieces, "up") } }) {
+                Text("Step back up a rung (${data.steps.nextUp(target).label})")
             }
             Text(
                 "Stepping up makes your level more accurate. Step-downs are offered when you're ready; the target never changes on its own.",
@@ -108,6 +108,21 @@ fun PlanSettings(vm: FirewatchViewModel, data: FirewatchData) {
         }
         Text(
             "Above 1 a day. The battery then refills so you reach your level by your usual bedtime, whichever you pick. At 2 a day, full means half a piece, so your morning holds a quarter of your day. At 1 a day or less it runs around the clock instead.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text("Battery and steps in", style = MaterialTheme.typography.titleSmall)
+        val unitNow = data.unitChanges.lastOrNull()?.productId ?: ""
+        val stepProducts = data.products.filter { !it.archived && it.kind in FirewatchData.STEP_KINDS && it.id != s.referenceProductId }
+            .sortedWith(compareBy({ it.order }, { it.name }))
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FilterChip(selected = unitNow.isEmpty() || stepProducts.none { it.id == unitNow }, onClick = { scope.launch { vm.repository.setStepUnit("") } }, label = { Text("Pieces") })
+            stepProducts.forEach { p ->
+                FilterChip(selected = unitNow == p.id, onClick = { scope.launch { vm.repository.setStepUnit(p.id) } }, label = { Text(p.name) })
+            }
+        }
+        Text(
+            com.baastiklabs.firewatch.core.Help.STEP_UNIT_NOTE,
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -255,7 +270,7 @@ private fun PracticePaceSettings(vm: FirewatchViewModel, data: FirewatchData) {
     if (data.relapseOn) {
         Text(com.baastiklabs.firewatch.core.Help.PRACTICE_RELAPSE_NOTE, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     } else if (active != null) {
-        Text("On · ${Ladder.rung(active.pieces).label}", style = MaterialTheme.typography.bodyMedium)
+        Text("On · ${data.steps.rung(active.pieces).label}", style = MaterialTheme.typography.bodyMedium)
         OutlinedButton(onClick = { scope.launch { repo.stopPractice() } }) { Text("Back to my pace") }
     } else if (allowed.isNotEmpty()) {
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

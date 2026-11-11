@@ -70,7 +70,7 @@ fun PracticeStatusRow(status: Practice.Status) {
     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                "Practice pace · ${status.rung.tier.title} ${com.baastiklabs.firewatch.core.engine.Ladder.piecesText(status.rung.pieces)}",
+                "Practice pace · ${status.rung.tier.title} ${status.rung.unit?.amount(status.rung.pieces) ?: com.baastiklabs.firewatch.core.engine.Ladder.piecesText(status.rung.pieces)}",
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.weight(1f, fill = false),

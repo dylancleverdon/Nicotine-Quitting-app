@@ -128,5 +128,6 @@ Ideas raised while reviewing the app, not sent through the form.
 | 2026-10-09 | Idea | "This rung is tough right now" only when net is −1 gap or worse | Done | 0.19.0: net replaces the pull and over-target triggers; cravings, timer checks, cigarette/vape and multi-day patterns stay. |
 | 2026-10-09 | Idea | Use total net more, like a calorie deficit | Undecided | Proposed 13 Oct: net this week, running net chart. |
 | 2026-10-12 | Idea | Took it out: does it recalculate stretch and pull? | Done | Answered: yes, the dose-size part (0.18.0). |
-| 2026-10-12 | Idea | An optional smaller step down | Undecided | Proposed 13 Oct: "Smaller step" (half a piece) beside the step-down button. |
+| 2026-10-12 | Idea | An optional smaller step down | Done | 0.22.0: stepping in pouches (Battery and steps in) makes each step one pouch (0.4 piece). |
+| 2026-11-11 | Idea | Taper in 2 mg pouches without losing the level or progress | Done | 0.22.0: Settings → Your plan → Battery and steps in. Level stays in pieces; battery holds one pouch from the next wake-up; one pouch per step; pouches shown first. |
 | 2026-10-06 | Idea | Receptor load ideas (Help fix, Favourites fact, explanation, one framing, range band, history before Firewatch, badges) | Declined | D, 8 Oct; the Help line pointing at the removed spike share chart was fixed anyway in 0.18.0. |

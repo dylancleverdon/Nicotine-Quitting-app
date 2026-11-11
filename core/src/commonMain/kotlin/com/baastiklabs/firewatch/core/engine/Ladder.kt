@@ -21,17 +21,126 @@ enum class Tier(val title: String, val pace: String, val plain: String) {
     CLEAR_AIR("Clear Air", "Nicotine-free", "Clear"),
 }
 
-data class Rung(val pieces: Double, val tier: Tier) {
+/**
+ * A rung: [pieces] a day (gum 4 mg equivalents; tiers always come from pieces). With a [unit] (0.22,
+ * "Battery and steps in") it's shown in that product first: "Embers · 5 pouches a day".
+ */
+data class Rung(val pieces: Double, val tier: Tier, val unit: StepUnit? = null) {
     /** Minutes between pieces over a 16-hour waking day. */
     val intervalMinutes: Double get() = if (pieces <= 0) Double.POSITIVE_INFINITY else Ladder.WAKING_MINUTES / pieces
 
-    val label: String get() = if (tier == Tier.CLEAR_AIR) "Clear Air" else "${tier.title} · ${Ladder.piecesText(pieces)} a day"
+    val label: String get() = if (tier == Tier.CLEAR_AIR) "Clear Air"
+        else if (unit != null) "${tier.title} · ${unit.amount(pieces)} a day"
+        else "${tier.title} · ${Ladder.piecesText(pieces)} a day"
 
-    /** e.g. "Moderate, about 4 pieces a day." */
-    val plainLine: String get() = when (tier) {
-        Tier.CLEAR_AIR -> "No nicotine."
+    /** e.g. "Moderate, about 4 pieces a day." or "Very light, about 5 pouches a day (2 pieces)." */
+    val plainLine: String get() = when {
+        tier == Tier.CLEAR_AIR -> "No nicotine."
+        unit != null -> "${tier.plain}, about ${unit.amount(pieces)} a day (${Ladder.piecesText(pieces)} ${if (pieces == 1.0) "piece" else "pieces"})."
         else -> "${tier.plain}, about ${Ladder.piecesText(pieces)} ${if (pieces == 1.0) "piece" else "pieces"} a day."
     }
+}
+
+/**
+ * A product D steps in (0.22): the battery holds one and each step down is one. [pieces]: what one
+ * is worth in pieces (a 2 mg pouch ≈ 0.4).
+ */
+data class StepUnit(val productId: String, val pieces: Double, val noun: String, val plural: String) {
+    /** How many of this unit [p] pieces are, e.g. 2 pieces → 5 pouches. */
+    fun count(p: Double): Double = p / pieces
+
+    /** "5", or "7.5" when it isn't a whole number. */
+    fun countText(p: Double): String {
+        val c = (count(p) * 10).roundToLong() / 10.0
+        return if (c == c.toLong().toDouble()) c.toLong().toString() else c.toString()
+    }
+
+    /** "5 pouches", "1 pouch". */
+    fun amount(p: Double): String = "${countText(p)} ${if (countText(p) == "1") noun else plural}"
+
+    companion object {
+        fun of(product: com.baastiklabs.firewatch.core.model.Product, pieces: Double): StepUnit {
+            val (noun, plural) = when (product.kind) {
+                com.baastiklabs.firewatch.core.model.ProductKind.POUCH -> "pouch" to "pouches"
+                com.baastiklabs.firewatch.core.model.ProductKind.LOZENGE -> "lozenge" to "lozenges"
+                com.baastiklabs.firewatch.core.model.ProductKind.GUM -> "gum" to "gums"
+                else -> "dose" to "doses"
+            }
+            return StepUnit(product.id, pieces, noun, plural)
+        }
+    }
+}
+
+/**
+ * The ladder D steps along (0.22). Without a unit it's the piece ladder ([Ladder.rungs]). With a
+ * unit, rungs are whole numbers of it (5, 4, 3 … pouches), so each step down is one. Levels stay in
+ * pieces and tiers come from pieces, so switching never moves the level or the progress.
+ */
+class Steps(val unit: StepUnit?) {
+    val rungs: List<Rung> = if (unit == null) Ladder.rungs else {
+        val n = kotlin.math.ceil(Ladder.MAX_PIECES / unit.pieces - 1e-9).toInt()
+        (n downTo 1).map { k -> make(k * unit.pieces) }
+    }
+
+    private fun make(p: Double): Rung {
+        val r = (p * 1e6).roundToLong() / 1e6
+        return Rung(r, Ladder.tierFor(r), unit)
+    }
+
+    /** The rung for a level. With a unit the level is kept exactly (it may sit between whole units). */
+    fun rung(pieces: Double): Rung = when {
+        pieces <= 0 -> Ladder.clearAir
+        unit == null -> Ladder.rung(pieces)
+        else -> make(pieces)
+    }
+
+    fun nextDown(pieces: Double): Rung = rungs.firstOrNull { it.pieces < pieces - 1e-6 } ?: Ladder.clearAir
+
+    fun nextUp(pieces: Double): Rung {
+        if (pieces <= 0) return rungs.last()
+        return rungs.lastOrNull { it.pieces > pieces + 1e-6 } ?: rungs.first()
+    }
+
+    /** The rung for a measured pace, rounded toward the heavier rung so it's never flattering. */
+    fun measured(piecesPerDay: Double): Rung {
+        if (piecesPerDay < 0.2) return Ladder.clearAir
+        return rungs.lastOrNull { it.pieces >= piecesPerDay - 0.05 } ?: rungs.first()
+    }
+
+    /** Rungs from [heavier] down to [lighter] (exclusive of heavier), lightest last. */
+    fun between(heavier: Double, lighter: Double): List<Rung> =
+        rungs.filter { it.pieces < heavier - 1e-6 && it.pieces >= lighter - 1e-6 }
+
+    /** How many steps lighter [lighter] is than [heavier] (0 if it isn't lighter). */
+    fun stepsLighter(heavier: Double, lighter: Double): Int =
+        if (lighter <= 0) rungs.count { it.pieces < heavier - 1e-6 } + 1
+        else rungs.count { it.pieces < heavier - 1e-6 && it.pieces >= lighter - 1e-6 }
+
+    /** "5 pouches" or "2 pieces". */
+    fun amount(pieces: Double): String = unit?.amount(pieces)
+        ?: "${Ladder.piecesText(pieces)} ${if (abs(pieces - 1.0) < 1e-6) "piece" else "pieces"}"
+
+    /** "5" (pouches) or "2" (pieces). */
+    fun text(pieces: Double): String = unit?.countText(pieces) ?: Ladder.piecesText(pieces)
+
+    /**
+     * A level change in a few words: "Embers 5 → 4 pouches", "Flicker 3 → Embers · 2 a day".
+     * Used by the calendar day and the level history.
+     */
+    fun changeText(from: Double, to: Double): String {
+        val a = rung(from); val b = rung(to)
+        if (a.tier == Tier.CLEAR_AIR) return b.label
+        if (a.tier != b.tier) return "${a.tier.title} ${text(from)} → ${b.label}"
+        val word = unit?.let { u -> " " + (if (u.countText(to) == "1") u.noun else u.plural) } ?: ""
+        return "${a.tier.title} ${text(from)} → ${text(to)}$word"
+    }
+
+    /** For Insights while stepping in a product: charts keep counting pieces. */
+    val chartNote: String? get() = unit?.let { "Charts here count pieces: 1 piece = ${it.amount(1.0)}." }
+
+    /** "pouch" or "piece". */
+    val noun: String get() = unit?.noun ?: "piece"
+    val plural: String get() = unit?.plural ?: "pieces"
 }
 
 object Ladder {
@@ -66,15 +175,27 @@ object Ladder {
     fun rung(pieces: Double): Rung =
         rungs.minByOrNull { abs(it.pieces - pieces) }?.takeIf { pieces > 0 } ?: clearAir
 
-    fun nextDown(pieces: Double): Rung {
-        val i = rungs.indexOfFirst { abs(it.pieces - pieces) < 1e-6 }
-        return if (i < 0 || i == rungs.lastIndex) clearAir else rungs[i + 1]
-    }
+    // Also right for levels between rungs (a pouch level like 1.6 after switching back to pieces).
+    fun nextDown(pieces: Double): Rung = rungs.firstOrNull { it.pieces < pieces - 1e-6 } ?: clearAir
 
     fun nextUp(pieces: Double): Rung {
         if (pieces <= 0) return rungs.last()
-        val i = rungs.indexOfFirst { abs(it.pieces - pieces) < 1e-6 }
-        return if (i <= 0) rungs.first() else rungs[i - 1]
+        return rungs.lastOrNull { it.pieces > pieces + 1e-6 } ?: rungs.first()
+    }
+
+    /**
+     * Where [pieces] sits on the piece ladder as a fractional rung index (0 = heaviest rung,
+     * [rungs].size = Clear Air), interpolating between rungs so a pouch step moves it a little.
+     */
+    fun fractionalIndex(pieces: Double): Double {
+        if (pieces <= 0) return rungs.size.toDouble()
+        if (pieces >= rungs.first().pieces) return 0.0
+        for (i in 0 until rungs.lastIndex) {
+            val a = rungs[i].pieces; val b = rungs[i + 1].pieces
+            if (pieces <= a + 1e-9 && pieces >= b - 1e-9) return i + (a - pieces) / (a - b)
+        }
+        val last = rungs.last().pieces
+        return rungs.lastIndex + (last - pieces) / last
     }
 
     /** Position 0..1 from the heaviest rung to Clear Air (used for the journey meter). */

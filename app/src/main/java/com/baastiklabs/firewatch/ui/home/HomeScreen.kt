@@ -118,7 +118,7 @@ fun HomeScreen(
 
     val revealed = baseline is BaselineStatus.Complete
     val measured = remember(data, minute) { if (revealed) Progress.measuredRung(data, today, tz) else null }
-    val target = data.targetPieces?.let { Ladder.rung(it) }
+    val target = data.targetPieces?.let { data.steps.rung(it) }
     val context = androidx.compose.ui.platform.LocalContext.current
     val battery = remember(data, minute) { target?.let { Progress.battery(data, if (it.pieces > 0) it.pieces else 1.0 / 3.0, now, tz, com.baastiklabs.firewatch.data.AppActivity.last(context)) } }
     val stepDown = remember(data, minute) { if (revealed) Progress.stepDownOffer(data, now, tz) else null }
@@ -139,7 +139,7 @@ fun HomeScreen(
     val steadyMilestone = com.baastiklabs.firewatch.core.engine.Control.newSteadyMilestone(data, steadyDays)
     val practiceStatus = remember(data, minute) { com.baastiklabs.firewatch.core.engine.Practice.status(data, now, tz) }
     val followUpSession = remember(data, minute) { com.baastiklabs.firewatch.core.engine.Practice.followUp(data, now, tz) }
-    val practiceFollowUp = followUpSession?.let { Ladder.rung(it.pieces) }
+    val practiceFollowUp = followUpSession?.let { data.steps.rung(it.pieces) }
     val lighterOffer = remember(data, minute) { if (revealed) com.baastiklabs.firewatch.core.engine.Practice.lighterOffer(data, now, tz) else null }
     val workFrom = remember(data, minute) { if (revealed) com.baastiklabs.firewatch.core.engine.Practice.workFromOffer(data, now, tz) else null }
     var practiceAsk by remember { mutableStateOf<Double?>(null) }
@@ -202,10 +202,10 @@ fun HomeScreen(
         scope.launch {
             repo.setTarget(pieces, reason, detail)
             if (reason == "down") {
-                celebrate = Ladder.rung(pieces)
+                celebrate = data.steps.rung(pieces)
                 return@launch
             }
-            val r = Ladder.rung(pieces)
+            val r = data.steps.rung(pieces)
             snackbar.showSnackbar(
                 when (reason) {
                     "down" -> "New rung: ${r.label}. That's real progress."
@@ -233,7 +233,7 @@ fun HomeScreen(
             val waited = com.baastiklabs.firewatch.core.engine.BatteryEngine.waitedForFull(repo.data.value, dose, tz)
             val result = snackbar.showSnackbar(
                 message = if (waited) "Logged ${product.name}. You waited for a full battery. Nice work!"
-                else "Logged ${product.name} · ${Fmt.piecesLabel(dose.pieces(data.referenceMg))}",
+                else "Logged ${product.name} · ${Fmt.amountLabel(dose.pieces(data.referenceMg), data.steps.unit)}",
                 actionLabel = "Undo",
                 duration = SnackbarDuration.Short,
             )
@@ -591,6 +591,7 @@ fun HomeScreen(
                         preview = previews[product.id],
                         product = product,
                         referenceMg = data.referenceMg,
+                        unit = data.steps.unit,
                         modifier = Modifier.weight(1f),
                         onTap = {
                             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
@@ -637,7 +638,7 @@ fun HomeScreen(
             val canTakeOut = dose.kind == com.baastiklabs.firewatch.core.model.ProductKind.POUCH && dose.removedAt == null &&
                 !dose.estimated && now - dose.at in 0..(60 * 60_000L)
             DoseRow(
-                dose, data.refMgAt(dose.at), onClick = { editing = dose },
+                dose, data.refMgAt(dose.at), unit = data.steps.unit, onClick = { editing = dose },
                 onTookOut = if (canTakeOut) ({ scope.launch { repo.updateDose(dose.copy(removedAt = repo.now())) } }) else null,
             )
         }
@@ -761,13 +762,13 @@ fun HomeScreen(
     }
     practiceAsk?.let { pieces ->
         com.baastiklabs.firewatch.ui.practice.PracticeDurationDialog(
-            rungTitle = Ladder.rung(pieces).tier.title,
+            rungTitle = data.steps.rung(pieces).tier.title,
             initialUntilBedtime = data.settings.practiceUntilBedtime,
             onStart = { untilBedtime ->
                 practiceAsk = null
                 scope.launch {
                     repo.startPractice(pieces, untilBedtime)
-                    snackbar.showSnackbar("Practice pace on: ${Ladder.rung(pieces).tier.title}. ${com.baastiklabs.firewatch.core.Help.PRACTICE_STOP_NOTE}")
+                    snackbar.showSnackbar("Practice pace on: ${data.steps.rung(pieces).tier.title}. ${com.baastiklabs.firewatch.core.Help.PRACTICE_STOP_NOTE}")
                 }
             },
             onDismiss = { practiceAsk = null },
@@ -780,7 +781,7 @@ fun HomeScreen(
             title = { Text("New rung: ${r.tier.title}") },
             text = {
                 Text(
-                    "${r.plainLine} You earned the ${r.label} badge. Every step down is one piece a day lighter, and badges are never taken away.",
+                    "${r.plainLine} You earned the ${r.label} badge. Every step down is one ${data.steps.noun} a day lighter, and badges are never taken away.",
                     style = MaterialTheme.typography.bodyMedium,
                 )
             },
@@ -944,6 +945,7 @@ private fun ProductButton(
     preview: Double?,
     product: Product,
     referenceMg: Double,
+    unit: com.baastiklabs.firewatch.core.engine.StepUnit? = null,
     modifier: Modifier,
     onTap: () -> Unit,
     onLongPress: () -> Unit,
@@ -978,7 +980,7 @@ private fun ProductButton(
                     color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
                 )
             }
-            Text(Fmt.piecesLabel(pieces), style = MaterialTheme.typography.bodySmall)
+            Text(Fmt.amountLabel(pieces, unit), style = MaterialTheme.typography.bodySmall)
         }
     }
 }
@@ -1023,7 +1025,7 @@ private fun SleepRow(
 }
 
 @Composable
-fun DoseRow(dose: Dose, referenceMg: Double, onClick: () -> Unit, onTookOut: (() -> Unit)? = null) {
+fun DoseRow(dose: Dose, referenceMg: Double, onClick: () -> Unit, onTookOut: (() -> Unit)? = null, unit: com.baastiklabs.firewatch.core.engine.StepUnit? = null) {
     val extras = buildList {
         if (dose.estimated) add("estimated")
         if (dose.multiplier != 1.0) add("×${Fmt.pieces(dose.multiplier)}")
@@ -1047,7 +1049,7 @@ fun DoseRow(dose: Dose, referenceMg: Double, onClick: () -> Unit, onTookOut: (()
         trailingContent = {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (onTookOut != null) androidx.compose.material3.TextButton(onClick = onTookOut) { Text("Took it out") }
-                Text(Fmt.piecesLabel(dose.pieces(referenceMg)), style = MaterialTheme.typography.labelLarge)
+                Text(Fmt.amountLabel(dose.pieces(referenceMg), unit), style = MaterialTheme.typography.labelLarge)
             }
         },
     )

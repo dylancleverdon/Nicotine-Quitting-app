@@ -147,7 +147,7 @@ fun FirewatchRoot(vm: FirewatchViewModel) {
                     onStepDown = { p ->
                         scope.launch {
                             vm.repository.setTarget(p, "down")
-                            snackbar.showSnackbar("New rung: ${com.baastiklabs.firewatch.core.engine.Ladder.rung(p).label}. That's real progress.")
+                            snackbar.showSnackbar("New rung: ${data.steps.rung(p).label}. That's real progress.")
                         }
                     },
                 ) {

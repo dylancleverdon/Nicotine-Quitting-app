@@ -8,6 +8,10 @@ import com.baastiklabs.firewatch.core.model.Dose
 import com.baastiklabs.firewatch.core.model.ModeChange
 import com.baastiklabs.firewatch.core.model.TimerCheck
 import com.baastiklabs.firewatch.core.model.RefChange
+import com.baastiklabs.firewatch.core.model.UnitChange
+import com.baastiklabs.firewatch.core.model.ProductKind
+import com.baastiklabs.firewatch.core.engine.StepUnit
+import com.baastiklabs.firewatch.core.engine.Steps
 import com.baastiklabs.firewatch.core.model.Product
 import com.baastiklabs.firewatch.core.model.RungChange
 import com.baastiklabs.firewatch.core.model.Settings
@@ -48,6 +52,7 @@ object RecordTypes {
     const val REF_CHANGE = "refchange"
     const val DAY_MARK = "daymark"
     const val PRACTICE = "practice"
+    const val UNIT_CHANGE = "unitchange"
 
     const val SETTINGS_ID = "settings"
 }
@@ -116,6 +121,9 @@ object RecordCodec {
     fun practice(p: com.baastiklabs.firewatch.core.model.PracticeSession, previousJson: String?, now: Long, deleted: Boolean = false) =
         encode(RecordTypes.PRACTICE, p.id, p.start, p, com.baastiklabs.firewatch.core.model.PracticeSession.serializer(), previousJson, now, deleted)
 
+    fun unitChange(c: UnitChange, previousJson: String?, now: Long, deleted: Boolean = false) =
+        encode(RecordTypes.UNIT_CHANGE, c.id, c.at, c, UnitChange.serializer(), previousJson, now, deleted)
+
     fun settings(s: Settings, previousJson: String?, now: Long) =
         encode(RecordTypes.SETTINGS, RecordTypes.SETTINGS_ID, null, s, Settings.serializer(), previousJson, now)
 }
@@ -134,6 +142,7 @@ data class FirewatchData(
     val refChanges: List<RefChange> = emptyList(),
     val dayMarkList: List<com.baastiklabs.firewatch.core.model.DayMark> = emptyList(),
     val practices: List<com.baastiklabs.firewatch.core.model.PracticeSession> = emptyList(),
+    val unitChanges: List<UnitChange> = emptyList(),
 ) {
     /** Marked empty days: ISO date → "clear" / "ghost". */
     val dayMarks: Map<String, String> by lazy { dayMarkList.sortedBy { it.at }.associate { it.date to it.state } }
@@ -169,11 +178,32 @@ data class FirewatchData(
         return mgOf(last.productId)
     }
 
+    /**
+     * The product D steps in at [t] ("Battery and steps in", 0.22), or null for pieces. Only gum,
+     * pouches and lozenges count, and a product worth one piece is the same as pieces.
+     */
+    fun unitAt(t: Long): StepUnit? {
+        val id = unitChanges.lastOrNull { it.at <= t }?.productId?.takeIf { it.isNotEmpty() } ?: return null
+        val p = productsById[id]?.takeIf { it.kind in STEP_KINDS } ?: return null
+        val pieces = Absorption.pieces(Absorption.absorbedMg(p), refMgAt(t))
+        if (pieces <= 0.01 || kotlin.math.abs(pieces - 1.0) < 1e-6) return null
+        return StepUnit.of(p, pieces)
+    }
+
+    /** Pieces in one step unit at [t] (1 for pieces). */
+    fun unitPiecesAt(t: Long): Double = unitAt(t)?.pieces ?: 1.0
+
+    /** The ladder D steps along now: whole pieces, or one product at a time. */
+    val steps: Steps by lazy { Steps(unitAt(Long.MAX_VALUE)) }
+
     /** A dose's pieces with the reference in force when it was taken. */
     fun piecesOf(d: com.baastiklabs.firewatch.core.model.Dose): Double =
         Absorption.pieces(d.absorbedMg(), refMgAt(d.at))
 
     companion object {
+        /** Product kinds D can step in (0.22). */
+        val STEP_KINDS = setOf(ProductKind.GUM, ProductKind.POUCH, ProductKind.LOZENGE)
+
         fun fromRecords(records: Collection<RecordEnvelope>): FirewatchData {
             val live = records.filter { !it.deleted }
             fun <T> decodeAll(type: String, serializer: KSerializer<T>): List<T> =
@@ -194,6 +224,7 @@ data class FirewatchData(
                 refChanges = decodeAll(RecordTypes.REF_CHANGE, RefChange.serializer()).sortedBy { it.at },
                 dayMarkList = decodeAll(RecordTypes.DAY_MARK, com.baastiklabs.firewatch.core.model.DayMark.serializer()),
                 practices = decodeAll(RecordTypes.PRACTICE, com.baastiklabs.firewatch.core.model.PracticeSession.serializer()).sortedBy { it.start },
+                unitChanges = decodeAll(RecordTypes.UNIT_CHANGE, UnitChange.serializer()).sortedBy { it.at },
             )
         }
     }

@@ -48,15 +48,8 @@ object Practice {
             if (b > a) Window(a, b, s.pieces, s.id) else null
         }
 
-    private fun index(pieces: Double) = Ladder.rungs.indexOfFirst { kotlin.math.abs(it.pieces - pieces) < 1e-6 }
-
-    /** How many rungs lighter [lighter] is than [heavier] (rungs run heaviest first). */
-    fun rungsLighter(heavier: Double, lighter: Double): Int {
-        val a = index(heavier); val b = index(lighter)
-        if (a < 0) return 0
-        if (lighter <= 0) return Ladder.rungs.size - a
-        return if (b < 0) 0 else b - a
-    }
+    /** How many steps lighter [lighter] is than [heavier] on D's ladder (pieces or one unit at a time). */
+    fun rungsLighter(data: FirewatchData, heavier: Double, lighter: Double): Int = data.steps.stepsLighter(heavier, lighter)
 
     /**
      * Rungs D can practice: one below the working level, or down to the measured level if that's
@@ -65,11 +58,11 @@ object Practice {
     fun allowedRungs(data: FirewatchData, now: Long, tz: TimeZone): List<Rung> {
         val target = data.targetPieces ?: return emptyList()
         if (target <= 0 || data.relapseOn) return emptyList()
-        val one = Ladder.nextDown(target)
+        val one = data.steps.nextDown(target)
         if (one.pieces <= 0) return emptyList()
         val measured = Progress.measuredRung(data, now.localDate(tz), tz)?.pieces?.takeIf { it > 0 }
         val lightest = minOf(one.pieces, measured ?: one.pieces)
-        return Ladder.rungs.filter { it.pieces < target - 1e-6 && it.pieces >= lightest - 1e-6 }
+        return data.steps.between(target, lightest)
     }
 
     // ---- Coverage and practice net for a run ----
@@ -130,7 +123,7 @@ object Practice {
         }
         val startDate = BatteryEngine.currentDay(data, chain.first().start, tz).first.date
         val today = BatteryEngine.currentDay(data, now, tz).first.date
-        return Status(s, Ladder.rung(s.pieces), runNet(data, chain, now, tz), startDate.daysUntil(today) + 1)
+        return Status(s, data.steps.rung(s.pieces), runNet(data, chain, now, tz), startDate.daysUntil(today) + 1)
     }
 
     // ---- Offers ----
@@ -144,7 +137,7 @@ object Practice {
         if (active(data, now, tz) != null) return null
         val s = data.practices.lastOrNull() ?: return null
         if (s.id == data.settings.practiceAnswered) return null
-        if (kotlin.math.abs(s.pieces - Ladder.nextDown(target).pieces) > 1e-6) return null
+        if (kotlin.math.abs(s.pieces - data.steps.nextDown(target).pieces) > 1e-6) return null
         if (s.start < (data.rungChanges.lastOrNull()?.at ?: 0L)) return null
         val end = effectiveEnd(data, s, tz) ?: return null
         val today = BatteryEngine.currentDay(data, now, tz).first.date
@@ -162,7 +155,7 @@ object Practice {
         if (last.at.localDate(tz).daysUntil(today) < hold) return null
         val measured = Progress.measuredRung(data, today, tz) ?: return null
         if (measured.pieces <= 0) return null
-        if (rungsLighter(target, measured.pieces) < 2) return null
+        if (rungsLighter(data, target, measured.pieces) < 2) return null
         if (Progress.knownDays(data, today, tz) < 6) return null
         return measured
     }
@@ -211,7 +204,7 @@ object Practice {
 
     fun runs(data: FirewatchData, now: Long, tz: TimeZone): List<Run> = data.practices.map { s ->
         val end = effectiveEnd(data, s, tz)?.let { minOf(it, now) } ?: now
-        Run(s.start, Ladder.rung(s.pieces), runNet(data, listOf(s), end, tz), coverageMinutes(data, listOf(s), end, tz) / 60.0)
+        Run(s.start, data.steps.rung(s.pieces), runNet(data, listOf(s), end, tz), coverageMinutes(data, listOf(s), end, tz) / 60.0)
     }
 
     // ---- Level history ----
@@ -225,8 +218,8 @@ object Practice {
     fun history(data: FirewatchData, now: Long, tz: TimeZone, dateText: (LocalDate) -> String): List<HistoryEntry> {
         val out = ArrayList<HistoryEntry>()
         data.rungChanges.forEachIndexed { i, rc ->
-            val to = Ladder.rung(rc.pieces)
-            val prev = data.rungChanges.getOrNull(i - 1)?.let { Ladder.rung(it.pieces) }
+            val to = data.steps.rung(rc.pieces)
+            val prev = data.rungChanges.getOrNull(i - 1)?.let { data.steps.rung(it.pieces) }
             val move = when {
                 rc.reason == Control.EARLY && prev == null -> "started at an early estimate"
                 prev == null -> "started"
@@ -235,12 +228,14 @@ object Practice {
                 rc.pieces > prev.pieces -> "stepped up"
                 else -> "level set"
             }
-            fun short(r: Rung) = if (r.tier == Tier.CLEAR_AIR) "Clear Air" else "${r.tier.title} ${Ladder.piecesText(r.pieces)}"
+            fun short(r: Rung) = if (r.tier == Tier.CLEAR_AIR) "Clear Air" else "${r.tier.title} ${data.steps.text(r.pieces)}"
+            // With a step unit the last number gets its word: "Embers 5 → 4 pouches".
+            val unitWord = data.steps.unit?.takeIf { to.tier != Tier.CLEAR_AIR }?.let { u -> " " + (if (u.countText(to.pieces) == "1") u.noun else u.plural) } ?: ""
             val label = when {
                 prev == null -> short(to)
-                prev.tier == to.tier -> "${short(prev)} → ${Ladder.piecesText(to.pieces)}"
+                prev.tier == to.tier -> "${short(prev)} → ${data.steps.text(to.pieces)}"
                 else -> "${short(prev)} → ${short(to)}"
-            }
+            } + unitWord
             val detail = rc.detail.takeIf { it.isNotBlank() }?.let { ": $it" } ?: ""
             out += HistoryEntry(rc.at, "${dateText(rc.at.localDate(tz))} · $label · $move$detail",
                 if (prev != null && rc.pieces > prev.pieces) "up" else if (prev != null && rc.pieces < prev.pieces) "down" else "set")
@@ -253,7 +248,7 @@ object Practice {
             val netText = if (m >= 60) "${m / 60}h ${m % 60}m" else "${m}m"
             val days = BatteryEngine.currentDay(data, s.start, tz).first.date.daysUntil(BatteryEngine.currentDay(data, end - 1, tz).first.date) + 1
             val span = if (days > 1) "$days days" else "${clock(s.start, tz)} – ${clock(end, tz)}"
-            out += HistoryEntry(s.start, "${dateText(s.start.localDate(tz))} · Practiced ${Ladder.rung(s.pieces).tier.title} pace $span: practice net $sign$netText", "practice")
+            out += HistoryEntry(s.start, "${dateText(s.start.localDate(tz))} · Practiced ${data.steps.rung(s.pieces).tier.title} pace $span: practice net $sign$netText", "practice")
         }
         return out.sortedByDescending { it.at }
     }

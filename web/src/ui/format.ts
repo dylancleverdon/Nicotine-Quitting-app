@@ -1,5 +1,11 @@
 export const pieces = (x: number) => (Math.abs(x) < 0.05 ? '0' : x < 10 ? x.toFixed(1) : x.toFixed(0))
 export const piecesLabel = (x: number) => `≈ ${pieces(x)} ${Math.abs(x - 1) < 0.05 ? 'piece' : 'pieces'}`
+/** "≈ 1.5 pouches" when stepping in pouches (0.22), else "≈ 0.6 pieces". */
+export const amountLabel = (x: number, unitPieces: number, noun: string, plural: string) => {
+  if (unitPieces === 1) return piecesLabel(x)
+  const n = Math.round(x / unitPieces * 10) / 10
+  return `≈ ${n} ${n === 1 ? noun : plural}`
+}
 export const mg = (x: number) => `${x.toFixed(1)} mg`
 /** "system" follows the device; 12-hour always shows AM/PM. Set from Settings. */
 export let timeFormat = 'system'
@@ -39,10 +45,11 @@ export const TAGS = ['Coffee', 'After food', 'Driving', 'Work', 'Stress', 'Drink
 export const isoToday = () => { const d = new Date(); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10) }
 
 /** "2 days 6 hours of 3 days held toward Bonfire", from the step-down count. */
-export function stepText(p: { held: number; needed: number; heldHours: number; neededHours: number; unlocked: boolean; next: { tier: string } }) {
+/** [byLabel]: stepping in pouches (0.22), so name the step ("Embers · 4 pouches a day") rather than its tier. */
+export function stepText(p: { held: number; needed: number; heldHours: number; neededHours: number; unlocked: boolean; next: { tier: string; label?: string } }, byLabel = false) {
   if (p.unlocked) return `${p.needed} of ${p.needed} days held: unlocked`
   const per = p.neededHours / Math.max(1, p.needed)
   const days = Math.floor(p.heldHours / per + 1e-9), hours = Math.round(p.heldHours - days * per)
   const d = `${days} ${days === 1 ? 'day' : 'days'}`
-  return `${hours > 0 ? `${d} ${hours} ${hours === 1 ? 'hour' : 'hours'}` : d} of ${p.needed} days held toward ${p.next.tier}`
+  return `${hours > 0 ? `${d} ${hours} ${hours === 1 ? 'hour' : 'hours'}` : d} of ${p.needed} days held toward ${byLabel && p.next.label ? p.next.label : p.next.tier}`
 }

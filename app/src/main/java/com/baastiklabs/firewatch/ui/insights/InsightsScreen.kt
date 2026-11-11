@@ -479,6 +479,7 @@ private fun StretchSection(ins: Insights) = Col {
 
 @Composable
 private fun TrendsSection(ins: Insights, data: FirewatchData, now: Long, tz: TimeZone) = Col {
+    data.steps.chartNote?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
     val states = remember(data, now / 600_000) { Progress.recentStates(data, now, tz, 30) }
     if (states.isNotEmpty()) {
         val known = states.count { it.second.known }
@@ -599,7 +600,7 @@ private fun GapsSection(ins: Insights, data: FirewatchData) = Col {
             val atRung = com.baastiklabs.firewatch.core.engine.Control.heldDays(data, now, tz)
             Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
                 Stat("$n", "of the last ${full.size} days held")
-                data.targetPieces?.takeIf { atRung > 0 }?.let { Stat("$atRung", "days held at ${com.baastiklabs.firewatch.core.engine.Ladder.rung(it).label}") }
+                data.targetPieces?.takeIf { atRung > 0 }?.let { Stat("$atRung", "days held at ${data.steps.rung(it).label}") }
             }
         }
     }
@@ -801,8 +802,8 @@ private fun LadderSection(data: FirewatchData, now: Long, tz: TimeZone) = Col {
     }
     val measured = Progress.measuredRung(data, now.localDate(tz), tz)
     val target = data.targetPieces
-    ChartCard("The ladder", "Each rung is one piece a day lighter. Named tiers are the big landmarks.") {
-        (Ladder.rungs + Ladder.clearAir).forEach { r ->
+    ChartCard("The ladder", "Each rung is one ${data.steps.noun} a day lighter. Named tiers are the big landmarks.") {
+        (data.steps.rungs + Ladder.clearAir).forEach { r ->
             val isTarget = target != null && kotlin.math.abs(r.pieces - target) < 1e-6
             val isMeasured = measured != null && kotlin.math.abs(r.pieces - measured.pieces) < 1e-6
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {

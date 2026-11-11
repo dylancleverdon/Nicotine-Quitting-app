@@ -143,6 +143,20 @@ test('back-dated start, logging and persistence', async ({ page }) => {
   await page.getByRole('button', { name: 'Log' }).click()
   await expect(page.getByText(/Practice pace · /)).toHaveCount(0)
 
+  // Battery and steps in: pouches. The level stays Flicker 3 pieces, shown in pouches first.
+  await page.getByRole('button', { name: 'Settings' }).click()
+  const stepChips = page.locator('div.small:text-is("Battery and steps in") + div.row button')
+  await stepChips.filter({ hasText: 'Nicotine pouch 2 mg' }).click()
+  await page.getByRole('button', { name: 'Log' }).click()
+  await expect(page.getByText(/about 7\.5 pouches a day \(3 pieces\)/)).toBeVisible()
+  await expect(page.getByText('pouches today')).toBeVisible()
+  await expect(page.locator('.tier')).toHaveText('Flicker')
+  await page.screenshot({ path: 'test-results/pouches.png', fullPage: true })
+  await page.getByRole('button', { name: 'Settings' }).click()
+  await stepChips.filter({ hasText: 'Pieces' }).click()
+  await page.getByRole('button', { name: 'Log' }).click()
+  await expect(page.getByText('pieces today')).toBeVisible()
+
   // Export produces a Firewatch backup file.
   await page.getByRole('button', { name: 'Settings' }).click()
   // Hide next piece timer: on, then the Log tab hides the time until a tap.

@@ -98,7 +98,7 @@ class QuickLogWidget : GlanceAppWidget() {
             val b = Progress.battery(data, if (target > 0) target else 1.0 / 3.0, now, tz, com.baastiklabs.firewatch.data.AppActivity.last(context))
             when (b.state) {
                 BatteryState.CLEAR -> "Clear for one if you want it"
-                BatteryState.CHARGING -> "Next piece ~${b.readyAt?.let { Fmt.time(it) } ?: "later"}"
+                BatteryState.CHARGING -> "Next ${b.unitNoun} ~${b.readyAt?.let { Fmt.time(it) } ?: "later"}"
                 BatteryState.FULL_AT_WAKE -> b.fullAt?.let { "Full at ${Fmt.time(it)} · or fresh when you wake up" } ?: "Full when you wake up"
                 BatteryState.MORNING_DELAY -> "First piece goal ${b.readyAt?.let { Fmt.time(it) } ?: ""}"
                 BatteryState.WIND_DOWN -> "Winding down"

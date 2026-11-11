@@ -8,7 +8,7 @@ Every piece of data is a record:
 | field | meaning |
 | --- | --- |
 | `id` | unique id (time-prefixed random string) |
-| `type` | `product`, `dose`, `craving`, `sleep`, `settings`, `rung` (target changes), `checkin`, `mode` (Relapse prevention mode switched on/off: `at`, `on`, `mode: "relapse"`), `timercheck` (a tap on the hidden next-piece timer: `at`, `charging`), `refchange` (the reference piece changed: `at`, `from`, `productId`, `previousProductId`; doses before `from` keep the old piece size) (more may be added) |
+| `type` | `product`, `dose`, `craving`, `sleep`, `settings`, `rung` (target changes), `checkin`, `mode` (Relapse prevention mode switched on/off: `at`, `on`, `mode: "relapse"`), `timercheck` (a tap on the hidden next-piece timer: `at`, `charging`), `refchange` (the reference piece changed: `at`, `from`, `productId`, `previousProductId`; doses before `from` keep the old piece size), `unitchange` ("Battery and steps in" changed, 0.22.0: `at`, `productId`, "" = pieces) (more may be added) |
 | `ts` | main timestamp, epoch milliseconds (null for settings) |
 | `updatedAt` | epoch ms of the last change; newest wins when merging |
 | `deleted` | tombstone; deleted records are kept so undo and merging work |
@@ -22,6 +22,7 @@ Dose field `estimated: true` marks back-dated rough entries (no real time): coun
 Added in 0.16.0: settings `showWatch` (false), `lastZone` (""), `zoneHistory` (list of "<epoch ms>|<zone id>": which zone the usual wake/sleep times are in from the next day on).
 Added in 0.17.0: setting `favouriteCharts` (empty list): starred Insights chart ids (`core/.../engine/Favourites.kt`); unknown ids are ignored.
 Added in 0.18.0: dose `removedAt` (null): for pouches, when it came out of the mouth; when set it replaces `duration` in the absorbed estimate (5 min ≈ 30%, 15 min ≈ 60%, 30+ min = all).
+Added in 0.22.0: record type `unitchange` (`id`, `at`, `productId`; "" = pieces): what D steps in. Levels (`rung.pieces`) stay in pieces and may now sit between whole pieces (e.g. 1.6 = 4 pouches of 0.4); the battery uses the unit in force at each day's wake-up. Older versions ignore the record type and show such a level at the nearest piece rung.
 Added in 0.20.0: setting `wakeBattery` (1.0): how full the battery is at wake-up above 1 a day (1 = full … 0 = empty; at 2 a day it's a share of half a piece, from 0.21.0); the refill speed is fitted so the level is reached by the usual bedtime.
 
 Added in 0.14.0: settings `theme` ("firewatch"), `themeMode` ("system"), `trueBlack` (false), `colourBlindCharts` (false), `calmColours` (true), `installCardSeen` (false), `lastBackupAt` (0), `clearAirOfferSnoozedAt` (0). The old `remindCheckIn` / `remindBackup` settings are no longer read (those reminders were removed).

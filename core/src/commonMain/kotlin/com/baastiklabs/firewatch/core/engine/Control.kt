@@ -44,7 +44,7 @@ object Control {
         val avg = full.map { Progress.pace(data, it, tz).scaled }.average()
         val d = full.size.coerceAtMost(7)
         val blended = (EARLY_PIECES * (7 - d) + avg * d) / 7.0
-        val rung = Ladder.measured(blended).pieces.takeIf { it > 0 } ?: Ladder.rungs.last().pieces
+        val rung = data.steps.measured(blended).pieces.takeIf { it > 0 } ?: data.steps.rungs.last().pieces
         val current = data.targetPieces ?: return rung
         return if (kotlin.math.abs(rung - current) > 1e-6) rung else null
     }
@@ -181,7 +181,7 @@ object Control {
 
     fun practicingToday(data: FirewatchData, now: Long, tz: TimeZone): Boolean = Practice.active(data, now, tz) != null
 
-    fun practiceFollowUp(data: FirewatchData, now: Long, tz: TimeZone): Rung? = Practice.followUp(data, now, tz)?.let { Ladder.rung(it.pieces) }
+    fun practiceFollowUp(data: FirewatchData, now: Long, tz: TimeZone): Rung? = Practice.followUp(data, now, tz)?.let { data.steps.rung(it.pieces) }
 
     // ---- Taper forecast ----
 
@@ -206,10 +206,10 @@ object Control {
         var date = today
         val plan = ArrayList<TaperStep>()
         var guard = 0
-        while (rung > 0 && guard++ < 60) {
+        while (rung > 0 && guard++ < 200) {
             date = date.plus(daysLeft, DateTimeUnit.DAY)
-            rung = Ladder.nextDown(rung).pieces
-            plan += TaperStep(Ladder.rung(rung).takeIf { rung > 0 } ?: Ladder.clearAir, date)
+            rung = data.steps.nextDown(rung).pieces
+            plan += TaperStep(data.steps.rung(rung), date)
             daysLeft = hold
         }
         // Blend toward the real pace as full weeks of data build up (4 weeks = all pace).

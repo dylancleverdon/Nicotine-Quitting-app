@@ -27,6 +27,8 @@ data class DayBattery(
     val paused: Boolean = false,
     val netMin: Double = 0.0,
     val gapMin: Double = 0.0,
+    /** Minutes per step unit (0.22): one pouch's time when stepping in pouches, else [gapMin]. */
+    val unitGapMin: Double = gapMin,
 )
 
 /**
@@ -40,6 +42,9 @@ data class DayBattery(
  *   resets, holds up to one piece and starts empty when D first moves to that level.
  * - 0.21: 2 a day moved from continuous to daily mode from the waking day of
  *   [TWO_A_DAY_FITTED_FROM]. Days before it keep the old rule, so they are never recounted.
+ * - 0.22: with "Battery and steps in" set to a product, the battery holds one of it ([DayPlan.cap]
+ *   pieces, e.g. 0.4 for a 2 mg pouch) from the next wake-up: full means one pouch, and a full start
+ *   is one pouch. Net and costs are the same formulas (room in pieces × minutes per piece).
  * - A tank: each dose uses its share (p pieces), never below empty, so the wait is at most one gap.
  *   Pull: the part of a dose that didn't fit, in minutes. Stretch: minutes held with a full battery
  *   before bedtime. Both are for Insights.
@@ -78,6 +83,8 @@ object BatteryEngine {
         val continuous: Boolean,
         val c0: Double,
         val rate: Double,
+        /** What a full battery holds, in pieces: 1, or one step unit (a pouch ≈ 0.4). */
+        val cap: Double = 1.0,
     ) {
         val gap: Double get() = 1.0 / rate
         val refillEnd: Long get() = if (continuous) Long.MAX_VALUE else day.bedtime
@@ -119,14 +126,16 @@ object BatteryEngine {
         val since = continuousSince(data, t, limit) ?: return 0.0
         var c = 0.0
         var x = since
+        // Holds at most one step unit (one piece, or one pouch), the unit in force at each point.
         val events = (data.rungChanges.filter { it.at in since until t }.map { it.at to null as Dose? } +
+            data.unitChanges.filter { it.at in since until t }.map { it.at to null as Dose? } +
             data.doses.filter { it.at in since until t }.map { it.at to it as Dose? }).sortedBy { it.first }
         for ((at, dose) in events) {
-            c = (c + levelOf(targetAt(data, x) ?: 1.0) / DAY_MIN * (at - x) / MIN).coerceAtMost(1.0)
+            c = (c + levelOf(targetAt(data, x) ?: 1.0) / DAY_MIN * (at - x) / MIN).coerceAtMost(data.unitPiecesAt(x))
             x = at
             if (dose != null) c = (c - data.piecesOf(dose)).coerceAtLeast(0.0)
         }
-        return (c + levelOf(targetAt(data, x) ?: 1.0) / DAY_MIN * (t - x) / MIN).coerceAtMost(1.0)
+        return (c + levelOf(targetAt(data, x) ?: 1.0) / DAY_MIN * (t - x) / MIN).coerceAtMost(data.unitPiecesAt(x))
     }
 
     /** The day's battery at its level (null before any level). [fallback]: the level on day one. */
@@ -134,11 +143,13 @@ object BatteryEngine {
         val raw = targetAt(data, day.wakeAt) ?: fallback ?: data.rungChanges.firstOrNull { it.at < day.bedtime }?.pieces ?: return null
         val level = levelOf(raw)
         val limit = continuousAt(day.date)
+        // The step unit in force at wake-up: a switch applies from the next wake-up.
+        val cap = data.unitPiecesAt(day.wakeAt)
         if (level <= limit + 1e-9) {
-            return DayPlan(day, nextWake, level, true, continuousCharge(data, day.wakeAt, limit), level / DAY_MIN)
+            return DayPlan(day, nextWake, level, true, continuousCharge(data, day.wakeAt, limit).coerceAtMost(cap), level / DAY_MIN, cap)
         }
-        val c0 = (data.settings.wakeBattery.coerceIn(0.0, 1.0) * startShare(level)).coerceAtMost(level)
-        return DayPlan(day, nextWake, level, false, c0, fittedRate(level, c0, day))
+        val c0 = (data.settings.wakeBattery.coerceIn(0.0, 1.0) * minOf(cap, startShare(level))).coerceAtMost(level)
+        return DayPlan(day, nextWake, level, false, c0, fittedRate(level, c0, day), cap)
     }
 
     /** Refill speed for a practice level, fitted the same way as the real level. */
@@ -185,11 +196,11 @@ object BatteryEngine {
             val r = rateAt(t)
             val refillEnd = minOf(to, plan.refillEnd)
             if (refillEnd > t) {
-                val fullAt = t + ((1.0 - charge).coerceAtLeast(0.0) / r * MIN).toLong()
+                val fullAt = t + ((plan.cap - charge).coerceAtLeast(0.0) / r * MIN).toLong()
                 val sStart = maxOf(fullAt, t, stretchFrom)
                 val sEnd = minOf(refillEnd, day.bedtime)
                 if (sEnd > sStart) stretch += counted(sStart, sEnd)
-                charge = (charge + (refillEnd - t) / MIN.toDouble() * r).coerceAtMost(1.0)
+                charge = (charge + (refillEnd - t) / MIN.toDouble() * r).coerceAtMost(plan.cap)
             }
             t = to
         }
@@ -199,8 +210,8 @@ object BatteryEngine {
         for (d in doses) {
             if (d.at > end) break
             advance(d.at)
-            if (stopBefore != null && d.id == stopBefore.id) return Sim(charge, stretch, pull, charge >= 1.0 - 1e-9)
-            val full = charge >= 1.0 - 1e-9
+            if (stopBefore != null && d.id == stopBefore.id) return Sim(charge, stretch, pull, charge >= plan.cap - 1e-9)
+            val full = charge >= plan.cap - 1e-9
             val p = data.piecesOf(d)
             if (inCount(d.at)) pull += (p - charge).coerceAtLeast(0.0) / rateAt(d.at)
             fullBeforeLast = full
@@ -237,8 +248,8 @@ object BatteryEngine {
                 di++
             }
             if (t < plan.refillEnd && t < end) {
-                if (charge >= 1.0 - 1e-9 && t < day.bedtime && t >= stretchFrom) stretch += 1.0
-                charge = (charge + plan.rate).coerceAtMost(1.0)
+                if (charge >= plan.cap - 1e-9 && t < day.bedtime && t >= stretchFrom) stretch += 1.0
+                charge = (charge + plan.rate).coerceAtMost(plan.cap)
             }
             t += MIN
         }
@@ -315,8 +326,8 @@ object BatteryEngine {
         when {
             !plan.continuous && now >= day.bedtime -> { state = BatteryState.ASLEEP; readyAt = nextWake }
             goal != null && !firstDose && now < goal -> { state = BatteryState.MORNING_DELAY; readyAt = goal }
-            charge < 1.0 - 1e-9 -> {
-                val ready = now + ceil((1.0 - charge) / rate).toLong() * MIN
+            charge < plan.cap - 1e-9 -> {
+                val ready = now + ceil((plan.cap - charge) / rate).toLong() * MIN
                 if (!plan.continuous && ready > day.bedtime) { state = BatteryState.FULL_AT_WAKE; readyAt = nextWake }
                 else { state = BatteryState.CHARGING; readyAt = ready }
             }
@@ -325,9 +336,14 @@ object BatteryEngine {
         // Relapse prevention mode: waiting longer isn't the goal, so stretch, pull and net pause.
         // Wind-down is a note only: it never replaces the guidance.
         val closeToBed = data.settings.windDown && now in (day.bedtime - 60 * MIN) until day.bedtime
-        if (Relapse.isModeDay(data, day.date, tz)) return Battery(charge, state, readyAt, 0.0, plan.gap, 0.0, closeToBed, gapMin = plan.gap)
-        return Battery(charge, state, readyAt, sim.stretch, plan.gap, sim.pull, closeToBed,
-            netMin = room(data, plan, now), gapMin = plan.gap, practicePieces = active?.pieces)
+        // The bar shows how full the battery is (one piece, or one pouch when stepping in pouches).
+        val fraction = (charge / plan.cap).coerceIn(0.0, 1.0)
+        val noun = data.unitAt(day.wakeAt)?.noun ?: "piece"
+        if (Relapse.isModeDay(data, day.date, tz)) return Battery(fraction, state, readyAt, 0.0, plan.gap, 0.0, closeToBed, gapMin = plan.gap,
+            unitGapMin = plan.gap * plan.cap, unitNoun = noun)
+        return Battery(fraction, state, readyAt, sim.stretch, plan.gap, sim.pull, closeToBed,
+            netMin = room(data, plan, now), gapMin = plan.gap, practicePieces = active?.pieces,
+            unitGapMin = plan.gap * plan.cap, unitNoun = noun)
     }
 
     /**
@@ -359,10 +375,10 @@ object BatteryEngine {
         if (day.wakeAt > now) return null
         val nextWake = Waking.day(data, date.plus(1, DateTimeUnit.DAY), tz).wakeAt
         val plan = plan(data, day, nextWake) ?: return null
-        if (Relapse.isModeDay(data, date, tz)) return DayBattery(date, 0.0, 0.0, paused = true, gapMin = plan.gap)
+        if (Relapse.isModeDay(data, date, tz)) return DayBattery(date, 0.0, 0.0, paused = true, gapMin = plan.gap, unitGapMin = plan.gap * plan.cap)
         val until = minOf(now, nextWake - 1)
         val sim = simulate(data, plan, until)
-        return DayBattery(date, sim.stretch, sim.pull, netMin = room(data, plan, until), gapMin = plan.gap)
+        return DayBattery(date, sim.stretch, sim.pull, netMin = room(data, plan, until), gapMin = plan.gap, unitGapMin = plan.gap * plan.cap)
     }
 
     /**
@@ -381,7 +397,7 @@ object BatteryEngine {
         if (!earlier) morningGoal(data, day, tz)?.let { if (dose.at < it) return false }
         val plan = plan(data, day, nextWake, target) ?: return null
         val sim = simulate(data, plan, dose.at, stopBefore = dose)
-        return sim.fullBeforeLast == true || sim.charge >= 1.0 - 1e-9
+        return sim.fullBeforeLast == true || sim.charge >= plan.cap - 1e-9
     }
 
     /** True if [dose] was taken with a full battery and wasn't the day's first piece (the cheer). */
@@ -392,7 +408,7 @@ object BatteryEngine {
         if (!earlier) return false
         val plan = plan(data, day, nextWake, target) ?: return false
         val sim = simulate(data, plan, dose.at, stopBefore = dose)
-        return sim.fullBeforeLast == true || sim.charge >= 1.0 - 1e-9
+        return sim.fullBeforeLast == true || sim.charge >= plan.cap - 1e-9
     }
 
 }

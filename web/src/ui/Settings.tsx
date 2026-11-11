@@ -54,7 +54,7 @@ export function Settings({ toast, go, updateInfo }: { toast: (m: string) => void
       <h3 class="label">Your plan</h3>
       <div class="small">{target ? `Working at ${target.label}` : 'Your target appears once your baseline is known.'}</div>
       {target && target.pieces > 0 && <button class="btn outline" onClick={() => {
-        const i = snap.ladder.findIndex((r) => Math.abs(r.pieces - target.pieces) < 1e-6); const up = snap.ladder[Math.max(0, i - 1)]
+        const up = snap.ladder.filter((r) => r.pieces > target.pieces + 1e-6).pop() ?? snap.ladder[0]
         S.setTarget(up.pieces, 'up'); toast(`Stepped up to ${up.label}. Your level is more accurate now.`)
       }}>Step back up a rung</button>}
       <div class="small">Hold each rung for</div>
@@ -73,6 +73,10 @@ export function Settings({ toast, go, updateInfo }: { toast: (m: string) => void
       <div class="row wrap">{([[1, 'Full'], [0.75, '¾'], [0.5, 'Half'], [0.25, '¼'], [0, 'Empty']] as [number, string][]).map(([v, l]) =>
         <button class={`chip ${Math.abs((s.wakeBattery ?? 1) - v) < 1e-6 ? 'on' : ''}`} onClick={() => S.updateSettings({ wakeBattery: v })}>{l}</button>)}</div>
       <div class="small muted">Above 1 a day. The battery then refills so you reach your level by your usual bedtime, whichever you pick. At 2 a day, full means half a piece, so your morning holds a quarter of your day. At 1 a day or less it runs around the clock instead.</div>
+      <div class="small">Battery and steps in</div>
+      <div class="row wrap"><button class={`chip ${snap.stepProducts.some((p) => p.extra === snap.stepUnitId) ? '' : 'on'}`} onClick={() => S.setStepUnit('')}>Pieces</button>
+        {snap.stepProducts.map((p) => <button class={`chip ${snap.stepUnitId === p.extra ? 'on' : ''}`} onClick={() => S.setStepUnit(p.extra)}>{p.label}</button>)}</div>
+      <div class="small muted">{snap.stepUnitNote}</div>
       <div class="small">Time format</div>
       <div class="row wrap">{[['system', 'Device setting'], ['12h', '12-hour (AM/PM)'], ['24h', '24-hour']].map(([v, l]) =>
         <button class={`chip ${(s.timeFormat ?? 'system') === v ? 'on' : ''}`} onClick={() => S.updateSettings({ timeFormat: v })}>{l}</button>)}</div>

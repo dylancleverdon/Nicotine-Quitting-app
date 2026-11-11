@@ -168,6 +168,7 @@ export function Insights() {
 </>
       })()}
       {sec === 'Trends' && <>
+        {snap.chartNote && <div class="small muted">{snap.chartNote}</div>}
         {snap.recentStates.length > 0 && <Card title={`${snap.recentStates.filter((s) => s.extra === 'logged' || s.extra === 'clear').length} of ${snap.recentStates.length} days known`} fav="known" sub="One dot per day: filled = logged, 🌿 = clear, ? = nothing logged, 👻 = left out. Only known days count in your figures.">
           <div class="strip">{snap.recentStates.map((s) => <span class={s.extra === 'logged' || s.extra === 'clear' ? 'on' : ''} title={s.label}>{s.extra === 'logged' ? '●' : s.extra === 'clear' ? '🌿' : s.extra === 'ghost' ? '👻' : '?'}</span>)}</div>
           {snap.measured && <div class="small">Your last 7 days measure {snap.measured.label}{snap.known7 < 7 ? ` (${snap.known7} of 7 days known)` : ''}</div>}
@@ -271,7 +272,7 @@ export function Insights() {
         <Bars values={ch.practiceRuns.map((r) => Math.max(0, r.value / 60))} fmt={h} x={ch.practiceRuns.map((r) => r.label)} />
         {ch.practiceRuns.map((r) => <div class="small">{r.label} pace · {Math.round(Number(r.extra))} h · practice net {hm(r.value)}</div>)}
       </Card>}
-      {sec === 'Ladder' && <Card title="The ladder" sub="Each rung is one piece a day lighter.">
+      {sec === 'Ladder' && <Card title="The ladder" sub={`Each rung is one ${snap.unitNoun} a day lighter.`}>
         {snap.ladder.map((r) => {
           const t = snap.target && Math.abs(snap.target.pieces - r.pieces) < 1e-6, me = snap.measured && Math.abs(snap.measured.pieces - r.pieces) < 1e-6
           return <div class="row small" style={{ fontWeight: t || me ? 700 : 400, color: t ? 'var(--primary)' : undefined }}><span class="grow">{r.label}</span>{t && 'target '}{me && 'you'}</div>

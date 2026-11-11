@@ -229,6 +229,19 @@ data class RefChange(
     val previousProductId: String,
 )
 
+/**
+ * What D steps in changed (0.22: "Battery and steps in"). The battery holds one [productId] and each
+ * step down is one of it; empty [productId] means pieces. The level itself stays in pieces (gum 4 mg
+ * equivalents), so tiers and progress don't move. The battery uses the unit in force at each day's
+ * wake-up (a switch applies from the next wake-up); labels and steps use the latest.
+ */
+@Serializable
+data class UnitChange(
+    val id: String,
+    val at: Long,
+    val productId: String = "",
+)
+
 /** A tap to see the hidden next-piece time. [charging]: the battery wasn't full yet. */
 @Serializable
 data class TimerCheck(
