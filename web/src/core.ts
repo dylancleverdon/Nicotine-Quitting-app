@@ -54,7 +54,7 @@ export interface Snapshot {
     kindsByHour: Record<string, number[]>; steadyByMonth: NamedValue[]; paceVsPlan: string[][]; practiceRuns: NamedValue[]; daysFree: NamedValue[]
   }
   qualityScore: number | null; qualityLabel: string | null; swapTip: string | null; activeCraving: CravingView | null
-  todayPieces: number; stepUnitId: string; unitPieces: number; unitNoun: string; unitPlural: string; stepProducts: NamedValue[]; chartNote: string | null; stepUnitNote: string; todayMg: number; todayCravings: number; todayRodeOut: number; lastDoseAt: number | null
+  todayPieces: number; stepUnitId: string; unitPieces: number; unitNoun: string; unitPlural: string; stepProducts: NamedValue[]; chartNote: string | null; stepUnitNote: string; manualStepDown: { next: Rung; title: string; body: string } | null; todayMg: number; todayCravings: number; todayRodeOut: number; lastDoseAt: number | null
   todayDoses: DoseView[]; todayCravingList: CravingView[]; wave: number[][]; wakeAt: number; sleepAt: number; typical: number[]
   days: DayView[]; sevenDayAverage: number[]; insights: InsightsData; ladder: Rung[]; tiers: NamedValue[]
   stretchDays: StretchDay[]; stretchSummary: string | null

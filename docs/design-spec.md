@@ -157,6 +157,11 @@ as an estimate.
   "Step down to …" button until it's taken or the level changes, even after "Stay here" or a
   heavier day. **Try it for a day** starts practice pace at the next rung; next morning
   "Step down / Stay here".
+  **Manual step down (0.23):** Settings → Your plan → "Step down a rung (…)" any time, one step
+  (the next rung on D's ladder, pieces or pouches). A confirm says "Step down to …?", "You've held
+  … for X of Y days." and that the battery switches from the next wake-up, with Step down / Stay
+  here. It counts exactly like an offered step down (celebration, badge, history "stepped down",
+  hold restarts). The app itself never offers a step down before the hold.
 - **No scaling:** every daily figure (level, tier, held days, steady days) counts exactly the pieces
   had; short or long waking days are never scaled up or down (removed in 0.15; past days recounted).
 

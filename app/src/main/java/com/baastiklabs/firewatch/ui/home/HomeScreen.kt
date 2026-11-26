@@ -774,20 +774,7 @@ fun HomeScreen(
             onDismiss = { practiceAsk = null },
         )
     }
-    celebrate?.let { r ->
-        androidx.compose.material3.AlertDialog(
-            onDismissRequest = { celebrate = null },
-            icon = { Text("🔥", style = MaterialTheme.typography.displaySmall) },
-            title = { Text("New rung: ${r.tier.title}") },
-            text = {
-                Text(
-                    "${r.plainLine} You earned the ${r.label} badge. Every step down is one ${data.steps.noun} a day lighter, and badges are never taken away.",
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-            },
-            confirmButton = { androidx.compose.material3.TextButton(onClick = { celebrate = null }) { Text("Onward") } },
-        )
-    }
+    celebrate?.let { r -> NewRungDialog(r, data.steps.noun) { celebrate = null } }
 
     if (checkIn) {
         CheckInDialog(onDismiss = { checkIn = false }, onSave = { c, m, sl ->
@@ -940,6 +927,18 @@ private fun StatusCard(
 }
 
 @OptIn(ExperimentalFoundationApi::class)
+/** The new-rung celebration, the same for an offered step down and one taken in Settings. */
+@Composable
+fun NewRungDialog(r: com.baastiklabs.firewatch.core.engine.Rung, noun: String, onDismiss: () -> Unit) {
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = { Text("🔥", style = MaterialTheme.typography.displaySmall) },
+        title = { Text("New rung: ${r.tier.title}") },
+        text = { Text(com.baastiklabs.firewatch.core.Help.newRungBody(r.plainLine, r.label, noun), style = MaterialTheme.typography.bodyMedium) },
+        confirmButton = { androidx.compose.material3.TextButton(onClick = onDismiss) { Text("Onward") } },
+    )
+}
+
 @Composable
 private fun ProductButton(
     preview: Double?,

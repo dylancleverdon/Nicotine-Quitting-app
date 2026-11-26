@@ -176,6 +176,16 @@ test('back-dated start, logging and persistence', async ({ page }) => {
   const file = JSON.parse(text)
   expect(file.app).toBe('Firewatch by Baastik Labs')
   expect(file.records.filter((r: any) => r.type === 'dose').length).toBe(37)
+
+  // Manual step down from Settings: one step, with a confirm that offers Stay here.
+  await page.getByRole('button', { name: /^Step down a rung/ }).click()
+  await expect(page.getByText('Step down to Embers · 2 a day?')).toBeVisible()
+  await expect(page.getByText(/The battery switches to the new level from your next wake-up/)).toBeVisible()
+  await page.getByRole('button', { name: 'Stay here' }).click()
+  await expect(page.getByText('Working at Flicker · 3 a day')).toBeVisible()
+  await page.getByRole('button', { name: /^Step down a rung/ }).click()
+  await page.getByRole('button', { name: 'Step down', exact: true }).click()
+  await expect(page.getByText('Working at Embers · 2 a day')).toBeVisible()
 })
 
 // A brand-new user on the baseline path gets guidance straight away: an early estimate of 8 a day.

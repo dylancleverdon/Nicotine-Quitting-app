@@ -2,6 +2,9 @@
 
 Newest first. Each release is a "## <version>" heading; the app shows these notes in "What's new".
 
+## 0.23.0 · 2026-11-26
+- **Step down yourself, any time.** Settings → Your plan → Step down a rung. It goes one step (for example 5 → 4 pouches), asks first with Step down or Stay here, and shows how many hold days you've done. It counts just like a step down the app offers: the new-rung badge, your level history, and the hold starting again at the new level. The battery switches at your next wake-up.
+
 ## 0.22.1 · 2026-11-11
 - **Battery and steps in now works on the phone.** In 0.22.0, tapping a product there was saved but didn't show. Your taps were kept, so if you picked Nicotine pouch 2 mg it's now selected, and the battery holds one pouch from your next wake-up.
 

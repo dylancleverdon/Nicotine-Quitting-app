@@ -17,6 +17,7 @@ export function Settings({ toast, go, updateInfo }: { toast: (m: string) => void
   const [editing, setEditing] = useState<any>(null)
   const [pending, setPending] = useState(unsent())
   const [refTo, setRefTo] = useState<string | null>(null)
+  const [askDown, setAskDown] = useState(false)
   const [refDate, setRefDate] = useState('')
   const applyRef = async (from: number) => {
     await S.save('refchange', { id: Core.newId(), at: Date.now(), from, productId: refTo, previousProductId: s.referenceProductId })
@@ -57,6 +58,15 @@ export function Settings({ toast, go, updateInfo }: { toast: (m: string) => void
         const up = snap.ladder.filter((r) => r.pieces > target.pieces + 1e-6).pop() ?? snap.ladder[0]
         S.setTarget(up.pieces, 'up'); toast(`Stepped up to ${up.label}. Your level is more accurate now.`)
       }}>Step back up a rung</button>}
+      {snap.manualStepDown && <button class="btn outline" onClick={() => setAskDown(true)}>Step down a rung ({snap.manualStepDown.next.label})</button>}
+      {askDown && snap.manualStepDown && <div class="card">
+        <b>{snap.manualStepDown.title}</b>
+        <div class="small">{snap.manualStepDown.body}</div>
+        <div class="row wrap">
+          <button class="btn" onClick={() => { const n = snap.manualStepDown!.next; setAskDown(false); S.setTarget(n.pieces, 'down'); toast(`New rung: ${n.label}. That's real progress.`) }}>Step down</button>
+          <button class="btn outline" onClick={() => setAskDown(false)}>Stay here</button>
+        </div>
+      </div>}
       <div class="small">Hold each rung for</div>
       <div class="row wrap">{[[3, '3 days'], [7, '1 week'], [14, '2 weeks'], [21, '3 weeks']].map(([d, l]) =>
         <button class={`chip ${s.holdDays === d ? 'on' : ''}`} onClick={() => S.updateSettings({ holdDays: d })}>{l}</button>)}</div>

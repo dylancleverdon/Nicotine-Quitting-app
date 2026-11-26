@@ -1,5 +1,8 @@
 # Firewatch web changelog
 
+## 0.20.0 · 2026-11-26
+- **Step down yourself, any time.** Settings → Your plan → Step down a rung. It goes one step (for example 5 → 4 pouches), asks first with Step down or Stay here, and shows how many hold days you've done. It counts just like a step down the app offers: the new-rung badge, your level history, and the hold starting again at the new level. The battery switches at your next wake-up.
+
 ## 0.19.0 · 2026-11-11
 - **Taper in pouches (or another product you use).** Settings → Your plan → Battery and steps in → Nicotine pouch 2 mg. Your level doesn't change: it's still counted in pieces, so your tier, steady days, held days, Journey to Clear Air and history stay as they are. It's shown in pouches first, e.g. "Embers · 5 pouches a day".
 - From your next wake-up after switching, the battery holds one pouch: it starts the day with one, and "Next pouch around …" is when a whole pouch is ready. Net works the same way.

@@ -33,7 +33,9 @@ Every feature has to follow these.
 2. **Control, not pressure.** Holding steady is a win. Tapering is offered ("or stay here, that's
    fine too"), never pushed. A step down is earned, not on demand: it unlocks once a level has
    been held, and then it stays unlocked (a button in Insights) until you take it or your level
-   changes, so you can hold a little longer and step down when it suits you.
+   changes, so you can hold a little longer and step down when it suits you. D can also choose to
+   step down at any time (Settings → Your plan → Step down a rung, one step, with Stay here): the
+   app never offers that early, it's D's own call.
 3. **Never judge.**
    - Tone: plain and factual by default; a calm, encouraging coach for wins; neutral, like a tool,
      for misses.

@@ -108,6 +108,9 @@ external object JsJodaTimeZoneModule
     val longestGapMin: Double?, val stacked: Int, val morningStretchMin: Double?, val tips: List<String>,
 )
 @Serializable data class NamedValue(val label: String, val value: Double, val extra: String = "")
+/** Settings → Your plan → "Step down a rung" (0.23): the next rung and the confirm's wording. */
+@Serializable data class ManualStepDownDto(val next: RungDto, val title: String, val body: String)
+
 @Serializable data class Snapshot(
     val today: String,
     val baselineState: String,
@@ -166,6 +169,7 @@ external object JsJodaTimeZoneModule
     val stepProducts: List<NamedValue> = emptyList(),
     val chartNote: String? = null,
     val stepUnitNote: String = com.baastiklabs.firewatch.core.Help.STEP_UNIT_NOTE,
+    val manualStepDown: ManualStepDownDto? = null,
     val todayMg: Double,
     val todayCravings: Int,
     val todayRodeOut: Int,
@@ -465,6 +469,12 @@ object FirewatchCore {
             unitNoun = d.steps.noun,
             unitPlural = d.steps.plural,
             chartNote = d.steps.chartNote,
+            manualStepDown = d.targetPieces?.takeIf { it > 0 }?.let { t ->
+                val n = d.steps.nextDown(t)
+                val p = Progress.stepDownProgress(d, now, tz)
+                ManualStepDownDto(n.dto(), com.baastiklabs.firewatch.core.Help.manualStepDownTitle(n.label),
+                    com.baastiklabs.firewatch.core.Help.manualStepDownBody(d.steps.rung(t).label, p?.held, p?.needed))
+            },
             stepProducts = d.products.filter { !it.archived && it.kind in FirewatchData.STEP_KINDS && it.id != d.settings.referenceProductId }
                 .sortedWith(compareBy({ it.order }, { it.name })).map { NamedValue(it.name, 0.0, it.id) },
             todayMg = todayDoses.sumOf { it.absorbedMg() },

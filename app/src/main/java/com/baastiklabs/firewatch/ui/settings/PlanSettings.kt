@@ -39,6 +39,9 @@ fun PlanSettings(vm: FirewatchViewModel, data: FirewatchData) {
 
     SectionTitle("Your plan")
     val target = data.targetPieces
+    var askDown by remember { mutableStateOf(false) }
+    var stepped by remember { mutableStateOf<com.baastiklabs.firewatch.core.engine.Rung?>(null) }
+    stepped?.let { r -> com.baastiklabs.firewatch.ui.home.NewRungDialog(r, data.steps.noun) { stepped = null } }
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(
             target?.let { "Working at ${data.steps.rung(it).label}" } ?: "Your target appears after the baseline week.",
@@ -48,8 +51,30 @@ fun PlanSettings(vm: FirewatchViewModel, data: FirewatchData) {
             OutlinedButton(onClick = { scope.launch { vm.repository.setTarget(data.steps.nextUp(target).pieces, "up") } }) {
                 Text("Step back up a rung (${data.steps.nextUp(target).label})")
             }
+            // Manual step down (0.23): one step at a time, any time, with a confirm that offers Stay here.
+            val next = data.steps.nextDown(target)
+            if (target > 0) {
+                OutlinedButton(onClick = { askDown = true }) { Text("Step down a rung (${next.label})") }
+            }
+            if (askDown) {
+                val progress = remember(data) {
+                    com.baastiklabs.firewatch.core.engine.Progress.stepDownProgress(data, vm.repository.now(), kotlinx.datetime.TimeZone.currentSystemDefault())
+                }
+                androidx.compose.material3.AlertDialog(
+                    onDismissRequest = { askDown = false },
+                    title = { Text(com.baastiklabs.firewatch.core.Help.manualStepDownTitle(next.label)) },
+                    text = { Text(com.baastiklabs.firewatch.core.Help.manualStepDownBody(data.steps.rung(target).label, progress?.held, progress?.needed)) },
+                    confirmButton = {
+                        androidx.compose.material3.TextButton(onClick = {
+                            askDown = false
+                            scope.launch { vm.repository.setTarget(next.pieces, "down"); stepped = next }
+                        }) { Text("Step down") }
+                    },
+                    dismissButton = { androidx.compose.material3.TextButton(onClick = { askDown = false }) { Text("Stay here") } },
+                )
+            }
             Text(
-                "Stepping up makes your level more accurate. Step-downs are offered when you're ready; the target never changes on its own.",
+                "Stepping up makes your level more accurate. Step-downs are offered when you're ready, and you can take one yourself any time; the target never changes on its own.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
