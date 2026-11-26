@@ -90,7 +90,8 @@ export async function startGum() {
 }
 /** "Battery and steps in" (0.22): step in a product ('' = pieces). The level and progress don't change. */
 export const setStepUnit = (productId: string) => save('unitchange', { id: Core.newId(), at: Date.now(), productId })
-export const setTarget = (pieces: number, reason: string, detail = '') => save('rung', { id: Core.newId(), at: Date.now(), pieces, reason, detail })
+/** [wholeDay]: a manual step down, which re-fits today to the new level at once (0.23). */
+export const setTarget = (pieces: number, reason: string, detail = '', wholeDay = false) => save('rung', { id: Core.newId(), at: Date.now(), pieces, reason, detail, wholeDay })
 
 /** Mark an empty day 'clear' or 'ghost'; null puts it back to "?". */
 export async function markDay(date: string, state: 'clear' | 'ghost' | null) {

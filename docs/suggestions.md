@@ -130,5 +130,5 @@ Ideas raised while reviewing the app, not sent through the form.
 | 2026-10-12 | Idea | Took it out: does it recalculate stretch and pull? | Done | Answered: yes, the dose-size part (0.18.0). |
 | 2026-10-12 | Idea | An optional smaller step down | Done | 0.22.0: stepping in pouches (Battery and steps in) makes each step one pouch (0.4 piece). |
 | 2026-11-11 | Idea | Taper in 2 mg pouches without losing the level or progress | Done | 0.22.0: Settings → Your plan → Battery and steps in. Level stays in pieces; battery holds one pouch from the next wake-up; one pouch per step; pouches shown first. |
-| 2026-11-26 | Idea | Let D step down manually | Done | 0.23.0: Settings → Your plan → Step down a rung; one step at a time; confirm with Stay here; counts like an offered step down. |
+| 2026-11-26 | Idea | Let D step down manually | Done | 0.23.0: Settings → Your plan → Step down a rung; one step at a time; confirm with Stay here; counts like an offered step down; starts at once (today re-fitted to the new level). |
 | 2026-10-06 | Idea | Receptor load ideas (Help fix, Favourites fact, explanation, one framing, range band, history before Firewatch, badges) | Declined | D, 8 Oct; the Help line pointing at the removed spike share chart was fixed anyway in 0.18.0. |

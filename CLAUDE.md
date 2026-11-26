@@ -60,7 +60,8 @@ non-technical: Claude Code builds, releases and maintains everything.
 - Holding steady is a win and gets celebrated. Tapering is offered, never pushed: step-down offers
   always include "Stay here". A step down unlocks after the hold and stays unlocked (Insights →
   Forecasts button) until taken or the level changes. D can also step down by hand any time
-  (Settings → Your plan, one step, confirm with "Stay here"); the app never offers it early. Days count exactly the pieces had: never
+  (Settings → Your plan, one step, confirm with "Stay here"; it re-fits today at once, unlike
+  offered changes, which start at the next wake-up); the app never offers it early. Days count exactly the pieces had: never
   scale a day up or down for short or long waking hours. Clear Air stays visible and within reach, never downplayed.
 - Never judge. Tone: factual by default, calm coach for wins, neutral for misses. Never condescending,
   never spin a miss positively, never show a negative comparison ("last week you were lighter").

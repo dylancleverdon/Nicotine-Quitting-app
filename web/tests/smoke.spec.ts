@@ -180,7 +180,7 @@ test('back-dated start, logging and persistence', async ({ page }) => {
   // Manual step down from Settings: one step, with a confirm that offers Stay here.
   await page.getByRole('button', { name: /^Step down a rung/ }).click()
   await expect(page.getByText('Step down to Embers · 2 a day?')).toBeVisible()
-  await expect(page.getByText(/The battery switches to the new level from your next wake-up/)).toBeVisible()
+  await expect(page.getByText(/It starts straight away: today is counted at the new level/)).toBeVisible()
   await page.getByRole('button', { name: 'Stay here' }).click()
   await expect(page.getByText('Working at Flicker · 3 a day')).toBeVisible()
   await page.getByRole('button', { name: /^Step down a rung/ }).click()

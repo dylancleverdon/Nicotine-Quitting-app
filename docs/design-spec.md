@@ -82,7 +82,7 @@ as an estimate.
 - **A tank fitted to the day (0.20).** It holds one piece; each dose uses its share (a gum 4 mg
   empties it, a 2 mg pouch uses 40%), never below empty, so the wait is at most one piece's time.
   "Next piece around …" is when it's full again. The level for a day is the rung in force at
-  wake-up (a change applies from the next wake-up).
+  wake-up (a change applies from the next wake-up; a manual step down re-fits the whole day, §8).
   - **Above 1 a day (daily):** at wake-up it starts at Settings' "Battery when you wake up" (Full by
     default; ¾, Half, ¼, Empty; at 2 a day each is halved, so Full = half a piece and the morning
     holds a quarter of the day, as at 4 a day: +5h net at wake over 8–23, a 2 mg pouch −4h) and refills at a steady speed so start + refill = the level exactly
@@ -159,9 +159,12 @@ as an estimate.
   "Step down / Stay here".
   **Manual step down (0.23):** Settings → Your plan → "Step down a rung (…)" any time, one step
   (the next rung on D's ladder, pieces or pouches). A confirm says "Step down to …?", "You've held
-  … for X of Y days." and that the battery switches from the next wake-up, with Step down / Stay
-  here. It counts exactly like an offered step down (celebration, badge, history "stepped down",
-  hold restarts). The app itself never offers a step down before the hold.
+  … for X of Y days." and that it starts straight away, with Step down / Stay here. It starts at
+  once (D, 26 Nov): today is re-fitted to the new level as if D had woken up at it (RungChange
+  `wholeDay: true`, `BatteryEngine.dayLevel`), so net and costs change immediately; offered step
+  downs and step ups still apply from the next wake-up. It counts exactly like an offered step down
+  (celebration, badge, history "stepped down", hold restarts). The app itself never offers a step
+  down before the hold.
 - **No scaling:** every daily figure (level, tier, held days, steady days) counts exactly the pieces
   had; short or long waking days are never scaled up or down (removed in 0.15; past days recounted).
 

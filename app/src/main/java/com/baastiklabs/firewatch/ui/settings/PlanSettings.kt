@@ -67,7 +67,7 @@ fun PlanSettings(vm: FirewatchViewModel, data: FirewatchData) {
                     confirmButton = {
                         androidx.compose.material3.TextButton(onClick = {
                             askDown = false
-                            scope.launch { vm.repository.setTarget(next.pieces, "down"); stepped = next }
+                            scope.launch { vm.repository.setTarget(next.pieces, "down", wholeDay = true); stepped = next }
                         }) { Text("Step down") }
                     },
                     dismissButton = { androidx.compose.material3.TextButton(onClick = { askDown = false }) { Text("Stay here") } },

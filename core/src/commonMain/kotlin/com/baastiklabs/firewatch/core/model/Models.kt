@@ -282,6 +282,12 @@ data class RungChange(
     val reason: String = "",
     /** Why, in plain words (e.g. the step-up reason). Empty for older entries. */
     val detail: String = "",
+    /**
+     * A manual step down (0.23, Settings → Your plan → Step down a rung): the waking day it was made
+     * in is re-fitted to this level as if D had woken up at it. Other changes apply from the next
+     * wake-up.
+     */
+    val wholeDay: Boolean = false,
 )
 
 /**

@@ -33,7 +33,8 @@ data class DayBattery(
 
 /**
  * The next-piece battery (0.20: fitted to the day).
- * - Level for a day: the rung in force at wake-up (a change applies from the next wake-up).
+ * - Level for a day: the rung in force at wake-up (a change applies from the next wake-up), except
+ *   a manual step down (0.23), which re-fits the whole day it was made in ([dayLevel]).
  * - Daily mode (above 1 a day): at wake-up the battery starts at Settings' wake amount (full by
  *   default; at 2 a day "full" is half a piece, so the morning holds a quarter of the day) and
  *   refills at a steady speed so start + refill = the level exactly at the usual bedtime (Settings,
@@ -140,7 +141,7 @@ object BatteryEngine {
 
     /** The day's battery at its level (null before any level). [fallback]: the level on day one. */
     internal fun plan(data: FirewatchData, day: WakingDay, nextWake: Long, fallback: Double? = null): DayPlan? {
-        val raw = targetAt(data, day.wakeAt) ?: fallback ?: data.rungChanges.firstOrNull { it.at < day.bedtime }?.pieces ?: return null
+        val raw = dayLevel(data, day, nextWake) ?: fallback ?: data.rungChanges.firstOrNull { it.at < day.bedtime }?.pieces ?: return null
         val level = levelOf(raw)
         val limit = continuousAt(day.date)
         // The step unit in force at wake-up: a switch applies from the next wake-up.
@@ -298,6 +299,14 @@ object BatteryEngine {
         val p = Absorption.pieces(Absorption.absorbedMg(product), data.refMgAt(now))
         return -p * plan.gap
     }
+
+    /**
+     * The level a waking day's battery is fitted to: the rung in force at wake-up, or a manual step
+     * down made during that day ([com.baastiklabs.firewatch.core.model.RungChange.wholeDay], 0.23),
+     * which re-fits the whole day as if D had woken up at it.
+     */
+    fun dayLevel(data: FirewatchData, day: WakingDay, nextWake: Long): Double? =
+        data.rungChanges.lastOrNull { it.at <= day.wakeAt || (it.wholeDay && it.at < nextWake) }?.pieces
 
     /** The target rung (pieces a day) in force at time [t], or null before any target. */
     fun targetAt(data: FirewatchData, t: Long): Double? = data.rungChanges.lastOrNull { it.at <= t }?.pieces

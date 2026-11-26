@@ -22,6 +22,7 @@ Dose field `estimated: true` marks back-dated rough entries (no real time): coun
 Added in 0.16.0: settings `showWatch` (false), `lastZone` (""), `zoneHistory` (list of "<epoch ms>|<zone id>": which zone the usual wake/sleep times are in from the next day on).
 Added in 0.17.0: setting `favouriteCharts` (empty list): starred Insights chart ids (`core/.../engine/Favourites.kt`); unknown ids are ignored.
 Added in 0.18.0: dose `removedAt` (null): for pouches, when it came out of the mouth; when set it replaces `duration` in the absorbed estimate (5 min ≈ 30%, 15 min ≈ 60%, 30+ min = all).
+Added in 0.23.0: rung `wholeDay` (false): a manual step down; the waking day it was made in is re-fitted to the new level (older versions apply it from the next wake-up).
 Added in 0.22.0: record type `unitchange` (`id`, `at`, `productId`; "" = pieces): what D steps in. Levels (`rung.pieces`) stay in pieces and may now sit between whole pieces (e.g. 1.6 = 4 pouches of 0.4); the battery uses the unit in force at each day's wake-up. Older versions ignore the record type and show such a level at the nearest piece rung.
 Added in 0.20.0: setting `wakeBattery` (1.0): how full the battery is at wake-up above 1 a day (1 = full … 0 = empty; at 2 a day it's a share of half a piece, from 0.21.0); the refill speed is fitted so the level is reached by the usual bedtime.
 

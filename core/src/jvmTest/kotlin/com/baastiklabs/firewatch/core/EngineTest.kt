@@ -1484,6 +1484,28 @@ class EngineTest {
     }
 
     @Test
+    fun aManualStepDownRefitsTheWholeDayAtOnce() {
+        val B = com.baastiklabs.firewatch.core.engine.BatteryEngine
+        val pouch2 = product(DefaultProducts.POUCH_2MG)
+        val times = listOf(nov(13, 8), nov(13, 11, 45), nov(13, 15, 30), nov(13, 19, 15), nov(13, 23))
+        val five = pouchData(times.mapIndexed { i, at -> pouch2.toDose("p$i", at, 0) })
+        fun stepped(wholeDay: Boolean) = five.copy(rungChanges = five.rungChanges + RungChange("m", nov(13, 14), 1.6, "down", wholeDay = wholeDay))
+        // Manual (whole day): today is fitted to 4 pouches from wake-up: 1.2 pieces over 15 h → 5 h a pouch.
+        val manual = stepped(true)
+        assertEquals(300.0, Progress.battery(manual, 1.6, nov(13, 15), tz).unitGapMin, 1.0)
+        assertEquals(-300.0, B.preview(manual, pouch2, 1.6, nov(13, 15), tz)!!, 1.0)
+        // Five pouches against 4: one pouch over at bedtime, in the new level's time.
+        assertEquals(-300.0, B.day(manual, kotlinx.datetime.LocalDate(2026, 11, 13), tz, nov(13, 23, 59))!!.netMin, 1.0)
+        // The day before isn't touched.
+        assertEquals(B.day(five, kotlinx.datetime.LocalDate(2026, 11, 12), tz, nov(13, 23, 59)), B.day(manual, kotlinx.datetime.LocalDate(2026, 11, 12), tz, nov(13, 23, 59)))
+        // An offered step down still starts at the next wake-up.
+        val offered = stepped(false)
+        assertEquals(225.0, Progress.battery(offered, 1.6, nov(13, 15), tz).unitGapMin, 1.0)
+        assertEquals(300.0, Progress.battery(offered, 1.6, nov(14, 9), tz).unitGapMin, 1.0)
+        assertEquals(0.0, B.day(offered, kotlinx.datetime.LocalDate(2026, 11, 13), tz, nov(13, 23, 59))!!.netMin, 1.0)
+    }
+
+    @Test
     fun steadyMeansAtOrUnderTheLevel() {
         val s = com.baastiklabs.firewatch.core.model.Settings(wakeMinutes = 8 * 60)
         val pouch2 = product(DefaultProducts.POUCH_2MG)

@@ -130,9 +130,10 @@ class Repository(
     // --- Rungs & check-ins ---
 
     /** Moves the target rung. [reason] is "start", "down" or "up". */
-    suspend fun setTarget(pieces: Double, reason: String, detail: String = "") {
+    /** [wholeDay]: a manual step down, which re-fits today to the new level at once (0.23). */
+    suspend fun setTarget(pieces: Double, reason: String, detail: String = "", wholeDay: Boolean = false) {
         val now = clock()
-        mutate { t -> listOf(RecordCodec.rung(RungChange(Ids.newId(now), now, pieces, reason, detail), null, t)) }
+        mutate { t -> listOf(RecordCodec.rung(RungChange(Ids.newId(now), now, pieces, reason, detail, wholeDay), null, t)) }
     }
 
     /** Mark an empty day "clear" or "ghost" (ISO date); null removes the mark (back to "?"). */

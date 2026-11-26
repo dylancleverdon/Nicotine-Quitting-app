@@ -63,7 +63,7 @@ export function Settings({ toast, go, updateInfo }: { toast: (m: string) => void
         <b>{snap.manualStepDown.title}</b>
         <div class="small">{snap.manualStepDown.body}</div>
         <div class="row wrap">
-          <button class="btn" onClick={() => { const n = snap.manualStepDown!.next; setAskDown(false); S.setTarget(n.pieces, 'down'); toast(`New rung: ${n.label}. That's real progress.`) }}>Step down</button>
+          <button class="btn" onClick={() => { const n = snap.manualStepDown!.next; setAskDown(false); S.setTarget(n.pieces, 'down', '', true); toast(`New rung: ${n.label}. That's real progress.`) }}>Step down</button>
           <button class="btn outline" onClick={() => setAskDown(false)}>Stay here</button>
         </div>
       </div>}
